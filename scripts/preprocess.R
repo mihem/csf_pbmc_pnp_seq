@@ -23,7 +23,7 @@ options(future.globals.maxSize = 16000 * 1024^2)
 
 # meta data ----
 lookup <-
-  read_excel(file.path("lookup", "SEED_lookup_v4.xlsx")) |>
+  read_excel(file.path("lookup", "SEED_lookup_v6.xlsx")) |>
   janitor::clean_names() |>
   mutate(age = lubridate::time_length(difftime(date, birth_date), "years")) |>
   mutate(diagnosis = factor(diagnosis, levels = c("CTRL", "CIAP", "CIDP", "GBS", "MAG", "MFS", "PNC", "CAN", "PPN")))
@@ -229,20 +229,23 @@ sc_merge_pre <- split(x = sc_merge_pre, f = sc_merge_pre$sample)
 seq_metadata <-
     lookup |>
     dplyr::select(
-      patient,
-      sex,
-      age,
-       group,
-       diagnosis,
-       incat_at_lumbar_puncture,
-       incat_follow_up,
-       onls_at_lumbar_puncture,
-       onls_follow_up,
-       mrc_sum_score_60_at_lumbar_puncture,
-       mrc_sum_score_60_follow_up,
-       icu
+        patient,
+        sex,
+        age,
+        group,
+        diagnosis,
+        incat_at_lumbar_puncture,
+        incat_follow_up,
+        onls_at_lumbar_puncture,
+        onls_follow_up,
+        mrc_sum_score_60_at_lumbar_puncture,
+        mrc_sum_score_60_follow_up,
+        icu
     )
 
+seq_metadata <-
+    seq_metadata |>
+    dplyr::select(patient, batch)
 
 sc_merge_pre@meta.data <-
     sc_merge_pre@meta.data |>
@@ -250,6 +253,9 @@ sc_merge_pre@meta.data <-
     dplyr::left_join(seq_metadata, by = "patient") |>
     tibble::column_to_rownames(var = "barcode")
 
+sc_merge_pre$batch <- paste0(sc_merge_pre$batch, "_", sc_merge_pre$tissue)
+
+str(sc_merge@meta.data)
 str(sc_merge_pre@meta.data)
 
 # qc metrics  -----

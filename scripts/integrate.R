@@ -24,42 +24,70 @@ sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthreads = 6)
 # split for Seurat integration
 sc_merge <- split(x = sc_merge, f = sc_merge$sample)
 
+# use different approaches for integration 
+# 1st level: different integration approaches
+# 2nd level: PCA vs NMF
+# 3rd level: batch at sample level vs multiplexed batches
+
+# PCA harmony
 sc_merge <- IntegrateLayers(
-  object = sc_merge,
-  method = HarmonyIntegration,
-  orig.reduction = "pca",
-  new.reduction = "harmony",
-  verbose = TRUE,
+    object = sc_merge,
+    method = HarmonyIntegration,
+    orig.reduction = "pca",
+    new.reduction = "harmony",
+    verbose = TRUE,
 )
 
+# NMF harmony
 sc_merge <- IntegrateLayers(
-  object = sc_merge,
-  method = RPCAIntegration,
-  orig.reduction = "pca",
-  new.reduction = "rpca",
-  verbose = TRUE,
-  k.weight = 50,
+    object = sc_merge,
+    method = HarmonyIntegration,
+    orig.reduction = "nmf",
+    new.reduction = "nmf.harmony",
+    verbose = TRUE,
 )
 
+# scvi PCA
 set.seed(123)
 sc_merge <- IntegrateLayers(
-  object = sc_merge,
-  method = scVIIntegration,
-  orig.reduction = "pca",
-  new.reduction = "scvi",
-  conda_env = "~/miniconda3/envs/scvi",
-  verbose = TRUE
+    object = sc_merge,
+    method = scVIIntegration,
+    orig.reduction = "pca",
+    new.reduction = "scvi",
+    conda_env = "~/miniconda3/envs/scvi",
+    verbose = TRUE
+)
+# scvi NMF
+set.seed(123)
+sc_merge <- IntegrateLayers(
+    object = sc_merge,
+    method = scVIIntegration,
+    orig.reduction = "nmf",
+    new.reduction = "nmf.scvi",
+    conda_env = "~/miniconda3/envs/scvi",
+    verbose = TRUE
+)
+
+# RPCA PCA
+sc_merge <- IntegrateLayers(
+    object = sc_merge,
+    method = RPCAIntegration,
+    orig.reduction = "pca",
+    new.reduction = "rpca",
+    verbose = TRUE,
+    k.weight = 50,
 )
 
 # rejoin layers after integration 
 sc_merge <- JoinLayers(sc_merge)
 
 # stancas integration unsupervised ----
+# stacas requires split objects
 sc_merge <- SplitObject(sc_merge, split.by = "sample")
 sc_merge_stacas <- STACAS::Run.STACAS(sc_merge)
 sc_merge$stacas <- sc_merge_stacas$pca
 
-# stancas integration semi-supervised based on azimuth annotation high confidence ---
+# stancas integration semi-supervised based on azimuth annotation high confidence
 sc_merge_stacas_ss_highconf <- sc_merge
 pred_high_conf <-
     data.frame(pred = sc_merge$azimuth_pbmcref2, score = sc_merge$azimuth_pbmcref2_score) |>
@@ -71,7 +99,7 @@ sc_merge_stacas_ss_highconf <- STACAS::Run.STACAS(sc_merge_stacas_ss_highconf, c
 qsave(sc_merge_stacas_ss_highconf, file.path("objects", "sc_merge_stacas_ss_highconf_highconf.qs"))
 sc_merge$stacas.ss.highconf <- sc_merge_stacas_ss_highconf$pca
 
-# stancas integration semi-supervised based on azimuth annotation all ---
+# stancas integration semi-supervised based on azimuth annotation all
 # use only one core to save memory
 future::plan("multicore", workers = 1) 
 options(future.globals.maxSize = 16000 * 1024^2)
@@ -83,24 +111,27 @@ qsave(sc_merge_stacas_ss_all, file.path("objects", "sc_merge_stacas_ss_all.qs"))
 sc_merge$stacas.ss.all <- sc_merge_stacas_ss_all$pca
 
 # umap ----
-sc_merge <- RunUMAP(sc_merge, reduction = "harmony", reduction.name = "umap.harmony", dims = 1:30)
-sc_merge <- RunUMAP(sc_merge, reduction = "rpca", reduction.name = "umap.rpca", dims = 1:30)
-sc_merge <- RunUMAP(sc_merge, reduction = "integrated.scvi", reduction.name = "umap.scvi", dims = 1:30)
-sc_merge <- RunUMAP(sc_merge, reduction = "stacas", reduction.name = "umap.stacas", dims = 1:30)
-sc_merge <- RunUMAP(sc_merge, reduction = "stacas.ss.highconf", reduction.name = "umap.stacas.ss.highconf", dims = 1:30)
-sc_merge <- RunUMAP(sc_merge, reduction = "stacas.ss.all", reduction.name = "umap.stacas.ss.all", dims = 1:30)
+integration_methods <- c("pca", "nmf", "harmony", "nmf.harmony", "rpca", "scvi", "nmf.scvi", "stacas", "stacas.ss.highconf", "stacas.ss.all")
+
+for (integration_method in integration_methods) {
+  umap_name <- paste0("umap.", integration_method)
+  
+  if (!umap_name %in% names(sc_merge@reductions)) {
+    sc_merge <- RunUMAP(sc_merge, reduction = integration_method, reduction.name = umap_name, dims = 1:30)
+  } else {
+    message(paste("UMAP reduction", umap_name, "already exists. Skipping..."))
+  }
+}
 
 qsave(sc_merge, file.path("objects", "sc_merge.qs"))
 
 # plot umaps per batch ----
 my_cols_100 <- unname(Polychrome::createPalette(100, pals::cols25()))
-integration_methods <- c("harmony", "rpca", "scvi", "stacas", "stacas.ss.highconf", "stacas.ss.all")
-umap_methods <- paste0("umap.", integration_methods)
 
 # per tissue
 umap_plots_tissue <-
     lapply(
-        umap_methods,
+        paste0("umap.", integration_methods),
         FUN = function(x) {
             DimPlot(sc_merge, reduction = x, pt.size = .5, raster = FALSE, alpha = 0.1, group.by = "tissue", cols = my_cols_100) +
                 theme_rect() +
@@ -118,7 +149,7 @@ for (name in names(umap_plots_tissue)) {
 # per sample
 umap_plots_sample <-
     lapply(
-        umap_methods,
+        paste0("umap.", integration_methods),
         FUN = function(x) {
             DimPlot(sc_merge, reduction = x, pt.size = .5, raster = FALSE, alpha = 0.1, group.by = "sample", cols = my_cols_100) +
                 theme_rect() +
@@ -134,12 +165,9 @@ for (name in names(umap_plots_sample)) {
 }
 
 # plot predictions ----
-integration_methods <- c("harmony", "rpca", "scvi", "stacas", "stacas.ss.highconf", "stacas.ss.all")
-umap_methods <- paste0("umap.", integration_methods)
-
 pred_plots_pbmcref_level2 <-
     lapply(
-        umap_methods,
+        paste0("umap.", integration_methods),
         FUN = function(x) {
             DimPlot(
                 sc_merge,
@@ -182,8 +210,8 @@ metrics_sample <-
         }
     )
 
-integration_methods <- str_replace(integration_methods, "\\.", "_")
-names(metrics_sample) <- str_replace_all(integration_methods, "\\.", "_")
+integration_methods_underscore <- str_replace(integration_methods, "\\.", "_")
+names(metrics_sample) <- str_replace_all(integration_methods_underscore, "\\.", "_")
 
 as.data.frame(metrics_sample) |>
     pivot_longer(everything()) |>

@@ -289,4 +289,22 @@ sc_merge <-
     ScaleData() |>
     RunPCA() 
 
+
+# NMF instead of PCA ----
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthreads = 6)
+library(singlet)
+
+# convert seuratv5 to seuratv3 data, because singlet does not support seuratv5
+sc_merge_nmf <- sc_merge
+sc_merge_nmf[["RNA3"]] <- as(object = sc_merge_nmf[["RNA"]], Class = "Assay")
+DefaultAssay(sc_merge_nmf) <- "RNA3"
+sc_merge_nmf[["RNA"]] <- NULL
+sc_merge_nmf <- RenameAssays(object = sc_merge_nmf, RNA3 = 'RNA')
+
+# for reproducible NMF models
+set.seed(123) 
+sc_merge_nmf <- RunNMF(sc_merge_nmf, k = 50)
+
+# add NMF embeddings to sc_merge
+sc_merge$nmf <- sc_merge_nmf@reductions$nmf
+qsave(sc_merge, file.path("objects", "sc_merge.qs"))

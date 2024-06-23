@@ -2,7 +2,6 @@
 # integrate data
 # requires running azimuth.R first
 ##################################################
-
 library(tidyverse)
 library(Seurat)
 library(Azimuth)
@@ -22,7 +21,8 @@ sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthreads = 6)
 
 # integrate data ---
 # split for Seurat integration
-sc_merge <- split(x = sc_merge, f = sc_merge$sample)
+# sc_merge <- split(x = sc_merge, f = sc_merge$sample)
+sc_merge <- split(x = sc_merge, f = sc_merge$batch)
 
 # use different approaches for integration 
 # 1st level: different integration approaches
@@ -47,8 +47,10 @@ sc_merge <- IntegrateLayers(
     verbose = TRUE,
 )
 
+
+qs::qsave(sc_merge, file.path("objects", "sc_merge.qs"))
+
 # scvi PCA
-set.seed(123)
 sc_merge <- IntegrateLayers(
     object = sc_merge,
     method = scVIIntegration,
@@ -57,8 +59,8 @@ sc_merge <- IntegrateLayers(
     conda_env = "~/miniconda3/envs/scvi",
     verbose = TRUE
 )
+
 # scvi NMF
-set.seed(123)
 sc_merge <- IntegrateLayers(
     object = sc_merge,
     method = scVIIntegration,
@@ -83,47 +85,37 @@ sc_merge <- JoinLayers(sc_merge)
 
 # stancas integration unsupervised ----
 # stacas requires split objects
-sc_merge <- SplitObject(sc_merge, split.by = "sample")
+# sc_merge <- SplitObject(sc_merge, split.by = "sample")
+sc_merge_stacas <- SplitObject(sc_merge, split.by = "batch")
 sc_merge_stacas <- STACAS::Run.STACAS(sc_merge)
 sc_merge$stacas <- sc_merge_stacas$pca
 
-# stancas integration semi-supervised based on azimuth annotation high confidence
-sc_merge_stacas_ss_highconf <- sc_merge
-pred_high_conf <-
-    data.frame(pred = sc_merge$azimuth_pbmcref2, score = sc_merge$azimuth_pbmcref2_score) |>
-    mutate(pred = ifelse(score < 0.99, "unknown", pred))
-sc_merge_stacas_ss_highconf <- AddMetaData(sc_merge_stacas_ss_highconf, pred_high_conf)
-sc_merge_stacas_ss_highconf <- SplitObject(sc_merge_stacas_ss_highconf, split.by = "sample")
-sc_merge_stacas_ss_highconf <- STACAS::Run.STACAS(sc_merge_stacas_ss_highconf, cell.labels = "pred")
-
-qsave(sc_merge_stacas_ss_highconf, file.path("objects", "sc_merge_stacas_ss_highconf_highconf.qs"))
-sc_merge$stacas.ss.highconf <- sc_merge_stacas_ss_highconf$pca
+sc_merge <- qread(file.path("objects", "sc_merge.qs"))
 
 # stancas integration semi-supervised based on azimuth annotation all
-# use only one core to save memory
-future::plan("multicore", workers = 1) 
-options(future.globals.maxSize = 16000 * 1024^2)
 sc_merge_stacas_ss_all <- sc_merge
-sc_merge_stacas_ss_all <- SplitObject(sc_merge_stacas_ss_all, split.by = "sample")
+rm(sc_merge)
+# sc_merge_stacas_ss_all <- SplitObject(sc_merge_stacas_ss_all, split.by = "sample")
+sc_merge_stacas_ss_all <- SplitObject(sc_merge_stacas_ss_all, split.by = "batch")
 sc_merge_stacas_ss_all <- STACAS::Run.STACAS(sc_merge_stacas_ss_all, cell.labels = "azimuth_pbmcref2", k.weight = 50)
 
+# qsave(sc_merge_stacas_ss_all, file.path("objects", "sc_merge_stacas_ss_all.qs"))
 qsave(sc_merge_stacas_ss_all, file.path("objects", "sc_merge_stacas_ss_all.qs"))
+
 sc_merge$stacas.ss.all <- sc_merge_stacas_ss_all$pca
 
 # umap ----
-integration_methods <- c("pca", "nmf", "harmony", "nmf.harmony", "rpca", "scvi", "nmf.scvi", "stacas", "stacas.ss.highconf", "stacas.ss.all")
+# integration_methods <- c("pca", "nmf", "harmony", "nmf.harmony", "rpca", "scvi", "nmf.scvi", "stacas", "stacas.ss.highconf", "stacas.ss.all")
+integration_methods <- c("pca", "nmf", "harmony", "nmf.harmony", "rpca", "scvi", "nmf.scvi", "stacas", "stacas.ss.all")
 
 for (integration_method in integration_methods) {
   umap_name <- paste0("umap.", integration_method)
-  
   if (!umap_name %in% names(sc_merge@reductions)) {
     sc_merge <- RunUMAP(sc_merge, reduction = integration_method, reduction.name = umap_name, dims = 1:30)
   } else {
     message(paste("UMAP reduction", umap_name, "already exists. Skipping..."))
   }
 }
-
-qsave(sc_merge, file.path("objects", "sc_merge.qs"))
 
 # plot umaps per batch ----
 my_cols_100 <- unname(Polychrome::createPalette(100, pals::cols25()))

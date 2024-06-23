@@ -17,6 +17,9 @@ library(languageserver)
 library(httpgd)
 library(codegrip)
 
+# renv for better reproducibility
+library(renv)
+
 # general settings  ----
 future::plan("multicore", workers = 6)
 options(future.globals.maxSize = 16000 * 1024^2)

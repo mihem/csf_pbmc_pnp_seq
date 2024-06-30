@@ -1960,14 +1960,14 @@
     },
     "cerebroAppLite": {
       "Package": "cerebroAppLite",
-      "Version": "1.5.2",
+      "Version": "1.5.3",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteRepo": "cerebroAppLite",
       "RemoteUsername": "mihem",
       "RemoteRef": "HEAD",
-      "RemoteSha": "177d59bcd3beb01b2d7feb8658588b206df85d5b",
+      "RemoteSha": "2f10afe99276ecd2884014dee8fe8007dbec7bb4",
       "Requirements": [
         "BPCells",
         "DT",
@@ -2006,7 +2006,7 @@
         "utils",
         "viridis"
       ],
-      "Hash": "8f240a5a01dc504a922f9df93e852dc5"
+      "Hash": "eeff634fe3be019260f141ba41da065c"
     },
     "checkmate": {
       "Package": "checkmate",

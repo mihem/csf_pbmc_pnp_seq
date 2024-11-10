@@ -21,7 +21,7 @@ sc_merge_pbmc <- subset(sc_merge, tissue %in% "PBMC")
 
 # meta data ----
 lookup <-
-  read_excel(file.path("lookup", "SEED_lookup_v6.xlsx")) |>
+  readxl::read_excel(file.path("lookup", "SEED_lookup_v6.xlsx")) |>
   janitor::clean_names() |>
   mutate(age = lubridate::time_length(difftime(date, birth_date), "years")) |>
   mutate(diagnosis = factor(diagnosis, levels = c("CTRL", "CIAP", "CIDP", "GBS", "MAG", "MFS", "PNC", "CAN", "PPN")))

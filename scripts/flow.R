@@ -22,7 +22,7 @@ flow_pre <-
  mutate(date = as_date(date))
 
 lookup <-
-  read_excel(file.path("lookup", "SEED_lookup_v5.xlsx")) |>
+  read_excel(file.path("lookup", "SEED_lookup_v6.xlsx")) |>
   janitor::clean_names() |>
   mutate(diagnosis = factor(diagnosis, levels = diagnosis_order)) |>
   mutate(group = factor(group, levels = group_order))

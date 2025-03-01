@@ -24,7 +24,7 @@ sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthreads = 6)
 # sc_merge <- split(x = sc_merge, f = sc_merge$sample)
 sc_merge <- split(x = sc_merge, f = sc_merge$batch)
 
-# use different approaches for integration 
+# use different approaches for integration
 # 1st level: different integration approaches
 # 2nd level: PCA vs NMF
 # 3rd level: batch at sample level vs multiplexed batches
@@ -80,7 +80,7 @@ sc_merge <- IntegrateLayers(
     k.weight = 50,
 )
 
-# rejoin layers after integration 
+# rejoin layers after integration
 sc_merge <- JoinLayers(sc_merge)
 
 # stancas integration unsupervised ----
@@ -96,8 +96,15 @@ sc_merge <- qread(file.path("objects", "sc_merge.qs"))
 sc_merge_stacas_ss_all <- sc_merge
 rm(sc_merge)
 # sc_merge_stacas_ss_all <- SplitObject(sc_merge_stacas_ss_all, split.by = "sample")
-sc_merge_stacas_ss_all <- SplitObject(sc_merge_stacas_ss_all, split.by = "batch")
-sc_merge_stacas_ss_all <- STACAS::Run.STACAS(sc_merge_stacas_ss_all, cell.labels = "azimuth_pbmcref2", k.weight = 50)
+sc_merge_stacas_ss_all <- SplitObject(
+    sc_merge_stacas_ss_all,
+    split.by = "batch"
+)
+sc_merge_stacas_ss_all <- STACAS::Run.STACAS(
+    sc_merge_stacas_ss_all,
+    cell.labels = "azimuth_pbmcref2",
+    k.weight = 50
+)
 
 # qsave(sc_merge_stacas_ss_all, file.path("objects", "sc_merge_stacas_ss_all.qs"))
 qsave(sc_merge_stacas_ss_all, file.path("objects", "sc_merge_stacas_ss_all.qs"))
@@ -106,15 +113,34 @@ sc_merge$stacas.ss.all <- sc_merge_stacas_ss_all$pca
 
 # umap ----
 # integration_methods <- c("pca", "nmf", "harmony", "nmf.harmony", "rpca", "scvi", "nmf.scvi", "stacas", "stacas.ss.highconf", "stacas.ss.all")
-integration_methods <- c("pca", "nmf", "harmony", "nmf.harmony", "rpca", "scvi", "nmf.scvi", "stacas", "stacas.ss.all")
+integration_methods <- c(
+    "pca",
+    "nmf",
+    "harmony",
+    "nmf.harmony",
+    "rpca",
+    "scvi",
+    "nmf.scvi",
+    "stacas",
+    "stacas.ss.all"
+)
 
 for (integration_method in integration_methods) {
-  umap_name <- paste0("umap.", integration_method)
-  if (!umap_name %in% names(sc_merge@reductions)) {
-    sc_merge <- RunUMAP(sc_merge, reduction = integration_method, reduction.name = umap_name, dims = 1:30)
-  } else {
-    message(paste("UMAP reduction", umap_name, "already exists. Skipping..."))
-  }
+    umap_name <- paste0("umap.", integration_method)
+    if (!umap_name %in% names(sc_merge@reductions)) {
+        sc_merge <- RunUMAP(
+            sc_merge,
+            reduction = integration_method,
+            reduction.name = umap_name,
+            dims = 1:30
+        )
+    } else {
+        message(paste(
+            "UMAP reduction",
+            umap_name,
+            "already exists. Skipping..."
+        ))
+    }
 }
 
 # plot umaps per batch ----
@@ -125,7 +151,15 @@ umap_plots_tissue <-
     lapply(
         paste0("umap.", integration_methods),
         FUN = function(x) {
-            DimPlot(sc_merge, reduction = x, pt.size = .5, raster = FALSE, alpha = 0.1, group.by = "tissue", cols = my_cols_100) +
+            DimPlot(
+                sc_merge,
+                reduction = x,
+                pt.size = .5,
+                raster = FALSE,
+                alpha = 0.1,
+                group.by = "tissue",
+                cols = my_cols_100
+            ) +
                 theme_rect() +
                 xlab("UMAP1") +
                 ylab("UMAP2")
@@ -135,7 +169,12 @@ umap_plots_tissue <-
 names(umap_plots_tissue) <- integration_methods
 
 for (name in names(umap_plots_tissue)) {
-    ggsave(file.path("results", "umap", paste0(name, "_umap_tissue", ".png")), plot = umap_plots_tissue[[name]], width = 20, height = 8)
+    ggsave(
+        file.path("results", "umap", paste0(name, "_umap_tissue", ".png")),
+        plot = umap_plots_tissue[[name]],
+        width = 20,
+        height = 8
+    )
 }
 
 # per sample
@@ -143,7 +182,15 @@ umap_plots_sample <-
     lapply(
         paste0("umap.", integration_methods),
         FUN = function(x) {
-            DimPlot(sc_merge, reduction = x, pt.size = .5, raster = FALSE, alpha = 0.1, group.by = "sample", cols = my_cols_100) +
+            DimPlot(
+                sc_merge,
+                reduction = x,
+                pt.size = .5,
+                raster = FALSE,
+                alpha = 0.1,
+                group.by = "sample",
+                cols = my_cols_100
+            ) +
                 theme_rect() +
                 xlab("UMAP1") +
                 ylab("UMAP2")
@@ -153,7 +200,12 @@ umap_plots_sample <-
 names(umap_plots_sample) <- integration_methods
 
 for (name in names(umap_plots_sample)) {
-    ggsave(file.path("results", "umap", paste0(name, "_umap_sample", ".png")), plot = umap_plots_sample[[name]], width = 20, height = 8)
+    ggsave(
+        file.path("results", "umap", paste0(name, "_umap_sample", ".png")),
+        plot = umap_plots_sample[[name]],
+        width = 20,
+        height = 8
+    )
 }
 
 # plot predictions ----
@@ -178,7 +230,16 @@ pred_plots_pbmcref_level2 <-
 names(pred_plots_pbmcref_level2) <- integration_methods
 
 for (name in names(pred_plots_pbmcref_level2)) {
-    ggsave(file.path("results", "map", paste0("map_pbmcref_level2_", name, ".png")), plot = pred_plots_pbmcref_level2[[name]], width = 20, height = 8)
+    ggsave(
+        file.path(
+            "results",
+            "map",
+            paste0("map_pbmcref_level2_", name, ".png")
+        ),
+        plot = pred_plots_pbmcref_level2[[name]],
+        width = 20,
+        height = 8
+    )
 }
 
 # integration metrics ----
@@ -203,14 +264,20 @@ metrics_sample <-
     )
 
 integration_methods_underscore <- str_replace(integration_methods, "\\.", "_")
-names(metrics_sample) <- str_replace_all(integration_methods_underscore, "\\.", "_")
+names(metrics_sample) <- str_replace_all(
+    integration_methods_underscore,
+    "\\.",
+    "_"
+)
 
 as.data.frame(metrics_sample) |>
     pivot_longer(everything()) |>
     separate_wider_delim(name, names = c("method", "metric"), delim = ".") |>
-    pivot_wider(names_from = metric, values_from = value)  |>
+    pivot_wider(names_from = metric, values_from = value) |>
     arrange(desc(celltype_ASW)) |>
-    write_csv(file = file.path("results", "qc", "integration_metrics_sample.csv"))
+    write_csv(
+        file = file.path("results", "qc", "integration_metrics_sample.csv")
+    )
 
 # for each tissue
 metrics_tissue <-
@@ -232,6 +299,8 @@ names(metrics_tissue) <- str_replace_all(integration_methods, "\\.", "_")
 as.data.frame(metrics_tissue) |>
     pivot_longer(everything()) |>
     separate_wider_delim(name, names = c("method", "metric"), delim = ".") |>
-    pivot_wider(names_from = metric, values_from = value)  |>
+    pivot_wider(names_from = metric, values_from = value) |>
     arrange(desc(celltype_ASW)) |>
-    write_csv(file = file.path("results", "qc", "integration_metrics_tissue.csv"))
+    write_csv(
+        file = file.path("results", "qc", "integration_metrics_tissue.csv")
+    )

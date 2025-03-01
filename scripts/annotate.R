@@ -235,6 +235,7 @@ sc_merge@misc$cluster_col <- setNames(
   )),
   sc_merge@misc$cluster_order
 )
+
 sc_merge@misc$diagnosis_order <- c(
   "CTRL",
   "CIAP",
@@ -246,14 +247,17 @@ sc_merge@misc$diagnosis_order <- c(
   "CAN",
   "PPN"
 )
+
 sc_merge@misc$diagnosis_col <- setNames(
   pals::cols25(length(sc_merge@misc$diagnosis_order)),
   sc_merge@misc$diagnosis_order
 )
+
 sc_merge@misc$tissue_diagnosis_order <- c(
   paste0("CSF_", sc_merge@misc$diagnosis_order),
   paste0("PBMC_", sc_merge@misc$diagnosis_order)
 )
+
 sc_merge@misc$tissue_diagnosis_col <- setNames(
   pals::cols25(length(sc_merge@misc$tissue_diagnosis_order)),
   sc_merge@misc$tissue_diagnosis_order

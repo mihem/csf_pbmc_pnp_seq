@@ -108,7 +108,6 @@ scMisc::stackedPlot(
 )
 
 # propeller abundance analysis ---
-
 # PNP vs CTRL CSF
 propeller_CSF_PNP_CTRL <-
   scMisc::propellerCalc(
@@ -168,178 +167,70 @@ scMisc::plotPropeller(
   FDR = 0.1
 )
 
-# CIDP vs CTRL CSF
-propeller_CSF_CIDP_CTRL <-
-  scMisc::propellerCalc(
-    seu_obj1 = sc_merge_csf,
-    condition1 = "CIDP",
-    condition2 = "CTRL",
-    cluster_col = "cluster",
-    meta_col = "diagnosis",
-    lookup = lookup,
-    sample_col = "patient",
-    formula = "~0 + diagnosis",
-    min_cells = 30
-  )
-
-scMisc::plotPropeller(
-  data = propeller_CSF_CIDP_CTRL,
-  color = sc_merge@misc$cluster_col,
-  filename = "CSF_CIDP_CTRL",
-  FDR = 0.1
+# create all combinations with defined order
+# filter out same conditions and reverse combinations
+diagnosis <- factor(
+  c("CIDP", "GBS", "CIAP", "CTRL"),
+  levels = c("CIDP", "GBS", "CIAP", "CTRL")
 )
 
-# CIDP vs CTRL PBMC
-propeller_PBMC_CIDP_CTRL <-
-  scMisc::propellerCalc(
-    seu_obj1 = sc_merge_pbmc,
-    condition1 = "CIDP",
-    condition2 = "CTRL",
-    cluster_col = "cluster",
-    meta_col = "diagnosis",
-    lookup = lookup,
-    sample_col = "patient",
-    formula = "~0 + diagnosis",
-    min_cells = 30
-  )
-
-scMisc::plotPropeller(
-  data = propeller_PBMC_CIDP_CTRL,
-  color = sc_merge@misc$cluster_col,
-  filename = "PBMC_CIDP_CTRL",
-  FDR = 0.1
+seu_objects <- list(
+  "CSF" = sc_merge_csf,
+  "PBMC" = sc_merge_pbmc
 )
 
-# GBS vs CTRL CSF
-propeller_CSF_GBS_CTRL <-
-  scMisc::propellerCalc(
-    seu_obj1 = sc_merge_csf,
-    condition1 = "GBS",
-    condition2 = "CTRL",
-    cluster_col = "cluster",
-    meta_col = "diagnosis",
-    lookup = lookup,
-    sample_col = "patient",
-    formula = "~0 + diagnosis",
-    min_cells = 30
+combinations <- crossing(
+  tissue = names(seu_objects),
+  condition1 = diagnosis,
+  condition2 = diagnosis
+) |>
+  dplyr::filter(
+    condition1 != condition2,
+    as.numeric(condition1) < as.numeric(condition2)
+  ) |>
+  dplyr::mutate(across(everything(), as.character))
+
+# Calculate propeller results for all combinations
+propeller_results <-
+  pmap(
+    combinations,
+    function(tissue, condition1, condition2) {
+      scMisc::propellerCalc(
+        seu_obj1 = seu_objects[[tissue]],
+        condition1 = condition1,
+        condition2 = condition2,
+        cluster_col = "cluster",
+        meta_col = "diagnosis",
+        lookup = lookup,
+        sample_col = "patient",
+        formula = "~0 + diagnosis + sex + age",
+        min_cells = 30
+      )
+    }
   )
 
-scMisc::plotPropeller(
-  data = propeller_CSF_GBS_CTRL,
-  color = sc_merge@misc$cluster_col,
-  filename = "CSF_GBS_CTRL",
-  FDR = 0.1
+# Create filenames
+filenames <- paste0(
+  combinations$tissue, "_", 
+  combinations$condition1, "_", 
+  combinations$condition2
 )
 
-# GBS vs CTRL PBMC
-propeller_PBMC_GBS_CTRL <-
-  scMisc::propellerCalc(
-    seu_obj1 = sc_merge_pbmc,
-    condition1 = "GBS",
-    condition2 = "CTRL",
-    cluster_col = "cluster",
-    meta_col = "diagnosis",
-    lookup = lookup,
-    sample_col = "patient",
-    formula = "~0 + diagnosis",
-    min_cells = 30
-  )
-
-scMisc::plotPropeller(
-  data = propeller_PBMC_GBS_CTRL,
-  color = sc_merge@misc$cluster_col,
-  filename = "PBMC_GBS_CTRL",
-  FDR = 0.1
+# Plot the results
+map2(
+  propeller_results,
+  filenames,
+  function(data, filename) {
+    scMisc::plotPropeller(
+      data = data,
+      color = sc_merge@misc$cluster_col,
+      filename = filename,
+      FDR = 0.1
+    )
+  }
 )
 
-# CIDP vs CIAP CSF
-propeller_CSF_CIDP_CIAP <-
-  scMisc::propellerCalc(
-    seu_obj1 = sc_merge_csf,
-    condition1 = "CIDP",
-    condition2 = "CIAP",
-    cluster_col = "cluster",
-    meta_col = "diagnosis",
-    lookup = lookup,
-    sample_col = "patient",
-    formula = "~0 + diagnosis",
-    min_cells = 30
-  )
-
-scMisc::plotPropeller(
-  data = propeller_CSF_CIDP_CIAP,
-  color = sc_merge@misc$cluster_col,
-  filename = "CSF_CIDP_CIAP",
-  FDR = 0.1
-)
-
-# CIDP vs CIAP PBMC
-propeller_PBMC_CIDP_CIAP <-
-  scMisc::propellerCalc(
-    seu_obj1 = sc_merge_pbmc,
-    condition1 = "CIDP",
-    condition2 = "CIAP",
-    cluster_col = "cluster",
-    meta_col = "diagnosis",
-    lookup = lookup,
-    sample_col = "patient",
-    formula = "~0 + diagnosis",
-    min_cells = 30
-  )
-
-scMisc::plotPropeller(
-  data = propeller_PBMC_CIDP_CIAP,
-  color = sc_merge@misc$cluster_col,
-  filename = "PBMC_CIDP_CIAP",
-  FDR = 0.1
-)
-
-# GBS vs CIAP CSF
-propeller_CSF_GBS_CIAP <-
-  scMisc::propellerCalc(
-    seu_obj1 = sc_merge_csf,
-    condition1 = "GBS",
-    condition2 = "CIAP",
-    cluster_col = "cluster",
-    meta_col = "diagnosis",
-    lookup = lookup,
-    sample_col = "patient",
-    formula = "~0 + diagnosis",
-    min_cells = 30
-  )
-
-scMisc::plotPropeller(
-  data = propeller_CSF_GBS_CIAP,
-  color = sc_merge@misc$cluster_col,
-  filename = "CSF_GBS_CIAP",
-  FDR = 0.1
-)
-
-# GBS vs CIAP PBMC
-propeller_PBMC_GBS_CIAP <-
-  scMisc::propellerCalc(
-    seu_obj1 = sc_merge_pbmc,
-    condition1 = "GBS",
-    condition2 = "CIAP",
-    cluster_col = "cluster",
-    meta_col = "diagnosis",
-    lookup = lookup,
-    sample_col = "patient",
-    formula = "~0 + diagnosis",
-    min_cells = 30
-  )
-
-scMisc::plotPropeller(
-  data = propeller_PBMC_GBS_CIAP,
-  color = sc_merge@misc$cluster_col,
-  filename = "PBMC_GBS_CIAP",
-  FDR = 0.1
-)
-
-
-unique(sc_merge_csf$tissue_diagnosis)
-unique(sc_merge_csf$tissue)
-
+# abundance box plot ----
 scMisc::abBoxPlot(
   object = sc_merge_csf,
   cluster_idents = "cluster",
@@ -351,9 +242,7 @@ scMisc::abBoxPlot(
   number_of_tests = choose(9, 2),
   width = 14
 )
-  
 
-# abundance box plot ----
 scMisc::abBoxPlot(
   object = sc_merge_pbmc,
   cluster_idents = "cluster",
@@ -365,4 +254,3 @@ scMisc::abBoxPlot(
   number_of_tests = choose(9, 2),
   width = 14
 )
-

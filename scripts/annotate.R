@@ -263,6 +263,9 @@ sc_merge@misc$tissue_diagnosis_col <- setNames(
   sc_merge@misc$tissue_diagnosis_order
 )
 
+sc_merge$tissue_diagnosis <- factor(paste0(sc_merge$tissue, "_", sc_merge$diagnosis), levels = sc_merge@misc$tissue_diagnosis_order)
+sc_merge$tissue_group <- paste0(sc_merge$tissue, "_", sc_merge$group)
+
 #sanity check
 setdiff(sc_merge@misc$cluster_order, levels(sc_merge))
 setdiff(levels(sc_merge), sc_merge@misc$cluster_order)

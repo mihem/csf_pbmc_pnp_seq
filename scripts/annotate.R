@@ -366,6 +366,23 @@ dotPlot(
   width = 12
 )
 
+# olink markers
+olink_cols <- c("olink_96_immuno_onco", "olink_96_inflammation", "olink_48_immune_surv", "olink_48_cytokine")
+
+lapply(
+  olink_cols,
+  function(x) {
+    dotPlot(
+      path = file.path("lookup", "markers.csv"),
+      object = sc_merge,
+      par = x,
+      dot_min = 0.01,
+      height = 8,
+      width = 15
+    )
+  }
+)
+
 # feature plots ---
 scMisc::fPlot(
   path = file.path("lookup", "markers.csv"),

@@ -22,16 +22,18 @@ diagnosis_order <- c(
   "CAN",
   "PPN"
 )
+
 diagnosis_color <- setNames(
   pals::cols25(length(diagnosis_order)),
   diagnosis_order
 )
+
 group_order <- c("CTRL", "PNP")
 group_color <- setNames(pals::cols25(length(group_order)), group_order)
 
 # load flow and lookup file ----
 flow_pre <-
-  read_excel(file.path("raw", "flow", "SEED_flow_v5.xlsx")) |>
+  read_excel(file.path("raw", "flow", "SEED_flow_v6.xlsx")) |>
   mutate(date = as_date(date))
 
 lookup <-
@@ -190,6 +192,7 @@ stats_csf_con_group <- compStat(
   group = "group",
   data = flow$CSF
 )
+
 csf_con_plots_group <- lapply(
   flow_vars,
   FUN = function(x) {
@@ -202,10 +205,12 @@ csf_con_plots_group <- lapply(
     )
   }
 )
+
 csf_con_plots_patch_group <- patchwork::wrap_plots(
   csf_con_plots_group,
   ncol = 4
 )
+
 ggsave(
   file.path("results", "flow", "csf_con_plots_group.pdf"),
   width = 5,
@@ -219,6 +224,7 @@ stats_csf_con_dx <- compStat(
   group = "diagnosis",
   data = flow$CSF
 )
+
 csf_con_plots_dx <- lapply(
   flow_vars,
   FUN = function(x) {
@@ -231,7 +237,9 @@ csf_con_plots_dx <- lapply(
     )
   }
 )
+
 csf_con_plots_patch_dx <- patchwork::wrap_plots(csf_con_plots_dx, ncol = 4)
+
 ggsave(
   file.path("results", "flow", "csf_con_plots_dx.pdf"),
   width = 10,
@@ -248,6 +256,7 @@ stats_blood_con_group <- compStat(
   group = "group",
   data = flow$blood
 )
+
 blood_con_plots_group <- lapply(
   flow_vars,
   FUN = function(x) {
@@ -260,10 +269,12 @@ blood_con_plots_group <- lapply(
     )
   }
 )
+
 blood_con_plots_patch_group <- patchwork::wrap_plots(
   blood_con_plots_group,
   ncol = 4
 )
+
 ggsave(
   file.path("results", "flow", "blood_con_plots_group.pdf"),
   width = 5,
@@ -277,6 +288,7 @@ stats_blood_con_dx <- compStat(
   group = "diagnosis",
   data = flow$blood
 )
+
 blood_con_plots_dx <- lapply(
   flow_vars,
   FUN = function(x) {
@@ -289,7 +301,9 @@ blood_con_plots_dx <- lapply(
     )
   }
 )
+
 blood_con_plots_patch_dx <- patchwork::wrap_plots(blood_con_plots_dx, ncol = 4)
+
 ggsave(
   file.path("results", "flow", "blood_con_plots_dx.pdf"),
   width = 10,
@@ -375,22 +389,26 @@ flow_pnp_ctrl_csf_pval <- statVolcano(
   reference = "group",
   data = flow$CSF
 )
+
 flow_pnp_ctrl_csf_fc <- logfcVolcano(
   data = flow$CSF,
   group = "group",
   group1 = "PNP",
   group2 = "CTRL"
 )
+
 flow_pnp_ctrl_csf_vol_data <- left_join(
   flow_pnp_ctrl_csf_fc,
   flow_pnp_ctrl_csf_pval,
   join_by(var)
 )
+
 flow_pnp_ctrl_csf_vol_plot <- VolPlot(
   data = flow_pnp_ctrl_csf_vol_data,
   cols = flow_vars_cols,
   n = length(flow_vars)
 )
+
 ggsave(
   file.path("results", "flow", "volcano_pnp_ctrl_csf.pdf"),
   plot = flow_pnp_ctrl_csf_vol_plot,
@@ -404,22 +422,26 @@ flow_pnp_ctrl_blood_pval <- statVolcano(
   reference = "group",
   data = flow$blood
 )
+
 flow_pnp_ctrl_blood_fc <- logfcVolcano(
   data = flow$blood,
   group = "group",
   group1 = "PNP",
   group2 = "CTRL"
 )
+
 flow_pnp_ctrl_blood_vol_data <- left_join(
   flow_pnp_ctrl_blood_fc,
   flow_pnp_ctrl_blood_pval,
   join_by(var)
 )
+
 flow_pnp_ctrl_blood_vol_plot <- VolPlot(
   data = flow_pnp_ctrl_blood_vol_data,
   cols = flow_vars_cols,
   n = length(flow_vars)
 )
+
 ggsave(
   file.path("results", "flow", "volcano_pnp_ctrl_blood.pdf"),
   plot = flow_pnp_ctrl_blood_vol_plot,
@@ -435,22 +457,26 @@ flow_ciap_ctrl_csf_pval <- statVolcano(
   reference = "diagnosis",
   data = flow_ciap_ctrl
 )
+
 flow_ciap_ctrl_csf_fc <- logfcVolcano(
   data = flow_ciap_ctrl,
   group = "diagnosis",
   group1 = "CIAP",
   group2 = "CTRL"
 )
+
 flow_ciap_ctrl_csf_vol_data <- left_join(
   flow_ciap_ctrl_csf_fc,
   flow_ciap_ctrl_csf_pval,
   join_by(var)
 )
+
 flow_ciap_ctrl_csf_vol_plot <- VolPlot(
   data = flow_ciap_ctrl_csf_vol_data,
   cols = flow_vars_cols,
   n = length(flow_vars)
 )
+
 ggsave(
   file.path("results", "flow", "volcano_ciap_ctrl_csf.pdf"),
   plot = flow_ciap_ctrl_csf_vol_plot,
@@ -460,27 +486,32 @@ ggsave(
 
 # cidp vs ctrl csf
 flow_cidp_ctrl <- filter(flow$CSF, diagnosis %in% c("CIDP", "CTRL"))
+
 flow_cidp_ctrl_csf_pval <- statVolcano(
   flow_vars,
   reference = "diagnosis",
   data = flow_cidp_ctrl
 )
+
 flow_cidp_ctrl_csf_fc <- logfcVolcano(
   data = flow_cidp_ctrl,
   group = "diagnosis",
   group1 = "CIDP",
   group2 = "CTRL"
 )
+
 flow_cidp_ctrl_csf_vol_data <- left_join(
   flow_cidp_ctrl_csf_fc,
   flow_cidp_ctrl_csf_pval,
   join_by(var)
 )
+
 flow_cidp_ctrl_csf_vol_plot <- VolPlot(
   data = flow_cidp_ctrl_csf_vol_data,
   cols = flow_vars_cols,
   n = length(flow_vars)
 )
+
 ggsave(
   file.path("results", "flow", "volcano_cidp_ctrl_csf.pdf"),
   plot = flow_cidp_ctrl_csf_vol_plot,
@@ -490,27 +521,32 @@ ggsave(
 
 # gbs vs ctrl csf
 flow_gbs_ctrl <- filter(flow$CSF, diagnosis %in% c("GBS", "CTRL"))
+
 flow_gbs_ctrl_csf_pval <- statVolcano(
   flow_vars,
   reference = "diagnosis",
   data = flow_gbs_ctrl
 )
+
 flow_gbs_ctrl_csf_fc <- logfcVolcano(
   data = flow_gbs_ctrl,
   group = "diagnosis",
   group1 = "GBS",
   group2 = "CTRL"
 )
+
 flow_gbs_ctrl_csf_vol_data <- left_join(
   flow_gbs_ctrl_csf_fc,
   flow_gbs_ctrl_csf_pval,
   join_by(var)
 )
+
 flow_gbs_ctrl_csf_vol_plot <- VolPlot(
   data = flow_gbs_ctrl_csf_vol_data,
   cols = flow_vars_cols,
   n = length(flow_vars)
 )
+
 ggsave(
   file.path("results", "flow", "volcano_gbs_ctrl_csf.pdf"),
   plot = flow_gbs_ctrl_csf_vol_plot,
@@ -526,22 +562,26 @@ flow_cidp_ciap_csf_pval <- statVolcano(
   reference = "diagnosis",
   data = flow_cidp_ciap
 )
+
 flow_cidp_ciap_csf_fc <- logfcVolcano(
   data = flow_cidp_ciap,
   group = "diagnosis",
   group1 = "CIDP",
   group2 = "CIAP"
 )
+
 flow_cidp_ciap_csf_vol_data <- left_join(
   flow_cidp_ciap_csf_fc,
   flow_cidp_ciap_csf_pval,
   join_by(var)
 )
+
 flow_cidp_ciap_csf_vol_plot <- VolPlot(
   data = flow_cidp_ciap_csf_vol_data,
   cols = flow_vars_cols,
   n = length(flow_vars)
 )
+
 ggsave(
   file.path("results", "flow", "volcano_cidp_ciap_csf.pdf"),
   plot = flow_cidp_ciap_csf_vol_plot,
@@ -556,22 +596,26 @@ flow_gbs_ciap_csf_pval <- statVolcano(
   reference = "diagnosis",
   data = flow_gbs_ciap
 )
+
 flow_gbs_ciap_csf_fc <- logfcVolcano(
   data = flow_gbs_ciap,
   group = "diagnosis",
   group1 = "GBS",
   group2 = "CIAP"
 )
+
 flow_gbs_ciap_csf_vol_data <- left_join(
   flow_gbs_ciap_csf_fc,
   flow_gbs_ciap_csf_pval,
   join_by(var)
 )
+
 flow_gbs_ciap_csf_vol_plot <- VolPlot(
   data = flow_gbs_ciap_csf_vol_data,
   cols = flow_vars_cols,
   n = length(flow_vars)
 )
+
 ggsave(
   file.path("results", "flow", "volcano_gbs_ciap_csf.pdf"),
   plot = flow_gbs_ciap_csf_vol_plot,
@@ -582,27 +626,32 @@ ggsave(
 # blood volcano plots subgroups ----
 # ciap vs ctrl blood
 flow_ciap_ctrl <- filter(flow$blood, diagnosis %in% c("CIAP", "CTRL"))
+
 flow_ciap_ctrl_blood_pval <- statVolcano(
   flow_vars,
   reference = "diagnosis",
   data = flow_ciap_ctrl
 )
+
 flow_ciap_ctrl_blood_fc <- logfcVolcano(
   data = flow_ciap_ctrl,
   group = "diagnosis",
   group1 = "CIAP",
   group2 = "CTRL"
 )
+
 flow_ciap_ctrl_blood_vol_data <- left_join(
   flow_ciap_ctrl_blood_fc,
   flow_ciap_ctrl_blood_pval,
   join_by(var)
 )
+
 flow_ciap_ctrl_blood_vol_plot <- VolPlot(
   data = flow_ciap_ctrl_blood_vol_data,
   cols = flow_vars_cols,
   n = length(flow_vars)
 )
+
 ggsave(
   file.path("results", "flow", "volcano_ciap_ctrl_blood.pdf"),
   plot = flow_ciap_ctrl_blood_vol_plot,
@@ -612,27 +661,32 @@ ggsave(
 
 # cidp vs ctrl blood
 flow_cidp_ctrl <- filter(flow$blood, diagnosis %in% c("CIDP", "CTRL"))
+
 flow_cidp_ctrl_blood_pval <- statVolcano(
   flow_vars,
   reference = "diagnosis",
   data = flow_cidp_ctrl
 )
+
 flow_cidp_ctrl_blood_fc <- logfcVolcano(
   data = flow_cidp_ctrl,
   group = "diagnosis",
   group1 = "CIDP",
   group2 = "CTRL"
 )
+
 flow_cidp_ctrl_blood_vol_data <- left_join(
   flow_cidp_ctrl_blood_fc,
   flow_cidp_ctrl_blood_pval,
   join_by(var)
 )
+
 flow_cidp_ctrl_blood_vol_plot <- VolPlot(
   data = flow_cidp_ctrl_blood_vol_data,
   cols = flow_vars_cols,
   n = length(flow_vars)
 )
+
 ggsave(
   file.path("results", "flow", "volcano_cidp_ctrl_blood.pdf"),
   plot = flow_cidp_ctrl_blood_vol_plot,
@@ -642,27 +696,32 @@ ggsave(
 
 # gbs vs ctrl blood
 flow_gbs_ctrl <- filter(flow$blood, diagnosis %in% c("GBS", "CTRL"))
+
 flow_gbs_ctrl_blood_pval <- statVolcano(
   flow_vars,
   reference = "diagnosis",
   data = flow_gbs_ctrl
 )
+
 flow_gbs_ctrl_blood_fc <- logfcVolcano(
   data = flow_gbs_ctrl,
   group = "diagnosis",
   group1 = "GBS",
   group2 = "CTRL"
 )
+
 flow_gbs_ctrl_blood_vol_data <- left_join(
   flow_gbs_ctrl_blood_fc,
   flow_gbs_ctrl_blood_pval,
   join_by(var)
 )
+
 flow_gbs_ctrl_blood_vol_plot <- VolPlot(
   data = flow_gbs_ctrl_blood_vol_data,
   cols = flow_vars_cols,
   n = length(flow_vars)
 )
+
 ggsave(
   file.path("results", "flow", "volcano_gbs_ctrl_blood.pdf"),
   plot = flow_gbs_ctrl_blood_vol_plot,

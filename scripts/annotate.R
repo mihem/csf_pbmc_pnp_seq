@@ -383,6 +383,23 @@ lapply(
   }
 )
 
+# spectal flow panels
+aurora_cols <- c("Tcells3", "Tfu", "ILC1", "NKFu")
+
+lapply(
+  aurora_cols,
+  function(x) {
+    dotPlot(
+      path = file.path("lookup", "markers.csv"),
+      object = sc_merge,
+      par = x,
+      dot_min = 0.01,
+      height = 8,
+      width = 12
+    )
+  }
+)
+
 # feature plots ---
 scMisc::fPlot(
   path = file.path("lookup", "markers.csv"),

@@ -354,14 +354,14 @@ statVolcano <- function(vars, reference, data) {
 # volcano plot function for cell abundancies
 VolPlot <- function(data, cols, n) {
   data |>
-    ggplot(aes(x = log2_ratio, y = neg_log10_p, color = var, label = var)) +
+    ggplot(aes(x = log2_ratio, y = neg_log10_p_adj, color = var, label = var)) +
     geom_point(size = 3) +
     geom_hline(yintercept = -log10(0.05), color = "blue", linetype = "dashed") +
-    geom_hline(
-      yintercept = -log10(0.05 / n),
-      color = "blue",
-      linetype = "solid"
-    ) +
+    # geom_hline(
+    #   yintercept = -log10(0.05 / n),
+    #   color = "blue",
+    #   linetype = "solid"
+    # ) +
     geom_vline(xintercept = 0, color = "red", linetyp = "solid") +
     geom_vline(xintercept = -1, color = "red", linetype = "dashed") +
     geom_vline(xintercept = 1, color = "red", linetype = "dashed") +
@@ -449,32 +449,44 @@ createVolcanoPlot <- function(
   return(list(data = vol_data, plot = vol_plot))
 }
 
-# Create manually the exact comparison table needed
-diagnosis_comparison <- tibble::tibble(
-  group1 =  c("CIDP", "CIDP", "CIDP", "GBS", "GBS", "CIAP"),
-  group2 = c("GBS", "CIAP", "CTRL", "CIAP", "CTRL", "CTRL")
-)  
+diagnosis <- factor(
+  c("CIDP", "GBS", "CIAP", "CTRL"),
+  levels = c("CIDP", "GBS", "CIAP", "CTRL")
+)
+
+combinations <- crossing(
+  tissue = c("CSF", "blood"),
+  condition1 = diagnosis,
+  condition2 = diagnosis
+) |>
+  dplyr::filter(
+    condition1 != condition2,
+    as.numeric(condition1) < as.numeric(condition2)
+  ) |>
+  dplyr::mutate(across(everything(), as.character)) |>
+  dplyr::mutate(group_column = "diagnosis") 
 
 
 # Create a configuration table for all volcano plot comparisons
 volcano_configs <- tibble::tibble(
-  group_column = c(rep("group", 2), rep("diagnosis", nrow(diagnosis_comparison) * 2)),
-  group1 = c(rep("PNP", 2), rep(diagnosis_comparison$group1, 2)),
-  group2 = c(rep("CTRL", 2), rep(diagnosis_comparison$group2, 2)),
-  tissue = c("CSF", "blood", rep(c("CSF", "blood"), each = nrow(diagnosis_comparison))),
+  group_column = c(rep("group", 2), combinations$group_column),
+  group1 = c(rep("PNP", 2), combinations$condition1),
+  group2 = c(rep("CTRL", 2), combinations$condition2),
+  tissue = c("CSF", "blood", combinations$tissue)
 )
 
 # Generate all volcano plots
-volcano_results_list <- lapply(
-  seq_len(nrow(volcano_configs)),
-  function(i) {
-    row <- volcano_configs[i, ]
+volcano_results_list <- pmap(
+  volcano_configs,
+  function(group_column, group1, group2, tissue) {
     createVolcanoPlot(
-      data = flow[[row$tissue]],
-      group_column = row$group_column,
-      group1 = row$group1,
-      group2 = row$group2,
-      tissue = row$tissue
+      data = flow[[tissue]],
+      group_column = group_column,
+      group1 = group1,
+      group2 = group2,
+      tissue = tissue
     )
   }
 )
+
+volcano_results_list[[1]]

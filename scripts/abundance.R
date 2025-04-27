@@ -107,66 +107,6 @@ scMisc::stackedPlot(
   width = 5
 )
 
-# propeller abundance analysis ---
-# PNP vs CTRL CSF
-propeller_CSF_PNP_CTRL <-
-  scMisc::propellerCalc(
-    seu_obj1 = sc_merge_csf,
-    condition1 = "PNP",
-    condition2 = "CTRL",
-    cluster_col = "cluster",
-    meta_col = "group",
-    lookup = lookup,
-    sample_col = "patient",
-    formula = "~0 + group",
-    min_cells = 30
-  )
-
-scMisc::plotPropeller(
-  data = propeller_CSF_PNP_CTRL,
-  color = sc_merge@misc$cluster_col,
-  filename = "CSF_PNP_CTRL",
-  FDR = 0.1
-)
-
-# scMisc::dotplotPropeller(
-#     data = propeller_PNP_CTRL,
-#     color = sc_merge@misc$cluster_col,
-#     filename = "PNP_CTRL",
-# )
-
-# # only plot logFC > 0.5
-# propeller_PNP_CTRL |>
-#   dplyr::filter(abs(log2ratio) > 0.5)  |>
-#   scMisc::dotplotPropeller(
-#     data = _,
-#     color = sc_merge@misc$cluster_col,
-#     filename = "PNP_CTRL_logFC_0.5",
-#     width = 2.5,
-#     height = 3
-#   )
-
-# PNP vs CTRL PBMC
-propeller_PBMC_PNP_CTRL <-
-  scMisc::propellerCalc(
-    seu_obj1 = sc_merge_pbmc,
-    condition1 = "PNP",
-    condition2 = "CTRL",
-    cluster_col = "cluster",
-    meta_col = "group",
-    lookup = lookup,
-    sample_col = "patient",
-    formula = "~0 + group",
-    min_cells = 30
-  )
-
-scMisc::plotPropeller(
-  data = propeller_PBMC_PNP_CTRL,
-  color = sc_merge@misc$cluster_col,
-  filename = "PBMC_PNP_CTRL",
-  FDR = 0.1
-)
-
 # create all combinations with defined order
 # filter out same conditions and reverse combinations
 diagnosis <- factor(

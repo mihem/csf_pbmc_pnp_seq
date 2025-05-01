@@ -367,7 +367,7 @@ dotPlot(
 )
 
 # olink markers
-olink_cols <- c("olink_96_immuno_onco", "olink_96_inflammation", "olink_48_immune_surv", "olink_48_cytokine")
+olink_cols <- c("olink_96_immuno_onco", "olink_96_inflammation", "olink_48_immune_surv", "olink_48_cytokine", "blood_nerve_olink")
 
 lapply(
   olink_cols,
@@ -382,6 +382,7 @@ lapply(
     )
   }
 )
+
 
 # spectal flow panels
 aurora_cols <- c("Tcells3", "Tfu", "ILC1", "NKFu")

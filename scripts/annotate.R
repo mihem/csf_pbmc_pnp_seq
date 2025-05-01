@@ -366,6 +366,37 @@ dotPlot(
   width = 12
 )
 
+# go blood brain barrier
+dotPlot(
+  path = file.path("lookup", "markers.csv"),
+  object = sc_merge,
+  par = "GO_Transport_Across_Blood_Brain_Barrier_GO_0150104",
+  dot_min = 0.01,
+  height = 8,
+  width = 14
+)
+
+# go blood brain barrier
+dotPlot(
+  path = file.path("lookup", "markers.csv"),
+  object = sc_merge,
+  par = "GO_Transport_Across_Blood_Brain_Barrier_GO_0150104",
+  dot_min = 0.01,
+  height = 8,
+  width = 14
+)
+
+sc_merge_pbmc <- subset(sc_merge, tissue %in% "PBMC")
+# go blood brain barrier
+dotPlot(
+  path = file.path("lookup", "markers.csv"),
+  object = sc_merge_pbmc,
+  par = "BNB",
+  dot_min = 0.01,
+  height = 8,
+  width = 14
+)
+
 # olink markers
 olink_cols <- c("olink_96_immuno_onco", "olink_96_inflammation", "olink_48_immune_surv", "olink_48_cytokine", "blood_nerve_olink")
 
@@ -400,6 +431,7 @@ lapply(
     )
   }
 )
+
 
 # feature plots ---
 scMisc::fPlot(

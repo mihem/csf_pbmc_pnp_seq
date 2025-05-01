@@ -376,16 +376,6 @@ dotPlot(
   width = 14
 )
 
-# go blood brain barrier
-dotPlot(
-  path = file.path("lookup", "markers.csv"),
-  object = sc_merge,
-  par = "GO_Transport_Across_Blood_Brain_Barrier_GO_0150104",
-  dot_min = 0.01,
-  height = 8,
-  width = 14
-)
-
 sc_merge_pbmc <- subset(sc_merge, tissue %in% "PBMC")
 # go blood brain barrier
 dotPlot(

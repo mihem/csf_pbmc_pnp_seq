@@ -10,6 +10,7 @@ library(qs)
 library(scMisc)
 library(readxl)
 
+scMisc::fPlot
 # Helper functions ----
 # Function to create and save violin plots
 create_save_violin_plot <- function(
@@ -18,6 +19,9 @@ create_save_violin_plot <- function(
     group_by = "diagnosis",
     filename_suffix = ""
 ) {
+    # remove NA values from features
+    features <- features[!is.na(features)]
+
     plot <- VlnPlot(
         seurat_obj,
         features = features,
@@ -37,14 +41,15 @@ create_save_violin_plot <- function(
         paste0("vln_bnb_", filename_suffix, ".png")
     )
 
+    height <- ceiling(length(features) / 4 * 3)
+
     ggplot2::ggsave(
         filename = filename,
         plot = plot,
         width = 10,
-        height = 20
+        height = height,
+        limitsize = FALSE
     )
-
-    return(plot)
 }
 
 # Function to create expression heatmap with custom filename
@@ -78,10 +83,17 @@ sc_merge_main_diagnosis <- subset(
     sc_merge,
     subset = diagnosis %in% main_diagnoses
 )
+
 sc_merge_main_diagnosis_pbmc <- subset(
     sc_merge,
     subset = diagnosis %in% main_diagnoses & tissue == "PBMC"
 )
+
+sc_merge_main_diagnosis_csf <- subset(
+    sc_merge,
+    subset = diagnosis %in% main_diagnoses & tissue == "CSF"
+)
+
 sc_merge_main_diagnosis_pbmc_t_nk <- subset(
     sc_merge,
     subset = diagnosis %in%
@@ -98,37 +110,79 @@ sc_merge_main_diagnosis_pbmc_cd8_nk <- subset(
 )
 
 # Load marker genes
-bnb_markers <- read_csv(file.path("lookup", "markers.csv"))
+markers <- read_csv(file.path("lookup", "markers.csv"))
 
 # Create and save violin plots using the helper function
-vln_bnb_plot <- create_save_violin_plot(
+create_save_violin_plot(
     sc_merge_main_diagnosis,
-    bnb_markers$BNB,
+    markers$BNB,
     filename_suffix = "main"
 )
 
-vln_bnb_pbmc_cd8_nk_plot <- create_save_violin_plot(
+create_save_violin_plot(
+    sc_merge_main_diagnosis,
+    markers$BNB_ligands,
+    filename_suffix = "ligands_main"
+)
+
+create_save_violin_plot(
+    sc_merge_main_diagnosis,
+    markers$chemokines,
+    filename_suffix = "chemokines_main"
+)
+
+create_save_violin_plot(
+    sc_merge_main_diagnosis_csf,
+    markers$chemokines,
+    filename_suffix = "chemokines_main_csf"
+)
+
+create_save_violin_plot(
     sc_merge_main_diagnosis_pbmc_cd8_nk,
-    bnb_markers$BNB,
+    markers$BNB,
     filename_suffix = "pbmc_cd8_nk"
 )
 
-vln_bnb_pbmc_t_nk_plot <- create_save_violin_plot(
+create_save_violin_plot(
+    sc_merge_main_diagnosis_pbmc_cd8_nk,
+    markers$BNB_ligands,
+    filename_suffix = "ligands_pbmc_cd8_nk"
+)
+
+create_save_violin_plot(
+    sc_merge_main_diagnosis_pbmc_cd8_nk,
+    markers$chemokines,
+    filename_suffix = "chemokines_pbmc_cd8_nk"
+)
+
+create_save_violin_plot(
     sc_merge_main_diagnosis_pbmc_t_nk,
-    bnb_markers$BNB,
+    markers$BNB,
     filename_suffix = "pbmc_t_nk"
+)
+
+create_save_violin_plot(
+    sc_merge_main_diagnosis_pbmc_t_nk,
+    markers$BNB_ligands,
+    filename_suffix = "ligands_pbmc_t_nk"
+)
+
+create_save_violin_plot(
+    sc_merge_main_diagnosis_pbmc_t_nk,
+    markers$chemokines,
+    filename_suffix = "chemokines_pbmc_t_nk"
 )
 
 # Create heatmaps using the helper function with custom names
 main_bnb_avg <- create_expression_heatmap(
     sc_merge_main_diagnosis,
-    bnb_markers$BNB,
+    markers$BNB,
     group_by = "diagnosis"
 )
 
 main_pbmc_bnb_avg <- create_expression_heatmap(
     sc_merge_main_diagnosis_pbmc,
-    bnb_markers$BNB,
+    markers$BNB,
     group_by = "diagnosis"
 )
 

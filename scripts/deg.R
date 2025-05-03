@@ -10,7 +10,6 @@ library(qs)
 library(scMisc)
 library(readxl)
 
-scMisc::fPlot
 # Helper functions ----
 # Function to create and save violin plots
 create_save_violin_plot <- function(
@@ -19,6 +18,18 @@ create_save_violin_plot <- function(
     group_by = "diagnosis",
     filename_suffix = ""
 ) {
+    filename <- file.path(
+        "results",
+        "de",
+        paste0("vln_", filename_suffix, ".png")
+    )
+    
+    # Skip if file already exists
+    if (file.exists(filename)) {
+        message(sprintf("Skipping existing file: %s", filename))
+        return(invisible(NULL))
+    }
+
     # remove NA values from features
     features <- features[!is.na(features)]
 
@@ -35,12 +46,6 @@ create_save_violin_plot <- function(
             axis.text.x = ggplot2::element_text(angle = 90, hjust = 1)
         )
 
-    filename <- file.path(
-        "results",
-        "de",
-        paste0("vln_bnb_", filename_suffix, ".png")
-    )
-
     height <- ceiling(length(features) / 4 * 3)
 
     ggplot2::ggsave(
@@ -50,6 +55,18 @@ create_save_violin_plot <- function(
         height = height,
         limitsize = FALSE
     )
+}
+
+# Simple function to create violin plots for a Seurat object with multiple feature sets
+create_violin_plots_for_object <- function(seurat_obj, base_suffix, feature_sets) {
+    for (set in feature_sets) {
+        suffix <- paste0(set$name, "_", base_suffix)
+        create_save_violin_plot(
+            seurat_obj = seurat_obj,
+            features = set$features,
+            filename_suffix = suffix
+        )
+    }
 }
 
 # Function to create expression heatmap with custom filename
@@ -101,6 +118,7 @@ sc_merge_main_diagnosis_pbmc_t_nk <- subset(
         tissue == "PBMC" &
         cluster %in% cd8_nk_clusters
 )
+
 sc_merge_main_diagnosis_pbmc_cd8_nk <- subset(
     sc_merge,
     subset = diagnosis %in%
@@ -112,66 +130,18 @@ sc_merge_main_diagnosis_pbmc_cd8_nk <- subset(
 # Load marker genes
 markers <- read_csv(file.path("lookup", "markers.csv"))
 
-# Create and save violin plots using the helper function
-create_save_violin_plot(
-    sc_merge_main_diagnosis,
-    markers$BNB,
-    filename_suffix = "main"
+# Define feature sets
+feature_sets <- list(
+    list(name = "bnb", features = markers$BNB),
+    list(name = "bnb_ligands", features = markers$BNB_ligands),
+    list(name = "chemokines", features = markers$chemokines)
 )
 
-create_save_violin_plot(
-    sc_merge_main_diagnosis,
-    markers$BNB_ligands,
-    filename_suffix = "ligands_main"
-)
-
-create_save_violin_plot(
-    sc_merge_main_diagnosis,
-    markers$chemokines,
-    filename_suffix = "chemokines_main"
-)
-
-create_save_violin_plot(
-    sc_merge_main_diagnosis_csf,
-    markers$chemokines,
-    filename_suffix = "chemokines_main_csf"
-)
-
-create_save_violin_plot(
-    sc_merge_main_diagnosis_pbmc_cd8_nk,
-    markers$BNB,
-    filename_suffix = "pbmc_cd8_nk"
-)
-
-create_save_violin_plot(
-    sc_merge_main_diagnosis_pbmc_cd8_nk,
-    markers$BNB_ligands,
-    filename_suffix = "ligands_pbmc_cd8_nk"
-)
-
-create_save_violin_plot(
-    sc_merge_main_diagnosis_pbmc_cd8_nk,
-    markers$chemokines,
-    filename_suffix = "chemokines_pbmc_cd8_nk"
-)
-
-create_save_violin_plot(
-    sc_merge_main_diagnosis_pbmc_t_nk,
-    markers$BNB,
-    filename_suffix = "pbmc_t_nk"
-)
-
-create_save_violin_plot(
-    sc_merge_main_diagnosis_pbmc_t_nk,
-    markers$BNB_ligands,
-    filename_suffix = "ligands_pbmc_t_nk"
-)
-
-create_save_violin_plot(
-    sc_merge_main_diagnosis_pbmc_t_nk,
-    markers$chemokines,
-    filename_suffix = "chemokines_pbmc_t_nk"
-)
+# Create violin plots for each Seurat object
+create_violin_plots_for_object(sc_merge_main_diagnosis, "main", feature_sets)
+create_violin_plots_for_object(sc_merge_main_diagnosis_csf, "main_csf", feature_sets)
+create_violin_plots_for_object(sc_merge_main_diagnosis_pbmc_cd8_nk, "pbmc_cd8_nk", feature_sets)
+create_violin_plots_for_object(sc_merge_main_diagnosis_pbmc_t_nk, "pbmc_t_nk", feature_sets)
 
 # Create heatmaps using the helper function with custom names
 main_bnb_avg <- create_expression_heatmap(

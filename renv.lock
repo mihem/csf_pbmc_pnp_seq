@@ -5695,7 +5695,7 @@
     },
     "sparseMatrixStats": {
       "Package": "sparseMatrixStats",
-      "Version": "1.14.0",
+      "Version": "1.16.0",
       "Source": "Bioconductor",
       "Requirements": [
         "Matrix",
@@ -5703,8 +5703,7 @@
         "Rcpp",
         "matrixStats",
         "methods"
-      ],
-      "Hash": "49383d0f6c6152ff7cb594f254c23cc8"
+      ]
     },
     "spatstat.data": {
       "Package": "spatstat.data",

@@ -481,6 +481,30 @@
       ],
       "Hash": "164809cd72e1d5160b4cb3aa57f510fe"
     },
+    "DESeq2": {
+      "Package": "DESeq2",
+      "Version": "1.44.0",
+      "Source": "Bioconductor",
+      "Repository": "Bioconductor 3.19",
+      "Requirements": [
+        "Biobase",
+        "BiocGenerics",
+        "BiocParallel",
+        "GenomicRanges",
+        "IRanges",
+        "MatrixGenerics",
+        "Rcpp",
+        "RcppArmadillo",
+        "S4Vectors",
+        "SummarizedExperiment",
+        "ggplot2",
+        "locfit",
+        "matrixStats",
+        "methods",
+        "stats4"
+      ],
+      "Hash": "a90e0e67215ba95ccb29e93b169caaa4"
+    },
     "DT": {
       "Package": "DT",
       "Version": "0.33",
@@ -545,6 +569,18 @@
         "stats4"
       ],
       "Hash": "18131c758b36c44d13e2ca9fdf656343"
+    },
+    "EnhancedVolcano": {
+      "Package": "EnhancedVolcano",
+      "Version": "1.22.0",
+      "Source": "Bioconductor",
+      "Repository": "Bioconductor 3.19",
+      "Requirements": [
+        "ggplot2",
+        "ggrepel",
+        "methods"
+      ],
+      "Hash": "5a83fa8aee8e8ef141122053cd398f53"
     },
     "EnsDb.Hsapiens.v86": {
       "Package": "EnsDb.Hsapiens.v86",
@@ -846,6 +882,44 @@
         "stats"
       ],
       "Hash": "9f33a1ee37bbe8919eb2ec4b9f2473a5"
+    },
+    "Libra": {
+      "Package": "Libra",
+      "Version": "1.0.0",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "neurorestore",
+      "RemoteRepo": "Libra",
+      "RemoteRef": "main",
+      "RemoteSha": "0a680543333261dca0aac4cdc6c2c38c442c0ded",
+      "Requirements": [
+        "DESeq2",
+        "Matrix",
+        "R",
+        "Rdpack",
+        "Seurat",
+        "blme",
+        "dplyr",
+        "edgeR",
+        "forcats",
+        "glmmTMB",
+        "limma",
+        "lme4",
+        "lmerTest",
+        "lmtest",
+        "magrittr",
+        "matrixStats",
+        "methods",
+        "parallel",
+        "pbmcapply",
+        "purrr",
+        "stats",
+        "tester",
+        "tibble",
+        "tidyselect"
+      ],
+      "Hash": "85fdaa600d7ff5380a59dae0d309a7b9"
     },
     "MASS": {
       "Package": "MASS",
@@ -1766,6 +1840,22 @@
       ],
       "Hash": "d2974f239e0c14cade60062fe2cbdf0b"
     },
+    "TMB": {
+      "Package": "TMB",
+      "Version": "1.9.17",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "Matrix",
+        "R",
+        "RcppEigen",
+        "graphics",
+        "methods",
+        "stats",
+        "utils"
+      ],
+      "Hash": "9c2b92259dda42fc0d3221eb3828a879"
+    },
     "UCSC.utils": {
       "Package": "UCSC.utils",
       "Version": "1.0.0",
@@ -2041,6 +2131,20 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "b7d8d8ee39869c18d8846a184dd8a1af"
+    },
+    "blme": {
+      "Package": "blme",
+      "Version": "1.0-6",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "lme4",
+        "methods",
+        "stats",
+        "utils"
+      ],
+      "Hash": "e7d3b3afab09b8b47e602198b65c4a46"
     },
     "blob": {
       "Package": "blob",
@@ -2828,7 +2932,7 @@
     },
     "edgeR": {
       "Package": "edgeR",
-      "Version": "4.2.0",
+      "Version": "4.2.2",
       "Source": "Bioconductor",
       "Repository": "Bioconductor 3.19",
       "Requirements": [
@@ -2841,7 +2945,7 @@
         "stats",
         "utils"
       ],
-      "Hash": "20783ecb7e7cea3f351e8b21153e3eb8"
+      "Hash": "4c31c0395110252e4ec7cf4ee9cbebb6"
     },
     "ellipse": {
       "Package": "ellipse",
@@ -3457,6 +3561,25 @@
         "vctrs"
       ],
       "Hash": "ccbc016a32fb8e0fe7205497c814e691"
+    },
+    "glmmTMB": {
+      "Package": "glmmTMB",
+      "Version": "1.1.11",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "Matrix",
+        "R",
+        "RcppEigen",
+        "TMB",
+        "lme4",
+        "methods",
+        "mgcv",
+        "nlme",
+        "numDeriv",
+        "reformulas"
+      ],
+      "Hash": "d9397006b6a8205a1e0b0ca3c2f855e3"
     },
     "glmnet": {
       "Package": "glmnet",
@@ -4193,7 +4316,7 @@
     },
     "limma": {
       "Package": "limma",
-      "Version": "3.60.2",
+      "Version": "3.60.6",
       "Source": "Bioconductor",
       "Repository": "Bioconductor 3.19",
       "Requirements": [
@@ -4205,7 +4328,7 @@
         "stats",
         "utils"
       ],
-      "Hash": "e50bcf846c8a9109a961d6058c9e5112"
+      "Hash": "0eccf07d5db97b84a912922e1d29e130"
     },
     "lintr": {
       "Package": "lintr",
@@ -4263,6 +4386,22 @@
         "utils"
       ],
       "Hash": "862f9d995f528f3051f524791955b20c"
+    },
+    "lmerTest": {
+      "Package": "lmerTest",
+      "Version": "3.1-3",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "MASS",
+        "R",
+        "ggplot2",
+        "lme4",
+        "methods",
+        "numDeriv",
+        "stats"
+      ],
+      "Hash": "f04948de84602afc23bfa9f5427e954d"
     },
     "lmtest": {
       "Package": "lmtest",
@@ -5280,6 +5419,19 @@
         "withr"
       ],
       "Hash": "e13ae292a170c6b1bd77acf2b3fa91db"
+    },
+    "reformulas": {
+      "Package": "reformulas",
+      "Version": "0.4.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "Matrix",
+        "Rdpack",
+        "methods",
+        "stats"
+      ],
+      "Hash": "697a42ea989da568a0251101f36a7632"
     },
     "rematch": {
       "Package": "rematch",

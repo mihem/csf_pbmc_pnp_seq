@@ -13,6 +13,8 @@ library(viridis)
 library(Libra)
 library(EnhancedVolcano)
 library(readxl)
+library(purrr)
+library(writexl)
 
 # load preprocessed data ----
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthread = 4)
@@ -56,10 +58,11 @@ runLimma <- function(seurat_object, cluster, lookup, condition1, condition2) {
     dge <- edgeR::calcNormFactors(dge, method = "TMM")
 
     meta_limma <-
-        data.frame(patient = gsub(x = colnames(dge), pattern = ":.+", replacement = "")) |>
+        data.frame(
+            patient = gsub(x = colnames(dge), pattern = ":.+", replacement = "")
+        ) |>
         dplyr::left_join(lookup, by = "patient")
-    # designMat <- model.matrix(~ 0 + diagnosis + sex + age, data = meta_limma)
-    designMat <- model.matrix(~ 0 + diagnosis, data = meta_limma)
+    designMat <- model.matrix(~ 0 + diagnosis + sex + age, data = meta_limma)
     my_contrasts <- glue::glue("diagnosis{condition1}-diagnosis{condition2}")
     my_args <- list(my_contrasts, levels = designMat)
     my_contrasts <- do.call(makeContrasts, my_args)
@@ -77,34 +80,7 @@ runLimma <- function(seurat_object, cluster, lookup, condition1, condition2) {
         dplyr::arrange(desc(logFC)) |>
         dplyr::rename(avg_log2FC = logFC, p_val_adj = adj.P.Val)
 
-    seurat_object_parse <- deparse(substitute(seurat_object))
-    readr::write_csv(
-        topgenes_sig,
-        file.path(
-            "results",
-            "de",
-            glue::glue(
-                "de_{condition1}_{condition2}_{seurat_object_parse}_sig.csv"
-            )
-        )
-    )
-
-    topgenes_all <- limma::topTable(dge_voom, n = Inf, adjust.method = "BH") |>
-        tibble::rownames_to_column("gene") |>
-        tibble::tibble() |>
-        dplyr::arrange(dplyr::desc(logFC)) |>
-        dplyr::rename(avg_log2FC = logFC, p_val_adj = adj.P.Val)
-
-    readr::write_csv(
-        topgenes_all,
-        file.path(
-            "results",
-            "de",
-            glue::glue(
-                "de_{condition1}_{condition2}_{seurat_object_parse}_all.csv"
-            )
-        )
-    )
+    return(topgenes_sig)
 }
 
 # CIDP vs CTRL pseudobulk ---
@@ -119,73 +95,44 @@ table(sc_cidp_ctrl_csf$diagnosis)
 table(sc_cidp_ctrl_csf$tissue)
 table(sc_cidp_ctrl_csf$cluster, sc_cidp_ctrl_csf$diagnosis)
 
+# Create error-safe version of runLimma using purrr
+safe_runLimma <- purrr::possibly(runLimma, otherwise = NULL)
 
-# perform DE
-runLimma(
-    cluster = "CD8_NK",
-    seurat_object = sc_cidp_ctrl_csf,
-    condition1 = "CIDP",
-    condition2 = "CTRL",
-    lookup = lookup
-)
-AggregateExpression(
-    sc_cidp_ctrl_csf_cd8_nk,
-    assay = "RNA",
-    group.by = "diagnosis",
-    features = c("SYNE1", "ITGB1", "CD44")
-)
-
-## perform DE
-
-dePseudo(sc_cidp_ctrl_csf, cell_type_col = "cluster", label_col = "diagnosis")
-
-# CIDP vs CTRL pseudoublk ----
-cidp_ctrl <- subset(sc_merge, level2 %in% c("CIDP", "CTRL"))
-cidp_ctrl$level2 <- factor(cidp_ctrl$level2, levels = c("CIDP", "CTRL"))
-
-# #sanity check
-table(sc_merge$level2)
-table(cidp_ctrl$level2)
-
-# perform DE
-dePseudo(cidp_ctrl, cell_type_col = "cluster", label_col = "level2")
-
-# CIAP vs CTRL pseudoublk ----
-ciap_ctrl <- subset(sc_merge, level2 %in% c("CIAP", "CTRL"))
-ciap_ctrl$level2 <- factor(ciap_ctrl$level2, levels = c("CIAP", "CTRL"))
-
-# #sanity check
-table(sc_merge$level2)
-table(ciap_ctrl$level2)
-
-# perform DE
-dePseudo(ciap_ctrl, cell_type_col = "cluster", label_col = "level2")
-
-# deSig() filters significant DEGs based on thresholds:
-deSig <- function(name) {
-    sheets <- readxl::excel_sheets(
-        path = file.path("results", "de", paste0(name, ".xlsx"))
-    )
-    de <-
-        lapply(
-            sheets,
-            function(sheet) {
-                read_xlsx(
-                    path = file.path("results", "de", paste0(name, ".xlsx")),
-                    sheet = sheet
-                ) |>
-                    dplyr::filter(p_val_adj < 0.1) |>
-                    dplyr::filter(abs(avg_logFC) > 2)
+de_cidp_ctrl_csf <-
+    purrr::map(
+        levels(sc_cidp_ctrl_csf),
+        function(cluster) {
+            result <- safe_runLimma(
+                cluster = cluster,
+                seurat_object = sc_cidp_ctrl_csf,
+                condition1 = "CIDP",
+                condition2 = "CTRL",
+                lookup = lookup
+            )
+            if (is.null(result)) {
+                message(paste("Failed to run DE for cluster:", cluster))
             }
-        )
-    de <- setNames(de, sheets)
-    write_xlsx(de, path = file.path("results", "de", paste0(name, "_sig.xlsx")))
-}
+            return(result)
+        }
+    )
 
-deSig("pnp_ctrl_pseudobulk")
-deSig("vn_ctrl")
-deSig("cidp_ctrl")
-deSig("ciap_ctrl")
+# Name the results with cluster names
+names(de_cidp_ctrl_csf) <- levels(sc_cidp_ctrl_csf)
+
+# Remove NULL results
+de_cidp_ctrl_csf <- purrr::compact(de_cidp_ctrl_csf)
+writexl::write_xlsx(
+    de_cidp_ctrl_csf,
+    file.path("results", "de", "de_cidp_ctrl_csf.xlsx")
+)
+
+
+# AggregateExpression(
+#     sc_cidp_ctrl_csf_cd8_nk,
+#     assay = "RNA",
+#     group.by = "diagnosis",
+#     features = c("SYNE1", "ITGB1", "CD44")
+# )
 
 # plot number of DEG per cluster ---
 plotDE <- function(name, title) {
@@ -207,7 +154,9 @@ plotDE <- function(name, title) {
     result <- tibble(
         cluster = sheets,
         n = unlist(cl_sig)
-    )
+    ) |>
+        dplyr::filter(n > 0) # Fixed: Filter applied to the data frame, not the vector
+
     plot <-
         result |>
         mutate(cluster = fct_reorder(cluster, n)) |>
@@ -230,8 +179,7 @@ plotDE <- function(name, title) {
     )
 }
 
-# plotDE("pnp_ctrl_wilcox", title = "PNP vs CTRL")
-plotDE("pnp_ctrl_pseudobulk", title = "PNP vs CTRL")
+plotDE("de_cidp_ctrl_csf", title = "CIDP vs CTRL CSF")
 
 # volcano plot
 volcanoPlot <- function(

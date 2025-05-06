@@ -73,66 +73,24 @@ runLimma <- function(seurat_object, cluster, lookup, condition1, condition2) {
         limma::contrasts.fit(my_contrasts) |>
         eBayes(robust = TRUE)
 
-    topgenes_sig <- limma::topTable(dge_voom, n = Inf, adjust.method = "BH") |>
-        dplyr::filter(adj.P.Val < 0.05) |>
+    # topgenes_sig <- limma::topTable(dge_voom, n = Inf, adjust.method = "BH") |>
+    #     dplyr::filter(adj.P.Val < 0.05) |>
+    #     tibble::rownames_to_column("gene") |>
+    #     tibble::tibble() |>
+    #     dplyr::arrange(desc(logFC)) |>
+    #     dplyr::rename(avg_log2FC = logFC, p_val_adj = adj.P.Val)
+
+    topgenes_all <- limma::topTable(dge_voom, n = Inf, adjust.method = "BH") |>
         tibble::rownames_to_column("gene") |>
         tibble::tibble() |>
         dplyr::arrange(desc(logFC)) |>
         dplyr::rename(avg_log2FC = logFC, p_val_adj = adj.P.Val)
 
-    return(topgenes_sig)
+    return(topgenes_all)
 }
-
-# CIDP vs CTRL pseudobulk ---
-sc_cidp_ctrl_csf <- subset(
-    sc_merge,
-    subset = diagnosis %in% c("CIDP", "CTRL") & tissue %in% c("CSF")
-)
-sc_cidp_ctrl_csf$diagnosis <- droplevels(sc_cidp_ctrl_csf$diagnosis)
-
-# sanity check
-table(sc_cidp_ctrl_csf$diagnosis)
-table(sc_cidp_ctrl_csf$tissue)
-table(sc_cidp_ctrl_csf$cluster, sc_cidp_ctrl_csf$diagnosis)
 
 # Create error-safe version of runLimma using purrr
 safe_runLimma <- purrr::possibly(runLimma, otherwise = NULL)
-
-de_cidp_ctrl_csf <-
-    purrr::map(
-        levels(sc_cidp_ctrl_csf),
-        function(cluster) {
-            result <- safe_runLimma(
-                cluster = cluster,
-                seurat_object = sc_cidp_ctrl_csf,
-                condition1 = "CIDP",
-                condition2 = "CTRL",
-                lookup = lookup
-            )
-            if (is.null(result)) {
-                message(paste("Failed to run DE for cluster:", cluster))
-            }
-            return(result)
-        }
-    )
-
-# Name the results with cluster names
-names(de_cidp_ctrl_csf) <- levels(sc_cidp_ctrl_csf)
-
-# Remove NULL results
-de_cidp_ctrl_csf <- purrr::compact(de_cidp_ctrl_csf)
-writexl::write_xlsx(
-    de_cidp_ctrl_csf,
-    file.path("results", "de", "de_cidp_ctrl_csf.xlsx")
-)
-
-
-# AggregateExpression(
-#     sc_cidp_ctrl_csf_cd8_nk,
-#     assay = "RNA",
-#     group.by = "diagnosis",
-#     features = c("SYNE1", "ITGB1", "CD44")
-# )
 
 # plot number of DEG per cluster ---
 plotDE <- function(name, title) {
@@ -154,8 +112,7 @@ plotDE <- function(name, title) {
     result <- tibble(
         cluster = sheets,
         n = unlist(cl_sig)
-    ) |>
-        dplyr::filter(n > 0) # Fixed: Filter applied to the data frame, not the vector
+    )
 
     plot <-
         result |>
@@ -179,7 +136,100 @@ plotDE <- function(name, title) {
     )
 }
 
-plotDE("de_cidp_ctrl_csf", title = "CIDP vs CTRL CSF")
+# Create a general function for differential expression analysis
+performDEAnalysis <- function(
+    seurat_object,
+    condition1,
+    condition2,
+    tissue_type
+) {
+    # Create descriptive name for output files
+    comparison_name <- paste0(
+        "de_",
+        tolower(condition1),
+        "_",
+        tolower(condition2),
+        "_",
+        tolower(tissue_type)
+    )
+
+    # Subset data for the specific conditions and tissue
+    sc_subset <- subset(
+        seurat_object,
+        subset = diagnosis %in%
+            c(condition1, condition2) &
+            tissue == tissue_type
+    )
+    sc_subset$diagnosis <- droplevels(sc_subset$diagnosis)
+
+    # Verify tissue filtering is correct
+    unique_tissue <- unique(sc_subset$tissue)
+    stopifnot(unique_tissue == tissue_type)
+
+    # Verify condition filtering is correct
+    unique_diagnoses <- unique(as.character(sc_subset$diagnosis))
+    stopifnot(all(c(condition1, condition2) %in% unique_diagnoses))
+
+    # Sanity check
+    message(paste(
+        "Performing DE analysis:",
+        condition1,
+        "vs",
+        condition2,
+        "in",
+        tissue_type
+    ))
+
+    # Run DE analysis for each cluster
+    de_results <- purrr::map(
+        levels(sc_subset),
+        function(cluster) {
+            result <- safe_runLimma(
+                cluster = cluster,
+                seurat_object = sc_subset,
+                condition1 = condition1,
+                condition2 = condition2,
+                lookup = lookup
+            )
+            if (is.null(result)) {
+                message(paste("Failed to run DE for cluster:", cluster))
+            }
+            return(result)
+        }
+    )
+
+    # Name the results with cluster names
+    names(de_results) <- levels(sc_subset)
+
+    # Remove NULL results
+    de_results <- purrr::compact(de_results)
+
+    # Save results to Excel
+    writexl::write_xlsx(
+        de_results,
+        file.path("results", "de", paste0(comparison_name, ".xlsx"))
+    )
+
+    # Plot number of DEGs per cluster
+    plotDE(
+        comparison_name,
+        title = paste(condition1, "vs", condition2, tissue_type)
+    )
+
+    return(de_results)
+}
+
+# Run DE analysis for CIDP vs CTRL in CSF
+de_cidp_ctrl_csf <- performDEAnalysis(sc_merge, "CIDP", "CTRL", "CSF")
+
+# Run DE analysis for GBS vs CTRL in CSF
+de_gbs_ctrl_csf <- performDEAnalysis(sc_merge, "GBS", "CTRL", "CSF")
+
+# Run DE analysis for CIDP vs CTRL in PBMC
+de_cidp_ctrl_pbmc <- performDEAnalysis(sc_merge, "CIDP", "CTRL", "PBMC")
+
+# Run DE analysis for GBS vs CTRL in PBMC
+de_gbs_ctrl_pbmc <- performDEAnalysis(sc_merge, "GBS", "CTRL", "PBMC")
 
 # volcano plot
 volcanoPlot <- function(
@@ -199,9 +249,9 @@ volcanoPlot <- function(
         volcano <- EnhancedVolcano::EnhancedVolcano(
             data.frame(input),
             lab = paste0("italic('", input[["gene"]], "')"),
-            x = "avg_logFC",
+            x = "avg_log2FC",
             y = "p_val_adj",
-            xlim = c(min(input[["avg_logFC"]], max(input[["avg_logFC"]]))),
+            xlim = c(min(input[["avg_log2FC"]], max(input[["avg_log2FC"]]))),
             ylim = c(0, max(-log10(input[["p_val_adj"]]))),
             pCutoff = 0.1,
             FCcutoff = FCcutoff,
@@ -214,7 +264,7 @@ volcanoPlot <- function(
             gridlines.major = FALSE,
             gridlines.minor = FALSE,
             drawConnectors = drawConnectors,
-            lengthConnectors = unit(0.0001, "npc"),
+            lengthConnectors = grid::unit(0.0001, "npc"),
             title = paste(condition1, "vs", condition2, "in ", sheet),
             boxedLabels = TRUE,
             selectLab = selectLab,
@@ -239,8 +289,35 @@ volcanoPlot <- function(
     }
 }
 
-cluster_de <- c("repairSC", "mySC", "nmSC", "PC2")
+# Define analysis configurations
+volcano_parameters <- list(
+    list(
+        filename = "de_cidp_ctrl_csf",
+        clusters = c("CD4TCM_2", "CD8_NK"),
+        condition1 = "CIDP",
+        condition2 = "CTRL"
+    ),
+    list(
+        filename = "de_gbs_ctrl_csf",
+        clusters = c("pDC", "CD8_NK"),
+        condition1 = "GBS",
+        condition2 = "CTRL"
+    ),
+    list(
+        filename = "de_cidp_ctrl_pbmc",
+        clusters = c("CD4TCM_2", "NKCD56dim", "CD8_NK"),
+        condition1 = "CIDP",
+        condition2 = "CTRL"
+    ),
+    list(
+        filename = "de_gbs_ctrl_pbmc",
+        clusters = c("Plasma", "CD16Mono"),
+        condition1 = "GBS",
+        condition2 = "CTRL"
+    )
+)
 
+# Common labels for plots if needed
 lab_pnp_ctrl <- list(
     "mySC" = paste0(
         "italic('",
@@ -260,61 +337,22 @@ lab_pnp_ctrl <- list(
     )
 )
 
-# PNP vs CTRL
-lapply(
-    cluster_de,
-    function(cluster) {
-        volcanoPlot(
-            filename = "pnp_ctrl_pseudobulk",
-            sheet = cluster,
-            FCcutoff = 2,
-            condition1 = "PNP",
-            condition2 = "CTRL",
-            selectLab = lab_pnp_ctrl[[cluster]]
-        )
-    }
-)
-
-# VN vs CTRL
-lapply(
-    cluster_de,
-    function(cluster) {
-        volcanoPlot(
-            filename = "vn_ctrl",
-            sheet = cluster,
-            FCcutoff = 2,
-            condition1 = "VN",
-            condition2 = "CTRL"
-        )
-    }
-)
-
-# ciap vs CTRL
-lapply(
-    cluster_de,
-    function(cluster) {
-        volcanoPlot(
-            filename = "ciap_ctrl",
-            sheet = cluster,
-            FCcutoff = 2,
-            condition1 = "ciap",
-            condition2 = "CTRL"
-        )
-    }
-)
-# CIAP vs CTRL
-lapply(
-    cluster_de,
-    function(cluster) {
-        volcanoPlot(
-            filename = "ciap_ctrl",
-            sheet = cluster,
-            FCcutoff = 2,
-            condition1 = "CIAP",
-            condition2 = "CTRL"
-        )
-    }
-)
+# Generate volcano plots for all configurations
+lapply(volcano_parameters, function(config) {
+    lapply(
+        config$clusters,
+        function(cluster) {
+            volcanoPlot(
+                filename = config$filename,
+                sheet = cluster,
+                FCcutoff = 2,
+                condition1 = config$condition1,
+                condition2 = config$condition2,
+                selectLab = NULL 
+            )
+        }
+    )
+})
 
 # function to compare gene expression between conditions using VlnPlot -----
 compareGeneExpression <- function(seu_obj, gene, seu_obj_name) {

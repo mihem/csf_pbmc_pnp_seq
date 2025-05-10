@@ -64,7 +64,7 @@ plotDE <- function(name, title) {
             sheets,
             function(sheet) {
                 read_xlsx(
-                    path = file.path("results", "de", paste0(name, ".xlsx")),
+                    path = file.path("results", "de", paste0(name, "_cluster.xlsx")),
                     sheet = sheet
                 ) |>
                     dplyr::filter(p_val_adj < 0.05) |>
@@ -235,6 +235,8 @@ performDEAnalysis <- function(
         condition1 = condition1,
         condition2 = condition2
     )
+
+    names(combined_result) <- "combined"
 
     writexl::write_xlsx(
         combined_result,

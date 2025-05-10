@@ -16,6 +16,9 @@ library(readxl)
 library(purrr)
 library(writexl)
 
+# functions ----
+source(file.path("scripts", "dge_helper.R"))
+
 # load preprocessed data ----
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthread = 4)
 
@@ -39,185 +42,6 @@ lookup <-
             )
         )
     )
-
-runLimma <- function(seurat_object, cluster, lookup, condition1, condition2) {
-    pseudobulk_data <- Libra::to_pseudobulk(
-        seurat_object,
-        cell_type_col = "cluster",
-        label_col = "diagnosis",
-        replicate_col = "patient"
-    )
-
-    dge <- edgeR::DGEList(
-        counts = pseudobulk_data[[cluster]],
-        group = colnames(pseudobulk_data[[cluster]])
-    )
-    count_check <- edgeR::cpm(dge) > 1
-    keep <- which(rowSums(count_check) > 2)
-    dge <- dge[keep, ]
-    dge <- edgeR::calcNormFactors(dge, method = "TMM")
-
-    meta_limma <-
-        data.frame(
-            patient = gsub(x = colnames(dge), pattern = ":.+", replacement = "")
-        ) |>
-        dplyr::left_join(lookup, by = "patient")
-    designMat <- model.matrix(~ 0 + diagnosis + sex + age, data = meta_limma)
-    my_contrasts <- glue::glue("diagnosis{condition1}-diagnosis{condition2}")
-    my_args <- list(my_contrasts, levels = designMat)
-    my_contrasts <- do.call(makeContrasts, my_args)
-    dge_voom <- limma::voomWithQualityWeights(dge, designMat, plot = FALSE)
-
-    dge_voom <- dge_voom |>
-        limma::lmFit(design = designMat, block = NULL) |>
-        limma::contrasts.fit(my_contrasts) |>
-        eBayes(robust = TRUE)
-
-    # topgenes_sig <- limma::topTable(dge_voom, n = Inf, adjust.method = "BH") |>
-    #     dplyr::filter(adj.P.Val < 0.05) |>
-    #     tibble::rownames_to_column("gene") |>
-    #     tibble::tibble() |>
-    #     dplyr::arrange(desc(logFC)) |>
-    #     dplyr::rename(avg_log2FC = logFC, p_val_adj = adj.P.Val)
-
-    topgenes_all <- limma::topTable(dge_voom, n = Inf, adjust.method = "BH") |>
-        tibble::rownames_to_column("gene") |>
-        tibble::tibble() |>
-        dplyr::arrange(desc(logFC)) |>
-        dplyr::rename(avg_log2FC = logFC, p_val_adj = adj.P.Val)
-
-    return(topgenes_all)
-}
-
-# Create error-safe version of runLimma using purrr
-safe_runLimma <- purrr::possibly(runLimma, otherwise = NULL)
-
-# plot number of DEG per cluster ---
-plotDE <- function(name, title) {
-    sheets <- readxl::excel_sheets(
-        path = file.path("results", "de", paste0(name, ".xlsx"))
-    )
-    cl_sig <-
-        lapply(
-            sheets,
-            function(sheet) {
-                read_xlsx(
-                    path = file.path("results", "de", paste0(name, ".xlsx")),
-                    sheet = sheet
-                ) |>
-                    dplyr::filter(p_val_adj < 0.05) |>
-                    nrow()
-            }
-        )
-    result <- tibble(
-        cluster = sheets,
-        n = unlist(cl_sig)
-    )
-
-    plot <-
-        result |>
-        mutate(cluster = fct_reorder(cluster, n)) |>
-        ggplot(aes(x = cluster, y = n, fill = cluster)) +
-        geom_col() +
-        coord_flip() +
-        scale_fill_manual(values = sc_merge@misc$cluster_col) +
-        theme_classic() +
-        theme(legend.position = "none") +
-        labs(
-            x = "",
-            y = "",
-            title = title
-        )
-    ggsave(
-        plot = plot,
-        filename = file.path("results", "de", paste0(name, ".pdf")),
-        width = 3,
-        height = 3
-    )
-}
-
-# Create a general function for differential expression analysis
-performDEAnalysis <- function(
-    seurat_object,
-    condition1,
-    condition2,
-    tissue_type
-) {
-    # Create descriptive name for output files
-    comparison_name <- paste0(
-        "de_",
-        tolower(condition1),
-        "_",
-        tolower(condition2),
-        "_",
-        tolower(tissue_type)
-    )
-
-    # Subset data for the specific conditions and tissue
-    sc_subset <- subset(
-        seurat_object,
-        subset = diagnosis %in%
-            c(condition1, condition2) &
-            tissue == tissue_type
-    )
-    sc_subset$diagnosis <- droplevels(sc_subset$diagnosis)
-
-    # Verify tissue filtering is correct
-    unique_tissue <- unique(sc_subset$tissue)
-    stopifnot(unique_tissue == tissue_type)
-
-    # Verify condition filtering is correct
-    unique_diagnoses <- unique(as.character(sc_subset$diagnosis))
-    stopifnot(all(c(condition1, condition2) %in% unique_diagnoses))
-
-    # Sanity check
-    message(paste(
-        "Performing DE analysis:",
-        condition1,
-        "vs",
-        condition2,
-        "in",
-        tissue_type
-    ))
-
-    # Run DE analysis for each cluster
-    de_results <- purrr::map(
-        levels(sc_subset),
-        function(cluster) {
-            result <- safe_runLimma(
-                cluster = cluster,
-                seurat_object = sc_subset,
-                condition1 = condition1,
-                condition2 = condition2,
-                lookup = lookup
-            )
-            if (is.null(result)) {
-                message(paste("Failed to run DE for cluster:", cluster))
-            }
-            return(result)
-        }
-    )
-
-    # Name the results with cluster names
-    names(de_results) <- levels(sc_subset)
-
-    # Remove NULL results
-    de_results <- purrr::compact(de_results)
-
-    # Save results to Excel
-    writexl::write_xlsx(
-        de_results,
-        file.path("results", "de", paste0(comparison_name, ".xlsx"))
-    )
-
-    # Plot number of DEGs per cluster
-    plotDE(
-        comparison_name,
-        title = paste(condition1, "vs", condition2, tissue_type)
-    )
-
-    return(de_results)
-}
 
 # Run DE analysis for CIDP vs CTRL in CSF
 de_cidp_ctrl_csf <- performDEAnalysis(sc_merge, "CIDP", "CTRL", "CSF")
@@ -292,25 +116,25 @@ volcanoPlot <- function(
 # Define analysis configurations
 volcano_parameters <- list(
     list(
-        filename = "de_cidp_ctrl_csf",
+        filename = "de_cidp_ctrl_csf_cluster",
         clusters = c("CD4TCM_2", "CD8_NK"),
         condition1 = "CIDP",
         condition2 = "CTRL"
     ),
     list(
-        filename = "de_gbs_ctrl_csf",
+        filename = "de_gbs_ctrl_csf_cluster",
         clusters = c("pDC", "CD8_NK"),
         condition1 = "GBS",
         condition2 = "CTRL"
     ),
     list(
-        filename = "de_cidp_ctrl_pbmc",
+        filename = "de_cidp_ctrl_pbmc_cluster",
         clusters = c("CD4TCM_2", "NKCD56dim", "CD8_NK"),
         condition1 = "CIDP",
         condition2 = "CTRL"
     ),
     list(
-        filename = "de_gbs_ctrl_pbmc",
+        filename = "de_gbs_ctrl_pbmc_cluster",
         clusters = c("Plasma", "CD16Mono"),
         condition1 = "GBS",
         condition2 = "CTRL"
@@ -348,7 +172,7 @@ lapply(volcano_parameters, function(config) {
                 FCcutoff = 2,
                 condition1 = config$condition1,
                 condition2 = config$condition2,
-                selectLab = NULL 
+                selectLab = NULL
             )
         }
     )

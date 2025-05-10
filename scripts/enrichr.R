@@ -42,8 +42,8 @@ get_top_genes <- function(
             p_val_adj < max_padj,
             avg_log2FC > min_log2fc
         ) |>
-        dplyr::slice_max(
-            order_by = avg_log2FC,
+        dplyr::slice_min(
+            order_by = p_val_adj,
             n = n,
             with_ties = FALSE
         )

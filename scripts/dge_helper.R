@@ -235,8 +235,9 @@ performDEAnalysis <- function(
         condition1 = condition1,
         condition2 = condition2
     )
-
-    names(combined_result) <- "combined"
+    combined_result <- list(
+        combined = combined_result
+    )
 
     writexl::write_xlsx(
         combined_result,

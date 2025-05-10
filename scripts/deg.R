@@ -122,8 +122,20 @@ volcano_parameters <- list(
         condition2 = "CTRL"
     ),
     list(
+        filename = "de_cidp_ctrl_csf_combined",
+        clusters = c("combined"),
+        condition1 = "CIDP",
+        condition2 = "CTRL"
+    ),
+    list(
         filename = "de_gbs_ctrl_csf_cluster",
         clusters = c("pDC", "CD8_NK"),
+        condition1 = "GBS",
+        condition2 = "CTRL"
+    ),
+    list(
+        filename = "de_gbs_ctrl_csf_combined",
+        clusters = c("combined"),
         condition1 = "GBS",
         condition2 = "CTRL"
     ),
@@ -133,9 +145,21 @@ volcano_parameters <- list(
         condition1 = "CIDP",
         condition2 = "CTRL"
     ),
+    lab_pnp_ctrl <- list(
+        filename = "de_cidp_ctrl_pbmc_combined",
+        clusters = c("combined"),
+        condition1 = "CIDP",
+        condition2 = "CTRL"
+    ),
     list(
         filename = "de_gbs_ctrl_pbmc_cluster",
         clusters = c("Plasma", "CD16Mono"),
+        condition1 = "GBS",
+        condition2 = "CTRL"
+    ),
+    list(
+        filename = "de_gbs_ctrl_pbmc_combined",
+        clusters = c("combined"),
         condition1 = "GBS",
         condition2 = "CTRL"
     )

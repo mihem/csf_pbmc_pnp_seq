@@ -95,6 +95,10 @@ cd8_nk_logfc <- cd8_nk_markers_filtered$avg_log2FC
 names(cd8_nk_logfc) <- cd8_nk_markers_filtered$entrez_id
 cd8_nk_logfc <- sort(cd8_nk_logfc, decreasing = TRUE)
 
+cd8_nk_logfc_gene <- cd8_nk_markers_filtered$avg_log2FC
+names(cd8_nk_logfc_gene) <- cd8_nk_markers_filtered$gene
+cd8_nk_logfc_gene <- sort(cd8_nk_logfc_gene, decreasing = TRUE)
+
 # Prepare background gene set
 background_genes <- map_to_entrez(rownames(sc_merge))
 background_genes <- background_genes[!is.na(background_genes)]
@@ -205,5 +209,9 @@ cd8_nk_msigdb_c8 <- enricher(
 plot_enrichment_results(
     cd8_nk_msigdb_c8,
     prefix = "cd8_nk_msigdb_c8",
-    fold_change = cd8_nk_logfc
+    fold_change = cd8_nk_logfc_gene,
+    width_dp = 7,
+    height_dp = 6,
+    width_hm = 17,
+    height_hm = 5
 )

@@ -13,6 +13,7 @@ library(clusterProfiler)
 library(org.Hs.eg.db)
 library(msigdbr)
 library(viridis)
+library(writexl)
 
 # Helper functions ----
 save_plot <- function(plot, filename, width, height) {
@@ -135,7 +136,7 @@ go_ora <- enrichGO(
     readable = TRUE
 )
 
-writexl::write_xlsx(
+write_xlsx(
     data.frame(go_ora),
     file.path("results", "enrich", "cd8_nk_go_ora_results.xlsx")
 )
@@ -194,6 +195,11 @@ plot_enrichment_results(
     height_hm = 3
 )
 
+write_xlsx(
+    data.frame(cell_enrichment_readable),
+    file.path("results", "enrich", "cd8_nk_cell_markers_results.xlsx")
+)
+
 # MSigDB Analysis ----
 # Get MSigDB gene sets
 msigdb_c8 <- msigdbr(species = "Homo sapiens", category = "C8") |>
@@ -214,4 +220,9 @@ plot_enrichment_results(
     height_dp = 6,
     width_hm = 17,
     height_hm = 5
+)
+
+write_xlsx(
+    data.frame(cd8_nk_msigdb_c8),
+    file.path("results", "enrich", "cd8_nk_msigdb_c8_results.xlsx")
 )

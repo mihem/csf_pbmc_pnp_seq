@@ -1,3 +1,8 @@
+###############################################################################
+# perform enrichment analysis using clusterProfiler
+# requires running annotate.R first
+###############################################################################
+
 # Required libraries ----
 library(tidyverse)
 library(ggplot2)

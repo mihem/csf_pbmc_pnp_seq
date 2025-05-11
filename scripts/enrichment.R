@@ -192,26 +192,18 @@ plot_enrichment_results(
 
 # MSigDB Analysis ----
 # Get MSigDB gene sets
-msigdb_sets <- list(
-    C7 = msigdbr(species = "Homo sapiens", category = "C7") |>
-        select(gs_name, gene_symbol),
-    C8 = msigdbr(species = "Homo sapiens", category = "C8") |>
-        select(gs_name, gene_symbol)
-)
+msigdb_c8 <- msigdbr(species = "Homo sapiens", category = "C8") |>
+    dplyr::select(gs_name, gene_symbol)
 
 # Perform enrichment analysis for each MSigDB category
-msigdb_results <- map(
-    msigdb_sets,
-    ~ enricher(
-        cd8_nk_markers_filtered$gene,
-        TERM2GENE = .x,
-        universe = rownames(sc_merge)
-    )
+cd8_nk_msigdb_c8 <- enricher(
+    cd8_nk_markers_filtered$gene,
+    TERM2GENE = msigdb_c8,
+    universe = rownames(sc_merge)
 )
 
-# Plot MSigDB results
-walk2(
-    msigdb_results,
-    names(msigdb_results),
-    ~ plot_enrichment_results(.x, prefix = paste0("msigdb_", .y))
+plot_enrichment_results(
+    cd8_nk_msigdb_c8,
+    prefix = "cd8_nk_msigdb_c8",
+    fold_change = cd8_nk_logfc
 )

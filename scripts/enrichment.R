@@ -163,18 +163,32 @@ go_gsea <- gseGO(
     seed = TRUE
 )
 
-plot_enrichment_results(go_gsea, prefix = "go_gsea")
+plot_enrichment_results(go_gsea, prefix = "go_gsea", fold_change = ranked_genes)
 
 # Cell Marker Enrichment Analysis ----
 cell_markers <- read_xlsx(file.path("lookup", "Cell_marker_Human.xlsx")) |>
-    select(cell_name, GeneID)
+    dplyr::select(cell_name, GeneID)
 
 cell_enrichment <- enricher(
     cd8_nk_markers_filtered$entrez_id,
     TERM2GENE = cell_markers
 )
 
-plot_enrichment_results(cell_enrichment, prefix = "cell_markers")
+cell_enrichment_readable <- setReadable(
+    cell_enrichment,
+    OrgDb = org.Hs.eg.db,
+    keyType = "ENTREZID"
+)
+
+plot_enrichment_results(
+    cell_enrichment_readable,
+    prefix = "cell_markers",
+    fold_change = cd8_nk_logfc,
+    width_dp = 6,
+    height_dp = 3,
+    width_hm = 7,
+    height_hm = 3
+)
 
 # MSigDB Analysis ----
 # Get MSigDB gene sets

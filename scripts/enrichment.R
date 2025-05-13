@@ -76,6 +76,7 @@ all_cd8_nk_markers <- FindMarkers(
     filter(!is.na(entrez_id))
 
 # Create ranked gene list for GSEA
+# CD8_NK
 ranked_genes <- all_cd8_nk_markers$avg_log2FC
 names(ranked_genes) <- all_cd8_nk_markers$entrez_id
 ranked_genes <- sort(ranked_genes, decreasing = TRUE)
@@ -97,6 +98,18 @@ de_combined_all <-
         }
     ) |>
     setNames(comparisons)
+
+# Create ranked gene list for de combined all
+ranked_genes_combined_all <- lapply(
+    de_combined_all,
+    function(x) {
+        ranked_genes <- x$avg_log2FC
+        names(ranked_genes) <- x$entrez_id
+        ranked_genes <- sort(ranked_genes, decreasing = TRUE)
+        return(ranked_genes)
+    }
+) |>
+    setNames(names(de_combined_all))
 
 # Gene Ontology Analysis ----
 # Over-representation analysis (ORA)
@@ -155,6 +168,63 @@ go_gsea <- gseGO(
 
 plot_enrichment_results(go_gsea, prefix = "go_gsea", fold_change = ranked_genes)
 
+# GSEO GO all clusters combined
+de_combined_gsea <- lapply(
+    names(ranked_genes_combined_all),
+    function(x) {
+        gseGO(
+            geneList = ranked_genes_combined_all[[x]],
+            OrgDb = org.Hs.eg.db,
+            ont = "BP",
+            minGSSize = 10,
+            maxGSSize = 500,
+            pvalueCutoff = 0.05,
+            verbose = TRUE,
+            seed = TRUE
+        )
+    }
+) |>
+    setNames(names(ranked_genes_combined_all))
+
+de_combined_gsea_readable <-
+    lapply(
+        de_combined_gsea,
+        function(x) {
+            setReadable(
+                x,
+                OrgDb = org.Hs.eg.db,
+                keyType = "ENTREZID"
+            )
+        }
+    )
+
+lapply(
+    names(de_combined_gsea_readable),
+    function(x) {
+        data.frame(de_combined_gsea_readable[[x]])
+    }
+) |>
+    setNames(names(de_combined_gsea_readable)) |>
+    write_xlsx(
+        file.path("results", "enrich", "de_combined_gsea_results.xlsx")
+    )
+
+
+# Plot GSEA results for all clusters combined
+lapply(
+    names(de_combined_gsea),
+    function(x) {
+        if (nrow(de_combined_gsea[[x]]) == 0) {
+            return(NULL)
+        } else {
+            plot_enrichment_results(
+                de_combined_gsea[[x]],
+                prefix = paste0(x, "_go_gsea"),
+                fold_change = ranked_genes_combined_all[[x]]
+            )
+        }
+    }
+)
 
 # Cell Marker Enrichment Analysis ----
 cell_markers <- read_xlsx(file.path("lookup", "Cell_marker_Human.xlsx")) |>

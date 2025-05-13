@@ -220,19 +220,19 @@ plot_enrichment_results(go_gsea, prefix = "go_gsea", fold_change = ranked_genes)
 cell_markers <- read_xlsx(file.path("lookup", "Cell_marker_Human.xlsx")) |>
     dplyr::select(cell_name, GeneID)
 
-cd8_nk_cell_enrichment <- enricher(
+cd8_nk_cell_markers_enrichment <- enricher(
     cd8_nk_markers_filtered$entrez_id,
     TERM2GENE = cell_markers
 )
 
-cd8_nkcell_enrichment_readable <- setReadable(
-    cd8_nk_cell_enrichment,
+cd8_nk_cell_markers_enrichment_readable <- setReadable(
+    cd8_nk_cell_markers_enrichment,
     OrgDb = org.Hs.eg.db,
     keyType = "ENTREZID"
 )
 
 plot_enrichment_results(
-    cd8_nkcell_enrichment_readable,
+    cd8_nk_cell_markers_enrichment_readable,
     prefix = "cd8_nk_cell_markers",
     fold_change = cd8_nk_logfc,
     width_dp = 6,
@@ -242,7 +242,7 @@ plot_enrichment_results(
 )
 
 write_xlsx(
-    data.frame(cd8_nkc_ell_enrichment_readable),
+    data.frame(cd8_nk_cell_markers_enrichment_readable),
     file.path("results", "enrich", "cd8_nk_cell_markers_results.xlsx")
 )
 

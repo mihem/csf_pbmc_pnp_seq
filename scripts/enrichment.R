@@ -89,7 +89,7 @@ topmarkers_cd8_nk <- read_xlsx(
 # Get significant top markers with Entrez IDs
 cd8_nk_markers_filtered <- topmarkers_cd8_nk |>
     mutate(entrez_id = map_to_entrez(gene)) |>
-    filter(!is.na(entrez_id), p_val_adj < 0.05, avg_log2FC > 2) |>
+    filter(!is.na(entrez_id), p_val_adj < 0.05, avg_log2FC > 1) |>
     slice_min(order_by = p_val_adj, n = 200)
 
 cd8_nk_logfc <- cd8_nk_markers_filtered$avg_log2FC
@@ -99,6 +99,52 @@ cd8_nk_logfc <- sort(cd8_nk_logfc, decreasing = TRUE)
 cd8_nk_logfc_gene <- cd8_nk_markers_filtered$avg_log2FC
 names(cd8_nk_logfc_gene) <- cd8_nk_markers_filtered$gene
 cd8_nk_logfc_gene <- sort(cd8_nk_logfc_gene, decreasing = TRUE)
+
+# get DE genes of all clusters combined
+de_combined <- read_xlsx(
+    file.path("results", "de", "de_cidp_ctrl_csf_combined.xlsx")
+)
+
+# Split DE genes into up and down regulated using base::split
+read_de_combined_top <- function(condition) {
+    de <- readxl::read_xlsx(
+        file.path("results", "de", paste0("de_", condition, "_combined.xlsx"))
+    ) |>
+        dplyr::filter(
+            p_val_adj < 0.05,
+            abs(avg_log2FC) > 1
+        ) |>
+        dplyr::slice_min(
+            order_by = p_val_adj,
+            n = 100,
+            with_ties = FALSE
+        )
+
+    if (nrow(de) == 0) {
+        return("No sig DE genes found")
+    } else {
+        de <- de |>
+            dplyr::mutate(entrez_id = map_to_entrez(gene)) |>
+            dplyr::filter(!is.na(entrez_id))
+        de <- split(de, sign(de$avg_log2FC)) |>
+            setNames(c("down", "up"))
+            return(de)
+    }
+}
+
+read_de_combined_top("cidp_ctrl_pbmc")
+
+conditions <- c(
+    "cidp_ctrl_csf",
+    "gbs_ctrl_csf",
+    "cidp_ctrl_pbmc",
+    "gbs_ctrl_pbmc"
+)
+
+
+de_combined_list <-
+    lapply(conditions, read_de_combined) |>
+    setNames(conditions)
 
 # Prepare background gene set
 background_genes <- map_to_entrez(rownames(sc_merge))
@@ -174,20 +220,20 @@ plot_enrichment_results(go_gsea, prefix = "go_gsea", fold_change = ranked_genes)
 cell_markers <- read_xlsx(file.path("lookup", "Cell_marker_Human.xlsx")) |>
     dplyr::select(cell_name, GeneID)
 
-cell_enrichment <- enricher(
+cd8_nk_cell_enrichment <- enricher(
     cd8_nk_markers_filtered$entrez_id,
     TERM2GENE = cell_markers
 )
 
-cell_enrichment_readable <- setReadable(
-    cell_enrichment,
+cd8_nkcell_enrichment_readable <- setReadable(
+    cd8_nk_cell_enrichment,
     OrgDb = org.Hs.eg.db,
     keyType = "ENTREZID"
 )
 
 plot_enrichment_results(
-    cell_enrichment_readable,
-    prefix = "cell_markers",
+    cd8_nkcell_enrichment_readable,
+    prefix = "cd8_nk_cell_markers",
     fold_change = cd8_nk_logfc,
     width_dp = 6,
     height_dp = 3,
@@ -196,7 +242,7 @@ plot_enrichment_results(
 )
 
 write_xlsx(
-    data.frame(cell_enrichment_readable),
+    data.frame(cd8_nkc_ell_enrichment_readable),
     file.path("results", "enrich", "cd8_nk_cell_markers_results.xlsx")
 )
 

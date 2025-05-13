@@ -15,6 +15,9 @@ library(msigdbr)
 library(viridis)
 library(writexl)
 
+# Load helper functions ----
+source(file.path("scripts", "enrichment_helper.R"))
+
 # Load and prepare data ----
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthread = 4)
 
@@ -43,7 +46,7 @@ de_combined <- read_xlsx(
     file.path("results", "de", "de_cidp_ctrl_csf_combined.xlsx")
 )
 
-conditions <- c(
+comparisons <- c(
     "cidp_ctrl_csf",
     "gbs_ctrl_csf",
     "cidp_ctrl_pbmc",
@@ -51,8 +54,8 @@ conditions <- c(
 )
 
 de_top_combined_list <-
-    lapply(conditions, read_de_combined_top) |>
-    setNames(conditions)
+    lapply(comparisons, read_de_combined_top) |>
+    setNames(comparisons)
 
 # Prepare background gene set
 background_genes <- map_to_entrez(rownames(sc_merge))
@@ -76,6 +79,24 @@ all_cd8_nk_markers <- FindMarkers(
 ranked_genes <- all_cd8_nk_markers$avg_log2FC
 names(ranked_genes) <- all_cd8_nk_markers$entrez_id
 ranked_genes <- sort(ranked_genes, decreasing = TRUE)
+
+# Get all DE genes of all clusters combined
+de_combined_all <-
+    lapply(
+        X = comparisons,
+        FUN = function(comparison) {
+            read_xlsx(
+                file.path(
+                    "results",
+                    "de",
+                    paste0("de_", comparison, "_combined.xlsx")
+                )
+            ) |>
+                dplyr::mutate(entrez_id = map_to_entrez(gene)) |>
+                dplyr::filter(!is.na(entrez_id))
+        }
+    ) |>
+    setNames(comparisons)
 
 # Gene Ontology Analysis ----
 # Over-representation analysis (ORA)
@@ -120,7 +141,7 @@ de_go_ora <- lapply(
     setNames(names(de_top_combined_list))
 
 
-# Gene Set Enrichment Analysis (GSEA)
+# Gene Set Enrichment Analysis (GSEA) GO
 go_gsea <- gseGO(
     geneList = ranked_genes,
     OrgDb = org.Hs.eg.db,
@@ -133,6 +154,7 @@ go_gsea <- gseGO(
 )
 
 plot_enrichment_results(go_gsea, prefix = "go_gsea", fold_change = ranked_genes)
+
 
 # Cell Marker Enrichment Analysis ----
 cell_markers <- read_xlsx(file.path("lookup", "Cell_marker_Human.xlsx")) |>

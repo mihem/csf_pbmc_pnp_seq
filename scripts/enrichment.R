@@ -107,32 +107,34 @@ de_combined <- read_xlsx(
 
 # Split DE genes into up and down regulated using base::split
 read_de_combined_top <- function(condition) {
+    # Read and filter for significant genes
     de <- readxl::read_xlsx(
         file.path("results", "de", paste0("de_", condition, "_combined.xlsx"))
     ) |>
         dplyr::filter(
             p_val_adj < 0.05,
             abs(avg_log2FC) > 1
-        ) |>
-        dplyr::slice_min(
-            order_by = p_val_adj,
-            n = 100,
-            with_ties = FALSE
         )
 
     if (nrow(de) == 0) {
-        return("No sig DE genes found")
-    } else {
-        de <- de |>
-            dplyr::mutate(entrez_id = map_to_entrez(gene)) |>
-            dplyr::filter(!is.na(entrez_id))
-        de <- split(de, sign(de$avg_log2FC)) |>
-            setNames(c("down", "up"))
-            return(de)
+        return(NULL)
     }
-}
 
-read_de_combined_top("cidp_ctrl_pbmc")
+    # Add entrez IDs and split by direction
+    de_split <- de |>
+        dplyr::mutate(entrez_id = map_to_entrez(gene)) |>
+        dplyr::filter(!is.na(entrez_id)) |>
+        (function(x) split(x, f = sign(x$avg_log2FC)))() |>
+        setNames(c("down", "up"))
+
+    # Get top 100 for each direction by p-value
+    de_split$up <- de_split$up |>
+        dplyr::slice_min(order_by = p_val_adj, n = 100, with_ties = FALSE)
+    de_split$down <- de_split$down |>
+        dplyr::slice_min(order_by = p_val_adj, n = 100, with_ties = FALSE)
+
+    return(de_split)
+}
 
 conditions <- c(
     "cidp_ctrl_csf",
@@ -141,9 +143,8 @@ conditions <- c(
     "gbs_ctrl_pbmc"
 )
 
-
-de_combined_list <-
-    lapply(conditions, read_de_combined) |>
+de_top_combined_list <-
+    lapply(conditions, read_de_combined_top) |>
     setNames(conditions)
 
 # Prepare background gene set
@@ -171,7 +172,7 @@ ranked_genes <- sort(ranked_genes, decreasing = TRUE)
 
 # Gene Ontology Analysis ----
 # Over-representation analysis (ORA)
-go_ora <- enrichGO(
+cd8_nk_go_ora <- enrichGO(
     gene = cd8_nk_markers_filtered$entrez_id,
     universe = background_genes,
     OrgDb = org.Hs.eg.db,
@@ -183,12 +184,12 @@ go_ora <- enrichGO(
 )
 
 write_xlsx(
-    data.frame(go_ora),
+    data.frame(cd8_nk_go_ora),
     file.path("results", "enrich", "cd8_nk_go_ora_results.xlsx")
 )
 
 plot_enrichment_results(
-    go_ora,
+    cd8_nk_go_ora,
     fold_change = cd8_nk_logfc,
     prefix = "cd8_nk_go_ora",
     width_dp = 6,
@@ -198,9 +199,80 @@ plot_enrichment_results(
 )
 
 # Create and plot GO term similarity tree
-go_ora_sim <- enrichplot::pairwise_termsim(go_ora)
-tree_plot <- enrichplot::treeplot(go_ora_sim, showCategory = 10)
-save_plot(tree_plot, "cd8_nk_go_ora_tree.pdf", width = 12, height = 8)
+cd8_nk_go_ora_sim <- enrichplot::pairwise_termsim(cd8_nk_go_ora)
+cd8_nk_tree_plot <- enrichplot::treeplot(cd8_nk_go_ora_sim, showCategory = 10)
+save_plot(cd8_nk_tree_plot, "cd8_nk_go_ora_tree.pdf", width = 12, height = 8)
+
+# Helper function for GO enrichment analysis
+run_go_enrichment <- function(gene_list, name, universe = background_genes) {
+    # Function to process single direction
+    process_direction <- function(genes, direction) {
+        if (is.null(genes) || nrow(genes) == 0) {
+            cat(sprintf("%s %s: No genes to analyze\n", name, direction))
+            return(NULL)
+        }
+
+        prefix <- paste0(name, "_", direction, "_go_ora")
+
+        # Run enrichment
+        result <- enrichGO(
+            gene = genes$entrez_id,
+            universe = universe,
+            OrgDb = org.Hs.eg.db,
+            ont = "BP",
+            pAdjustMethod = "BH",
+            pvalueCutoff = 0.01,
+            qvalueCutoff = 0.05,
+            readable = TRUE
+        )
+
+        # If we have results, save and plot them
+        if (!is.null(result) && nrow(as.data.frame(result)) > 0) {
+            n_terms <- nrow(as.data.frame(result))
+            cat(sprintf("%s: %d enriched terms\n", prefix, n_terms))
+
+            # Create plots
+            plot_enrichment_results(
+                result,
+                fold_change = NULL,
+                prefix = prefix,
+                width_dp = 7,
+                height_dp = 6
+            )
+
+            # Save results to Excel
+            write_xlsx(
+                data.frame(result),
+                file.path("results", "enrich", paste0(prefix, ".xlsx"))
+            )
+        } else {
+            cat(sprintf("%s: No enrichment results\n", prefix))
+        }
+
+        return(result)
+    }
+
+    # Process both directions if gene_list exists
+    if (!is.null(gene_list)) {
+        return(list(
+            up = process_direction(gene_list$up, "up"),
+            down = process_direction(gene_list$down, "down")
+        ))
+    } else {
+        cat(sprintf("%s: No results to analyze\n", name))
+        return(NULL)
+    }
+}
+
+# Run GO enrichment analysis for all conditions
+de_go_ora <- lapply(
+    names(de_top_combined_list),
+    function(condition) {
+        run_go_enrichment(de_top_combined_list[[condition]], condition)
+    }
+) |>
+    setNames(names(de_top_combined_list))
+
 
 # Gene Set Enrichment Analysis (GSEA)
 go_gsea <- gseGO(

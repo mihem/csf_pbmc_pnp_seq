@@ -51,7 +51,7 @@ plot_enrichment_results <- function(
 }
 
 map_to_entrez <- function(genes, from_type = "SYMBOL") {
-    entrez_ids <- mapIds(
+    entrez_ids <- AnnotationDbi::mapIds(
         org.Hs.eg.db,
         keys = genes,
         keytype = from_type,

@@ -91,6 +91,40 @@ read_de_combined_top <- function(condition) {
     return(de_split)
 }
 
+# Read DE results from cluster files with multiple sheets
+read_de_cluster_top <- function(condition, sheets) {
+    results <- list()
+    
+    for (sheet in sheets) {
+        # Read and filter for significant genes
+        de <- readxl::read_xlsx(
+            file.path("results", "de", paste0("de_", condition, "_cluster.xlsx")),
+            sheet = sheet
+        ) |>
+            dplyr::filter(
+                p_val_adj < 0.05,
+                abs(avg_log2FC) > 1
+            )
+
+        # Add entrez IDs and split by direction
+        de_split <- de |>
+            dplyr::mutate(entrez_id = map_to_entrez(gene)) |>
+            dplyr::filter(!is.na(entrez_id)) |>
+            (function(x) split(x, f = sign(x$avg_log2FC)))() |>
+            setNames(c("down", "up"))
+
+        # Get top 100 for each direction by p-value
+        de_split$up <- de_split$up |>
+            dplyr::slice_min(order_by = p_val_adj, n = 100, with_ties = FALSE)
+        de_split$down <- de_split$down |>
+            dplyr::slice_min(order_by = p_val_adj, n = 100, with_ties = FALSE)
+
+        results[[sheet]] <- de_split
+    }
+
+    return(results)
+}
+
 # Helper function for GO enrichment analysis
 run_go_enrichment <- function(gene_list, name, universe = background_genes) {
     # Function to process single direction

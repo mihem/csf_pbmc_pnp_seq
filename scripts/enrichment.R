@@ -41,11 +41,7 @@ cd8_nk_logfc_gene <- cd8_nk_markers_filtered$avg_log2FC
 names(cd8_nk_logfc_gene) <- cd8_nk_markers_filtered$gene
 cd8_nk_logfc_gene <- sort(cd8_nk_logfc_gene, decreasing = TRUE)
 
-# get DE genes of all clusters combined
-de_combined <- read_xlsx(
-    file.path("results", "de", "de_cidp_ctrl_csf_combined.xlsx")
-)
-
+# Read DE genes of all clusters combined
 comparisons <- c(
     "cidp_ctrl_csf",
     "gbs_ctrl_csf",
@@ -56,6 +52,9 @@ comparisons <- c(
 de_top_combined_list <-
     lapply(comparisons, read_de_combined_top) |>
     setNames(comparisons)
+ 
+# Read DE genes of specific clusters
+
 
 # Prepare background gene set
 background_genes <- map_to_entrez(rownames(sc_merge))

@@ -74,23 +74,23 @@ de_cluster_parameters <- list(
     )
 )
 
-de_top_cluster_list <-
-    lapply(
-        de_cluster_parameters,
-        function(config) {
-            cluster_results <- lapply(
-                config$clusters,
-                function(cluster) {
-                    read_de_cluster_top(
-                        condition = config$condition,
-                        sheets = cluster
-                    )
-                }
-            )
-            names(cluster_results) <- config$clusters
-            cluster_results
-        }
-    )
+# Read DE genes of specific clusters
+de_top_cluster_list <- list()
+for (config in de_cluster_parameters) {
+    # Initialize list for this condition
+    cluster_results <- list()
+    
+    # Read data for each cluster
+    for (cluster in config$clusters) {
+        cluster_results[[cluster]] <- read_de_cluster_top(
+            condition = config$condition,
+            sheets = cluster
+        )
+    }
+    
+    # Store results for this condition
+    de_top_cluster_list[[config$condition]] <- cluster_results
+}
 names(de_top_cluster_list) <- sapply(de_cluster_parameters, `[[`, "condition")
 
 # Prepare background gene set
@@ -148,50 +148,42 @@ ranked_genes_combined_all <- lapply(
     setNames(names(de_combined_all))
 
 # Create ranked gene list for de cluster specific
-de_cluster_all <-
-    lapply(
-        de_cluster_parameters,
-        function(config) {
-            cluster_results <- lapply(
-                config$clusters,
-                function(cluster) {
-                    readxl::read_xlsx(
-                        file.path(
-                            "results",
-                            "de",
-                            paste0("de_", config$condition, "_cluster.xlsx")
-                        ),
-                        sheet = cluster
-                    ) |>
-                        dplyr::mutate(entrez_id = map_to_entrez(gene)) |>
-                        dplyr::filter(!is.na(entrez_id))
-                }
-            )
-            names(cluster_results) <- config$clusters
-            cluster_results
-        }
-    )
+de_cluster_all <- list()
+for (config in de_cluster_parameters) {
+    condition <- config$condition
+    de_cluster_all[[condition]] <- list()
+    
+    for (cluster in config$clusters) {
+        de_cluster_all[[condition]][[cluster]] <- readxl::read_xlsx(
+            file.path(
+                "results",
+                "de",
+                paste0("de_", condition, "_cluster.xlsx")
+            ),
+            sheet = cluster
+        ) |>
+            dplyr::mutate(entrez_id = map_to_entrez(gene)) |>
+            dplyr::filter(!is.na(entrez_id))
+    }
+    names(de_cluster_all[[condition]]) <- config$clusters
+}
 names(de_cluster_all) <- sapply(de_cluster_parameters, `[[`, "condition")
 
 
 # Create ranked gene list for de cluster all
-ranked_genes_cluster_all <- lapply(
-    names(de_cluster_all),
-    function(condition) {
-        lapply(
-            names(de_cluster_all[[condition]]),
-            function(cluster) {
-                cluster_data <- de_cluster_all[[condition]][[cluster]]
-                ranked_genes <- cluster_data$avg_log2FC
-                names(ranked_genes) <- cluster_data$entrez_id
-                ranked_genes <- sort(ranked_genes, decreasing = TRUE)
-                return(ranked_genes)
-            }
-        ) |>
-            setNames(names(de_cluster_all[[condition]]))
+ranked_genes_cluster_all <- list()
+for (condition in names(de_cluster_all)) {
+    ranked_genes_cluster_all[[condition]] <- list()
+    
+    for (cluster in names(de_cluster_all[[condition]])) {
+        cluster_data <- de_cluster_all[[condition]][[cluster]]
+        ranked_genes <- cluster_data$avg_log2FC
+        names(ranked_genes) <- cluster_data$entrez_id
+        ranked_genes_cluster_all[[condition]][[cluster]] <- sort(ranked_genes, decreasing = TRUE)
     }
-) |>
-    setNames(names(de_cluster_all))
+    names(ranked_genes_cluster_all[[condition]]) <- names(de_cluster_all[[condition]])
+}
+names(ranked_genes_cluster_all) <- names(de_cluster_all)
 
 # Gene Ontology Analysis ----
 # Over-representation analysis (ORA)
@@ -236,29 +228,24 @@ de_go_ora <- lapply(
     setNames(names(de_top_combined_list))
 
 # Run GO enrichment analysis cluster specific DEG
-de_go_ora_cluster <- lapply(
-    names(de_top_cluster_list),
-    function(condition) {
-        cluster_results <- de_top_cluster_list[[condition]]
-        # For each cluster in this condition
-        cluster_enrichment <- lapply(
-            names(cluster_results),
-            function(cluster) {
-                # Get DEG for this specific cluster
-                deg_cluster <- cluster_results[[cluster]]
-                # Run enrichment and name results with condition_cluster
-                result <- run_go_enrichment(
-                    deg_cluster,
-                    paste0(condition, "_", cluster)
-                )
-                return(result)
-            }
-        ) |>
-            setNames(names(cluster_results))
-        return(cluster_enrichment)
+de_go_ora_cluster <- list()
+for (condition in names(de_top_cluster_list)) {
+    cluster_results <- de_top_cluster_list[[condition]]
+    de_go_ora_cluster[[condition]] <- list()
+    
+    # For each cluster in this condition
+    for (cluster in names(cluster_results)) {
+        # Get DEG for this specific cluster
+        deg_cluster <- cluster_results[[cluster]]
+        # Run enrichment and name results with condition_cluster
+        de_go_ora_cluster[[condition]][[cluster]] <- run_go_enrichment(
+            deg_cluster,
+            paste0(condition, "_", cluster)
+        )
     }
-) |>
-    setNames(names(de_top_cluster_list))
+    names(de_go_ora_cluster[[condition]]) <- names(cluster_results)
+}
+names(de_go_ora_cluster) <- names(de_top_cluster_list)
 
 # Gene Set Enrichment Analysis (GSEA) GO
 go_gsea <- gseGO(
@@ -335,92 +322,72 @@ lapply(
 )
 
 # GSEO GO cluster specific
-de_cluster_gsea <- lapply(
-    names(ranked_genes_cluster_all),
-    function(condition) {
-        lapply(
-            names(ranked_genes_cluster_all[[condition]]),
-            function(cluster) {
-                ranked_genes <- ranked_genes_cluster_all[[condition]][[cluster]]
-                gseGO(
-                    geneList = ranked_genes,
-                    OrgDb = org.Hs.eg.db,
-                    ont = "BP",
-                    minGSSize = 10,
-                    maxGSSize = 500,
-                    pvalueCutoff = 0.05,
-                    verbose = TRUE,
-                    seed = TRUE
-                )
-            }
-        ) |>
-            setNames(names(ranked_genes_cluster_all[[condition]]))
+de_cluster_gsea <- list()
+for (condition in names(ranked_genes_cluster_all)) {
+    de_cluster_gsea[[condition]] <- list()
+    
+    for (cluster in names(ranked_genes_cluster_all[[condition]])) {
+        ranked_genes <- ranked_genes_cluster_all[[condition]][[cluster]]
+        de_cluster_gsea[[condition]][[cluster]] <- gseGO(
+            geneList = ranked_genes,
+            OrgDb = org.Hs.eg.db,
+            ont = "BP",
+            minGSSize = 10,
+            maxGSSize = 500,
+            pvalueCutoff = 0.05,
+            verbose = TRUE,
+            seed = TRUE
+        )
     }
-) |>
-    setNames(names(ranked_genes_cluster_all))
+    names(de_cluster_gsea[[condition]]) <- names(ranked_genes_cluster_all[[condition]])
+}
+names(de_cluster_gsea) <- names(ranked_genes_cluster_all)
 
 # Make GSEA results readable for cluster specific
-de_cluster_gsea_readable <- lapply(
-    names(de_cluster_gsea),
-    function(condition) {
-        lapply(
-            names(de_cluster_gsea[[condition]]),
-            function(cluster) {
-                setReadable(
-                    de_cluster_gsea[[condition]][[cluster]],
-                    OrgDb = org.Hs.eg.db,
-                    keyType = "ENTREZID"
-                )
-            }
-        ) |>
-            setNames(names(de_cluster_gsea[[condition]]))
+de_cluster_gsea_readable <- list()
+for (condition in names(de_cluster_gsea)) {
+    de_cluster_gsea_readable[[condition]] <- list()
+    for (cluster in names(de_cluster_gsea[[condition]])) {
+        de_cluster_gsea_readable[[condition]][[cluster]] <- setReadable(
+            de_cluster_gsea[[condition]][[cluster]],
+            OrgDb = org.Hs.eg.db,
+            keyType = "ENTREZID"
+        )
     }
-) |>
-    setNames(names(de_cluster_gsea))
+    names(de_cluster_gsea_readable[[condition]]) <- names(de_cluster_gsea[[condition]])
+}
+names(de_cluster_gsea_readable) <- names(de_cluster_gsea)
 
 # Save cluster specific GSEA results to Excel
-lapply(
-    names(de_cluster_gsea_readable),
-    function(condition) {
-        cluster_results <- lapply(
-            names(de_cluster_gsea_readable[[condition]]),
-            function(cluster) {
-                data.frame(de_cluster_gsea_readable[[condition]][[cluster]])
-            }
-        ) |>
-            setNames(names(de_cluster_gsea_readable[[condition]]))
-        
-        write_xlsx(
-            cluster_results,
-            file.path(
-                "results", 
-                "enrich", 
-                paste0("de_", condition, "_cluster_gsea_results.xlsx")
-            )
+for (condition in names(de_cluster_gsea_readable)) {
+    cluster_results <- list()
+    for (cluster in names(de_cluster_gsea_readable[[condition]])) {
+        cluster_results[[cluster]] <- data.frame(
+            de_cluster_gsea_readable[[condition]][[cluster]]
         )
     }
-)
+    write_xlsx(
+        cluster_results,
+        file.path(
+            "results", 
+            "enrich", 
+            paste0("de_", condition, "_cluster_gsea_results.xlsx")
+        )
+    )
+}
 
 # Plot GSEA results for cluster specific
-lapply(
-    names(de_cluster_gsea),
-    function(condition) {
-        lapply(
-            names(de_cluster_gsea[[condition]]),
-            function(cluster) {
-                if (nrow(de_cluster_gsea[[condition]][[cluster]]) == 0) {
-                    return(NULL)
-                } else {
-                    plot_enrichment_results(
-                        de_cluster_gsea[[condition]][[cluster]],
-                        prefix = paste0(condition, "_", cluster, "_go_gsea"),
-                        fold_change = ranked_genes_cluster_all[[condition]][[cluster]]
-                    )
-                }
-            }
-        )
+for (condition in names(de_cluster_gsea)) {
+    for (cluster in names(de_cluster_gsea[[condition]])) {
+        if (nrow(de_cluster_gsea[[condition]][[cluster]]) > 0) {
+            plot_enrichment_results(
+                de_cluster_gsea[[condition]][[cluster]],
+                prefix = paste0(condition, "_", cluster, "_go_gsea"),
+                fold_change = ranked_genes_cluster_all[[condition]][[cluster]]
+            )
+        }
     }
-)
+}
 
 # Cell Marker Enrichment Analysis ----
 cell_markers <- read_xlsx(file.path("lookup", "Cell_marker_Human.xlsx")) |>

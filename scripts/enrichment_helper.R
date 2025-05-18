@@ -94,11 +94,15 @@ read_de_combined_top <- function(condition) {
 # Read DE results from cluster files with multiple sheets
 read_de_cluster_top <- function(condition, sheets) {
     results <- list()
-    
+
     for (sheet in sheets) {
         # Read and filter for significant genes
         de <- readxl::read_xlsx(
-            file.path("results", "de", paste0("de_", condition, "_cluster.xlsx")),
+            file.path(
+                "results",
+                "de",
+                paste0("de_", condition, "_cluster.xlsx")
+            ),
             sheet = sheet
         ) |>
             dplyr::filter(
@@ -109,17 +113,41 @@ read_de_cluster_top <- function(condition, sheets) {
         # Add entrez IDs and split by direction
         de_split <- de |>
             dplyr::mutate(entrez_id = map_to_entrez(gene)) |>
-            dplyr::filter(!is.na(entrez_id)) |>
-            (function(x) split(x, f = sign(x$avg_log2FC)))() |>
-            setNames(c("down", "up"))
+            dplyr::filter(!is.na(entrez_id))
 
         # Get top 100 for each direction by p-value
-        de_split$up <- de_split$up |>
-            dplyr::slice_min(order_by = p_val_adj, n = 100, with_ties = FALSE)
-        de_split$down <- de_split$down |>
-            dplyr::slice_min(order_by = p_val_adj, n = 100, with_ties = FALSE)
+        nrows_up <- de_split |>
+            dplyr::filter(avg_log2FC > 0) |>
+            nrow()
 
-        results[[sheet]] <- de_split
+        nrows_down <- de_split |>
+            dplyr::filter(avg_log2FC < 0) |>
+            nrow()
+
+        if (nrows_down == 0) {
+            results[[sheet]]$down <- NULL
+        } else {
+            results[[sheet]]$down <- de_split |>
+                dplyr::filter(avg_log2FC < 0) |>
+                dplyr::slice_min(
+                    order_by = p_val_adj,
+                    n = 100,
+                    with_ties = FALSE
+                )
+        }
+
+        if (nrows_up == 0) {
+            results[[sheet]]$up <- NULL
+        } else {
+            results[[sheet]]$up <- de_split |>
+                dplyr::filter(avg_log2FC > 0) |>
+                dplyr::slice_min(
+                    order_by = p_val_adj,
+                    n = 100,
+                    with_ties = FALSE
+                )
+        }
+
     }
 
     return(results)

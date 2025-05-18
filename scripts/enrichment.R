@@ -292,6 +292,7 @@ de_combined_gsea <- lapply(
 ) |>
     setNames(names(ranked_genes_combined_all))
 
+# Make GSEA results readable for all clusters combined
 de_combined_gsea_readable <-
     lapply(
         de_combined_gsea,
@@ -304,6 +305,7 @@ de_combined_gsea_readable <-
         }
     )
 
+# Save GSEA results to Excel for all clusters combined
 lapply(
     names(de_combined_gsea_readable),
     function(x) {
@@ -332,24 +334,93 @@ lapply(
     }
 )
 
-# RUN GSEA for cluster specific DEGs
+# GSEO GO cluster specific
 de_cluster_gsea <- lapply(
-    names(ranked_genes_combined_all),
-    function(x) {
-        gseGO(
-            geneList = ranked_genes_combined_all[[x]],
-            OrgDb = org.Hs.eg.db,
-            ont = "BP",
-            minGSSize = 10,
-            maxGSSize = 500,
-            pvalueCutoff = 0.05,
-            verbose = TRUE,
-            seed = TRUE
-        )
+    names(ranked_genes_cluster_all),
+    function(condition) {
+        lapply(
+            names(ranked_genes_cluster_all[[condition]]),
+            function(cluster) {
+                ranked_genes <- ranked_genes_cluster_all[[condition]][[cluster]]
+                gseGO(
+                    geneList = ranked_genes,
+                    OrgDb = org.Hs.eg.db,
+                    ont = "BP",
+                    minGSSize = 10,
+                    maxGSSize = 500,
+                    pvalueCutoff = 0.05,
+                    verbose = TRUE,
+                    seed = TRUE
+                )
+            }
+        ) |>
+            setNames(names(ranked_genes_cluster_all[[condition]]))
     }
 ) |>
-    setNames(names(ranked_genes_combined_all))
+    setNames(names(ranked_genes_cluster_all))
 
+# Make GSEA results readable for cluster specific
+de_cluster_gsea_readable <- lapply(
+    names(de_cluster_gsea),
+    function(condition) {
+        lapply(
+            names(de_cluster_gsea[[condition]]),
+            function(cluster) {
+                setReadable(
+                    de_cluster_gsea[[condition]][[cluster]],
+                    OrgDb = org.Hs.eg.db,
+                    keyType = "ENTREZID"
+                )
+            }
+        ) |>
+            setNames(names(de_cluster_gsea[[condition]]))
+    }
+) |>
+    setNames(names(de_cluster_gsea))
+
+# Save cluster specific GSEA results to Excel
+lapply(
+    names(de_cluster_gsea_readable),
+    function(condition) {
+        cluster_results <- lapply(
+            names(de_cluster_gsea_readable[[condition]]),
+            function(cluster) {
+                data.frame(de_cluster_gsea_readable[[condition]][[cluster]])
+            }
+        ) |>
+            setNames(names(de_cluster_gsea_readable[[condition]]))
+        
+        write_xlsx(
+            cluster_results,
+            file.path(
+                "results", 
+                "enrich", 
+                paste0("de_", condition, "_cluster_gsea_results.xlsx")
+            )
+        )
+    }
+)
+
+# Plot GSEA results for cluster specific
+lapply(
+    names(de_cluster_gsea),
+    function(condition) {
+        lapply(
+            names(de_cluster_gsea[[condition]]),
+            function(cluster) {
+                if (nrow(de_cluster_gsea[[condition]][[cluster]]) == 0) {
+                    return(NULL)
+                } else {
+                    plot_enrichment_results(
+                        de_cluster_gsea[[condition]][[cluster]],
+                        prefix = paste0(condition, "_", cluster, "_go_gsea"),
+                        fold_change = ranked_genes_cluster_all[[condition]][[cluster]]
+                    )
+                }
+            }
+        )
+    }
+)
 
 # Cell Marker Enrichment Analysis ----
 cell_markers <- read_xlsx(file.path("lookup", "Cell_marker_Human.xlsx")) |>

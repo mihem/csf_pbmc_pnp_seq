@@ -52,9 +52,46 @@ comparisons <- c(
 de_top_combined_list <-
     lapply(comparisons, read_de_combined_top) |>
     setNames(comparisons)
- 
-# Read DE genes of specific clusters
 
+# Read DE genes of specific clusters
+# Define analysis configurations
+de_cluster_parameters <- list(
+    list(
+        condition = "cidp_ctrl_csf",
+        clusters = c("CD4TCM_2", "CD8_NK")
+    ),
+    list(
+        condition = "gbs_ctrl_csf",
+        clusters = c("pDC", "CD8_NK")
+    ),
+    list(
+        condition = "cidp_ctrl_pbmc",
+        clusters = c("CD4TCM_2", "NKCD56dim", "CD8_NK")
+    ),
+    list(
+        condition = "gbs_ctrl_pbmc",
+        clusters = c("Plasma", "CD16Mono")
+    )
+)
+
+de_top_cluster_list <-
+    lapply(
+        de_cluster_parameters,
+        function(config) {
+            cluster_results <- lapply(
+                config$clusters,
+                function(cluster) {
+                    read_de_cluster_top(
+                        condition = config$condition,
+                        sheets = cluster
+                    )
+                }
+            )
+            names(cluster_results) <- config$clusters
+            cluster_results
+        }
+    )
+names(de_top_cluster_list) <- sapply(de_cluster_parameters, `[[`, "condition")
 
 # Prepare background gene set
 background_genes <- map_to_entrez(rownames(sc_merge))

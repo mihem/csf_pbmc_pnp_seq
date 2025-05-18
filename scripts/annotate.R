@@ -263,7 +263,10 @@ sc_merge@misc$tissue_diagnosis_col <- setNames(
   sc_merge@misc$tissue_diagnosis_order
 )
 
-sc_merge$tissue_diagnosis <- factor(paste0(sc_merge$tissue, "_", sc_merge$diagnosis), levels = sc_merge@misc$tissue_diagnosis_order)
+sc_merge$tissue_diagnosis <- factor(
+  paste0(sc_merge$tissue, "_", sc_merge$diagnosis),
+  levels = sc_merge@misc$tissue_diagnosis_order
+)
 sc_merge$tissue_group <- paste0(sc_merge$tissue, "_", sc_merge$group)
 
 #sanity check
@@ -388,7 +391,13 @@ dotPlot(
 )
 
 # olink markers
-olink_cols <- c("olink_96_immuno_onco", "olink_96_inflammation", "olink_48_immune_surv", "olink_48_cytokine", "blood_nerve_olink")
+olink_cols <- c(
+  "olink_96_immuno_onco",
+  "olink_96_inflammation",
+  "olink_48_immune_surv",
+  "olink_48_cytokine",
+  "blood_nerve_olink"
+)
 
 lapply(
   olink_cols,
@@ -422,6 +431,46 @@ lapply(
   }
 )
 
+# Louisas markers
+dotPlot(
+  path = file.path("lookup", "markers.csv"),
+  object = sc_merge,
+  par = "louisa",
+  dot_min = 0.01,
+  height = 8,
+  width = 12
+)
+
+tcells <- subset(
+  sc_merge,
+  cluster %in%
+    c(
+      "CD4naive_1",
+      "CD4TCM_1",
+      "CD4TCM_2",
+      "CD4TEM",
+      "Treg",
+      "MAIT",
+      "gdT",
+      "CD4CTL",
+      "CD8naive",
+      "CD8TCM",
+      "CD8TEM_1",
+      "CD8TEM_2",
+      "CD8_NK",
+      "NKCD56bright",
+      "NKCD56dim"
+    )
+)
+
+dotPlot(
+  path = file.path("lookup", "markers.csv"),
+  object = tcells,
+  par = "louisa",
+  dot_min = 0.01,
+  height = 8,
+  width = 12
+)
 
 # feature plots ---
 scMisc::fPlot(
@@ -433,7 +482,6 @@ scMisc::fPlot(
   width = 24
 )
 
-# feature plots ---
 scMisc::fPlot(
   path = file.path("lookup", "markers.csv"),
   object = sc_merge,
@@ -444,11 +492,20 @@ scMisc::fPlot(
   height = 32
 )
 
-# feature plots ---
 scMisc::fPlot(
   path = file.path("lookup", "markers.csv"),
   object = sc_merge,
   par = "dying_cells",
+  reduction = "umap.stacas.ss.all",
+  order = FALSE,
+  width = 40,
+  height = 20
+)
+
+scMisc::fPlot(
+  path = file.path("lookup", "markers.csv"),
+  object = sc_merge,
+  par = "louisa",
   reduction = "umap.stacas.ss.all",
   order = FALSE,
   width = 40,

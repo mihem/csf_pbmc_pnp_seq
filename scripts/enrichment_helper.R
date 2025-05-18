@@ -161,6 +161,13 @@ run_go_enrichment <- function(gene_list, name, universe = background_genes) {
             return(NULL)
         }
 
+        # Check if we have enough genes for meaningful enrichment
+        if (length(genes$entrez_id) < 10) {
+            cat(sprintf("%s %s: Only %d genes, skipping enrichment (minimum 10 required)\n", 
+                name, direction, length(genes$entrez_id)))
+            return(NULL)
+        }
+
         prefix <- paste0(name, "_", direction, "_go_ora")
 
         # Run enrichment

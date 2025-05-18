@@ -125,9 +125,9 @@ read_de_cluster_top <- function(condition, sheets) {
             nrow()
 
         if (nrows_down == 0) {
-            results[[sheet]]$down <- NULL
+            results$down <- NULL
         } else {
-            results[[sheet]]$down <- de_split |>
+            results$down <- de_split |>
                 dplyr::filter(avg_log2FC < 0) |>
                 dplyr::slice_min(
                     order_by = p_val_adj,
@@ -137,9 +137,9 @@ read_de_cluster_top <- function(condition, sheets) {
         }
 
         if (nrows_up == 0) {
-            results[[sheet]]$up <- NULL
+            results$up <- NULL
         } else {
-            results[[sheet]]$up <- de_split |>
+            results$up <- de_split |>
                 dplyr::filter(avg_log2FC > 0) |>
                 dplyr::slice_min(
                     order_by = p_val_adj,
@@ -147,7 +147,6 @@ read_de_cluster_top <- function(condition, sheets) {
                     with_ties = FALSE
                 )
         }
-
     }
 
     return(results)

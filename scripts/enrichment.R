@@ -189,6 +189,30 @@ de_go_ora <- lapply(
 ) |>
     setNames(names(de_top_combined_list))
 
+# Run GO enrichment analysis cluster specific DEG
+de_go_ora_cluster <- lapply(
+    names(de_top_cluster_list),
+    function(condition) {
+        cluster_results <- de_top_cluster_list[[condition]]
+        # For each cluster in this condition
+        cluster_enrichment <- lapply(
+            names(cluster_results),
+            function(cluster) {
+                # Get DEG for this specific cluster
+                deg_cluster <- cluster_results[[cluster]]
+                # Run enrichment and name results with condition_cluster
+                result <- run_go_enrichment(
+                    deg_cluster,
+                    paste0(condition, "_", cluster)
+                )
+                return(result)
+            }
+        ) |>
+            setNames(names(cluster_results))
+        return(cluster_enrichment)
+    }
+) |>
+    setNames(names(de_top_cluster_list))
 
 # Gene Set Enrichment Analysis (GSEA) GO
 go_gsea <- gseGO(

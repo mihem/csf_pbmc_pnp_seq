@@ -145,7 +145,7 @@ volcano_parameters <- list(
         condition1 = "CIDP",
         condition2 = "CTRL"
     ),
-    lab_pnp_ctrl <- list(
+    list(
         filename = "de_cidp_ctrl_pbmc_combined",
         clusters = c("combined"),
         condition1 = "CIDP",

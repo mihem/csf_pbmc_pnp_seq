@@ -304,16 +304,15 @@ lapply(
         file.path("results", "enrich", "de_combined_gsea_results.xlsx")
     )
 
-
 # Plot GSEA results for all clusters combined
 lapply(
-    names(de_combined_gsea),
+    names(de_combined_gsea_readable),
     function(x) {
-        if (nrow(de_combined_gsea[[x]]) == 0) {
+        if (nrow(de_combined_gsea_readable[[x]]) == 0) {
             return(NULL)
         } else {
             plot_enrichment_results(
-                de_combined_gsea[[x]],
+                de_combined_gsea_readable[[x]],
                 prefix = paste0(x, "_go_gsea"),
                 fold_change = ranked_genes_combined_all[[x]]
             )
@@ -377,11 +376,11 @@ for (condition in names(de_cluster_gsea_readable)) {
 }
 
 # Plot GSEA results for cluster specific
-for (condition in names(de_cluster_gsea)) {
-    for (cluster in names(de_cluster_gsea[[condition]])) {
-        if (nrow(de_cluster_gsea[[condition]][[cluster]]) > 0) {
+for (condition in names(de_cluster_gsea_readable)) {
+    for (cluster in names(de_cluster_gsea_readable[[condition]])) {
+        if (nrow(de_cluster_gsea_readable[[condition]][[cluster]]) > 0) {
             plot_enrichment_results(
-                de_cluster_gsea[[condition]][[cluster]],
+                de_cluster_gsea_readable[[condition]][[cluster]],
                 prefix = paste0(condition, "_", cluster, "_go_gsea"),
                 fold_change = ranked_genes_cluster_all[[condition]][[cluster]]
             )

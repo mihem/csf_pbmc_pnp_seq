@@ -147,6 +147,52 @@ ranked_genes_combined_all <- lapply(
 ) |>
     setNames(names(de_combined_all))
 
+# Create ranked gene list for de cluster specific
+de_cluster_all <-
+    lapply(
+        de_cluster_parameters,
+        function(config) {
+            cluster_results <- lapply(
+                config$clusters,
+                function(cluster) {
+                    readxl::read_xlsx(
+                        file.path(
+                            "results",
+                            "de",
+                            paste0("de_", config$condition, "_cluster.xlsx")
+                        ),
+                        sheet = cluster
+                    ) |>
+                        dplyr::mutate(entrez_id = map_to_entrez(gene)) |>
+                        dplyr::filter(!is.na(entrez_id))
+                }
+            )
+            names(cluster_results) <- config$clusters
+            cluster_results
+        }
+    )
+names(de_cluster_all) <- sapply(de_cluster_parameters, `[[`, "condition")
+
+
+# Create ranked gene list for de cluster all
+ranked_genes_cluster_all <- lapply(
+    names(de_cluster_all),
+    function(condition) {
+        lapply(
+            names(de_cluster_all[[condition]]),
+            function(cluster) {
+                cluster_data <- de_cluster_all[[condition]][[cluster]]
+                ranked_genes <- cluster_data$avg_log2FC
+                names(ranked_genes) <- cluster_data$entrez_id
+                ranked_genes <- sort(ranked_genes, decreasing = TRUE)
+                return(ranked_genes)
+            }
+        ) |>
+            setNames(names(de_cluster_all[[condition]]))
+    }
+) |>
+    setNames(names(de_cluster_all))
+
 # Gene Ontology Analysis ----
 # Over-representation analysis (ORA)
 cd8_nk_go_ora <- enrichGO(
@@ -285,6 +331,25 @@ lapply(
         }
     }
 )
+
+# RUN GSEA for cluster specific DEGs
+de_cluster_gsea <- lapply(
+    names(ranked_genes_combined_all),
+    function(x) {
+        gseGO(
+            geneList = ranked_genes_combined_all[[x]],
+            OrgDb = org.Hs.eg.db,
+            ont = "BP",
+            minGSSize = 10,
+            maxGSSize = 500,
+            pvalueCutoff = 0.05,
+            verbose = TRUE,
+            seed = TRUE
+        )
+    }
+) |>
+    setNames(names(ranked_genes_combined_all))
+
 
 # Cell Marker Enrichment Analysis ----
 cell_markers <- read_xlsx(file.path("lookup", "Cell_marker_Human.xlsx")) |>

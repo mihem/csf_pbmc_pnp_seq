@@ -369,6 +369,17 @@ dotPlot(
   width = 12
 )
 
+# exhaustion markers
+dotPlot(
+  path = file.path("lookup", "markers.csv"),
+  object = sc_merge,
+  par = "exhaustion",
+  dot_min = 0.01,
+  height = 8,
+  width = 12
+)
+
+
 # go blood brain barrier
 dotPlot(
   path = file.path("lookup", "markers.csv"),
@@ -511,3 +522,15 @@ scMisc::fPlot(
   width = 40,
   height = 20
 )
+
+nk_cells <- readRDS(
+  "/home/mischko/Documents/beruf/forschung/scRNA_reference/human_blood/nk_cells/nk_cells_rna.rds"
+)
+
+meta <- read_csv("/home/mischko/Documents/beruf/forschung/scRNA_reference/human_blood/all_pbmcs/all_pbmcs_metadata.csv")
+
+meta <- read_csv("/home/mischko/Documents/beruf/forschung/scRNA_reference/human_blood/conventional_cd8_t_cells/conventional_cd8_metadata.csv")
+
+names(meta)
+
+unique(meta$Cluster_names)

@@ -8,6 +8,31 @@ library(tidyverse)
 library(Seurat)
 library(qs)
 library(scMisc)
+library(writexl)
+
+# colors from https://romanhaa.github.io/projects/scrnaseq_workflow/
+colors_dutch <- c(
+  '#FFC312',
+  '#C4E538',
+  '#12CBC4',
+  '#FDA7DF',
+  '#ED4C67',
+  '#F79F1F',
+  '#A3CB38',
+  '#1289A7',
+  '#D980FA',
+  '#B53471',
+  '#EE5A24',
+  '#009432',
+  '#0652DD',
+  '#9980FA',
+  '#833471',
+  '#EA2027',
+  '#006266',
+  '#1B1464',
+  '#5758BB',
+  '#6F1E51'
+)
 
 # function to map project query on ref and make predictions based on Seurat integration
 mapSeurat <- function(ref, query) {
@@ -55,19 +80,32 @@ sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthreads = 6)
 cd8_nk <- subset(sc_merge, subset = cluster %in% c("CD8_NK"))
 
 # map to tabula sapiens blood ----
-cd8_terekhova <- qread(file.path(
+# cd8_terekhova <- qread(file.path(
+#   "objects",
+#   "conventional_cd8_seurat_object.qs"
+# ))
+
+cd8_nk_terekhova <- qread(file.path(
   "objects",
-  "conventional_cd8_seurat_object.qs"
+  "conventional_cd8_nk_terekhova.qs"
 ))
 
-scMisc::lss()
+Idents(cd8_nk_terekhova) <- cd8_nk_terekhova$cluster
 
-predictions_cd8_terehkova <- mapSeurat(ref = cd8_terekhova, query = cd8_nk)
+cd8_nk_terekhova_small <- subset(
+  cd8_nk_terekhova,
+  downsample = 1000
+)
+
+predictions_cd8_nk_terehkova <- mapSeurat(
+  ref = cd8_nk_terekhova_small,
+  query = cd8_nk
+)
 
 cd8_nk <- storePred(
-  predictions_cd8_terehkova,
-  label_col = "cd8_terehkova_label",
-  score_col = "cd8_terekhova_score",
+  predictions_cd8_nk_terehkova,
+  label_col = "cd8_nk_terehkova_label",
+  score_col = "cd8_nk_terekhova_score",
   seu_obj = cd8_nk
 )
 
@@ -75,7 +113,7 @@ pred_plot_cd8_nk <-
   DimPlot(
     cd8_nk,
     reduction = "umap.stacas.ss.all",
-    group.by = "cd8_terehkova_label",
+    group.by = "cd8_nk_terehkova_label",
     raster = FALSE,
     pt.size = .5,
     alpha = .5,
@@ -86,7 +124,17 @@ pred_plot_cd8_nk <-
 
 ggsave(
   plot = pred_plot_cd8_nk,
-  file.path("results", "map", "map_cd8_nk_terekhova.png"),
+  file.path("results", "map", "map_cd8_nk_terekhova_cd8_nk.png"),
   width = 20,
   height = 7
+)
+
+dplyr::count(cd8_nk@meta.data, cd8_nk_terehkova_label) |>
+  write_xlsx(
+    file.path("results", "map", "map_cd8_nk_terekhova_cd8_nk.xlsx")
+  )
+
+qsave(
+  cd8_nk,
+  file.path("objects", "cd8_nk_terekhova.qs")
 )

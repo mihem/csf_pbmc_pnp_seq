@@ -7,56 +7,73 @@
 library(qs)
 library(Seurat)
 library(tidyverse)
+library(ggplot2)
 library(ProjecTILs)
 
 # load preprocessed data ----
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthreads = 6)
 cd8_nk <- subset(sc_merge, subset = cluster %in% c("CD8_NK"))
-cd8_nk_ciap <- subset(cd8_nk, subset = diagnosis %in% c("CIAP"))
 
-table(cd8_nk_ciap$diagnosis)
+# Function to process and plot projections
+process_diagnosis <- function(data, diagnosis = NULL, ref) {
+    # If diagnosis is provided, subset the data
+    if (!is.null(diagnosis)) {
+        data <- subset(data, subset = diagnosis %in% diagnosis)
+        suffix <- paste0("_", tolower(paste(diagnosis, collapse = "_")))
+    } else {
+        suffix <- ""
+    }
 
+    # Create projection
+    projected <- make.projection(
+        data,
+        ref = ref,
+        ncores = 8,
+        filter.cells = FALSE
+    )
 
+    # Create and save plot
+    plot.projection(
+        ref,
+        projected,
+        linesize = 0.5,
+        pointsize = 0.5
+    )
+
+    # Save plot
+    ggsave(
+        file.path(
+            "results",
+            "projectil",
+            paste0("cd8_nk", suffix, "_projectil.pdf")
+        ),
+        width = 8,
+        height = 6
+    )
+
+    return(projected)
+}
+
+# Load reference map
 ref <- load.reference.map()
 
-#project reference on t cells
-cd8_nk_projected <- make.projection(
-    cd8_nk,
-    ref = ref,
-    ncores = 8,
-    filter.cells = FALSE
-)
-#project reference on t cells
-cd8_nk_ciap_projected <- make.projection(
-    cd8_nk_ciap,
-    ref = ref,
-    ncores = 8,
-    filter.cells = FALSE
+# Process all CD8_NK cells
+all_projected <- process_diagnosis(cd8_nk, diagnosis = NULL, ref = ref)
+
+# Process each diagnosis
+diagnoses <- list(
+    "CIAP" = "CIAP",
+    "CIDP" = "CIDP",
+    "GBS" = "GBS"
 )
 
-plot.projection(
-    ref,
-    cd8_nk_projected,
-    linesize = 0.5,
-    pointsize = 0.5
+# Process each diagnosis group
+projections <- lapply(
+    diagnoses,
+    function(x) process_diagnosis(cd8_nk, diagnosis = x, ref = ref)
 )
 
-ggsave(
-    file.path("results", "projectil", "cd8_nk_projectil.pdf"),
-    width = 8,
-    height = 6
-)
-
-plot.projection(
-    ref,
-    cd8_nk_ciap_projected,
-    linesize = 0.5,
-    pointsize = 0.5
-)
-
-ggsave(
-    file.path("results", "projectil", "cd8_nk_ciap_projectil.pdf"),
-    width = 8,
-    height = 6
-)
-
+# Print summary of cells per diagnosis
+diagnosis_counts <- table(cd8_nk$diagnosis)
+print("Number of cells per diagnosis:")
+print(diagnosis_counts)

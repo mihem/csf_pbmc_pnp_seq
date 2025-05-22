@@ -16,6 +16,7 @@ cd8_nk <- subset(sc_merge, subset = cluster %in% c("CD8_NK"))
 
 # Function to process and plot projections
 process_diagnosis <- function(data, diagnosis = NULL, ref) {
+    ref_name <- deparse(substitute(ref))
     # If diagnosis is provided, subset the data
     if (!is.null(diagnosis)) {
         data <- subset(data, subset = diagnosis %in% diagnosis)
@@ -45,7 +46,7 @@ process_diagnosis <- function(data, diagnosis = NULL, ref) {
         file.path(
             "results",
             "projectil",
-            paste0("cd8_nk", suffix, "_projectil.pdf")
+            paste0("cd8_nk", suffix, "_", ref_name, "_projectil.pdf")
         ),
         width = 8,
         height = 6
@@ -57,8 +58,18 @@ process_diagnosis <- function(data, diagnosis = NULL, ref) {
 # Load reference map
 ref <- load.reference.map()
 
+ref_cd8_terekhova <- qread(file.path(
+    "objects",
+    "conventional_cd8_projectil_reference.qs"
+))
+
+str(ref@assays$RNA$counts)
+str(ref_cd8_terekhova@assays$RNA$counts)
+str(ref_cd8_terekhova@assays$RNA)
+
 # Process all CD8_NK cells
 all_projected <- process_diagnosis(cd8_nk, diagnosis = NULL, ref = ref)
+all_projected <- process_diagnosis(cd8_nk, diagnosis = NULL, ref = ref_cd8_terekhova)
 
 # Process each diagnosis
 diagnoses <- list(

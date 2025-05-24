@@ -46,6 +46,8 @@ lookup <-
         )
     )
 
+qsave(lookup, file.path("objects", "lookup.qs"))
+
 # create overview table ---
 overview_table <-
     lookup |>

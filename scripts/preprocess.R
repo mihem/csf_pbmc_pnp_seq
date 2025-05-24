@@ -63,7 +63,7 @@ writexl::write_xlsx(
 )
 
 # find  raw files and match to names from lookup table ---
-h5_path <- list.files(pattern = ".h5", recursive = TRUE)
+h5_path <- list.files(file.path("raw", "rna"), pattern = ".h5", recursive = TRUE)
 
 seq_names <-
     tibble(name = h5_path) |>
@@ -118,6 +118,8 @@ donor_list[["PBMC_pool_1"]] <-
     dplyr::left_join(donor_pool1_lookup) |>
     dplyr::select(-donor_id) |>
     dplyr::rename(donor_id = donor_id_new)
+
+qsave(donor_list, file.path("objects", "donor_list.qs"))
 
 #set donor id from donor list to seurat metadata
 for (seq_name in seq_names[!seq_names %in% c("PNP38")]) {

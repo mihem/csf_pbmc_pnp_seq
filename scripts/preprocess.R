@@ -28,6 +28,7 @@ options(future.globals.maxSize = 16000 * 1024^2)
 lookup <-
     read_excel(file.path("lookup", "SEED_lookup_v6.xlsx")) |>
     janitor::clean_names() |>
+    dplyr::filter(cohort %in% c("scRNA", "scRNA_flow")) |>
     mutate(age = lubridate::time_length(difftime(date, birth_date), "years")) |>
     mutate(
         diagnosis = factor(

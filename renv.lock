@@ -1967,6 +1967,20 @@
       ],
       "Hash": "598759802c4d3a3b2cfe76a2d94ff614"
     },
+    "VGAM": {
+      "Package": "VGAM",
+      "Version": "1.1-13",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "methods",
+        "splines",
+        "stats",
+        "stats4"
+      ],
+      "Hash": "5d4da89c3fdf713838c1bba147a9355a"
+    },
     "WriteXLS": {
       "Package": "WriteXLS",
       "Version": "6.6.0",
@@ -2096,6 +2110,16 @@
         "sys"
       ],
       "Hash": "cad6cf7f1d5f6e906700b9d3e718c796"
+    },
+    "assertthat": {
+      "Package": "assertthat",
+      "Version": "0.2.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "tools"
+      ],
+      "Hash": "50c838a310445e954bc13f26f26a6ecf"
     },
     "babelgene": {
       "Package": "babelgene",
@@ -2758,6 +2782,16 @@
       "Repository": "RSPM",
       "Hash": "5d8225445acb167abf7797de48b2ee3c"
     },
+    "config": {
+      "Package": "config",
+      "Version": "0.3.2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "yaml"
+      ],
+      "Hash": "8b7222e9d9eb5178eea545c0c4d33fc2"
+    },
     "conflicted": {
       "Package": "conflicted",
       "Version": "1.2.0",
@@ -2829,6 +2863,16 @@
         "lazyeval"
       ],
       "Hash": "ab12c7b080a57475248a30f4db6298c0"
+    },
+    "cubature": {
+      "Package": "cubature",
+      "Version": "2.1.3",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "Rcpp"
+      ],
+      "Hash": "a9664c71cacbc382c62235897484ae2b"
     },
     "curl": {
       "Package": "curl",
@@ -3018,6 +3062,13 @@
         "R"
       ],
       "Hash": "80f374ef8500fcdc5d84a0345b837227"
+    },
+    "dotty": {
+      "Package": "dotty",
+      "Version": "0.1.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "94e848eb661547ed27d6589e0fb81f8c"
     },
     "downloader": {
       "Package": "downloader",
@@ -3236,6 +3287,35 @@
         "methods"
       ],
       "Hash": "daf4a1246be12c1fa8c7705a0935c1a0"
+    },
+    "evd": {
+      "Package": "evd",
+      "Version": "2.3-7.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "grDevices",
+        "graphics",
+        "stats"
+      ],
+      "Hash": "819b2e1414639b0cbe4dbf34e2bd67bf"
+    },
+    "evmix": {
+      "Package": "evmix",
+      "Version": "2.12",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "MASS",
+        "SparseM",
+        "grDevices",
+        "graphics",
+        "gsl",
+        "splines",
+        "stats"
+      ],
+      "Hash": "a92843a325821fd2154581f8c05b5a30"
     },
     "factoextra": {
       "Package": "factoextra",
@@ -3527,6 +3607,23 @@
       ],
       "Hash": "15e9634c0fcd294799e9b2e929ed1b86"
     },
+    "ggalluvial": {
+      "Package": "ggalluvial",
+      "Version": "0.12.5",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "dplyr",
+        "ggplot2",
+        "lazyeval",
+        "rlang",
+        "stats",
+        "tidyr",
+        "tidyselect"
+      ],
+      "Hash": "29bb601821609476215720798eecf979"
+    },
     "ggbeeswarm": {
       "Package": "ggbeeswarm",
       "Version": "0.7.2",
@@ -3541,6 +3638,18 @@
         "vipor"
       ],
       "Hash": "899f28fe0388b7f687d7453429c2474d"
+    },
+    "ggdendro": {
+      "Package": "ggdendro",
+      "Version": "0.2.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "MASS",
+        "R",
+        "ggplot2"
+      ],
+      "Hash": "6c64efa73d60c45946a5e6e3f894fdcd"
     },
     "ggforce": {
       "Package": "ggforce",
@@ -4020,6 +4129,16 @@
       ],
       "Hash": "5b79228594f02385d4df4979284879ae"
     },
+    "gsl": {
+      "Package": "gsl",
+      "Version": "2.1-8",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R"
+      ],
+      "Hash": "8f8205cbb9f1066a94e22898fe949184"
+    },
     "gson": {
       "Package": "gson",
       "Version": "0.1.0",
@@ -4077,6 +4196,18 @@
         "vctrs"
       ],
       "Hash": "42700da57c44a7f594270799803e20be"
+    },
+    "hash": {
+      "Package": "hash",
+      "Version": "2.2.6.3",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "methods",
+        "utils"
+      ],
+      "Hash": "8310fb85fc6230699c88c9a63f5dcb46"
     },
     "haven": {
       "Package": "haven",
@@ -4275,6 +4406,21 @@
       ],
       "Hash": "03d741c92fda96d98c3a3f22494e3b4a"
     },
+    "iNEXT": {
+      "Package": "iNEXT",
+      "Version": "3.0.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "Rcpp",
+        "ggplot2",
+        "graphics",
+        "reshape2",
+        "stats"
+      ],
+      "Hash": "81766ec84732c1c3c19164d1f97feae2"
+    },
     "ica": {
       "Package": "ica",
       "Version": "1.0-3",
@@ -4315,6 +4461,35 @@
         "vctrs"
       ],
       "Hash": "c3b7d801d722e26e4cd888e042bf9af5"
+    },
+    "immApex": {
+      "Package": "immApex",
+      "Version": "1.3.1",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "BorchLab",
+      "RemoteRepo": "immApex",
+      "RemoteRef": "main",
+      "RemoteSha": "281d34248c30133bbfc424b614403b751333ccf0",
+      "Requirements": [
+        "R",
+        "SingleCellExperiment",
+        "hash",
+        "httr",
+        "keras3",
+        "magrittr",
+        "matrixStats",
+        "methods",
+        "reticulate",
+        "rvest",
+        "stats",
+        "stringi",
+        "stringr",
+        "tensorflow",
+        "utils"
+      ],
+      "Hash": "06d09da700706766f12a3cb4392d39d9"
     },
     "ipred": {
       "Package": "ipred",
@@ -4408,6 +4583,27 @@
         "methods"
       ],
       "Hash": "e1b9c55281c5adc4dd113652d9e26768"
+    },
+    "keras3": {
+      "Package": "keras3",
+      "Version": "1.4.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "cli",
+        "dotty",
+        "fastmap",
+        "generics",
+        "glue",
+        "magrittr",
+        "reticulate",
+        "rlang",
+        "tensorflow",
+        "tfruns",
+        "zeallot"
+      ],
+      "Hash": "c049ccfd395033f7562a0003190e4239"
     },
     "knitr": {
       "Package": "knitr",
@@ -5824,7 +6020,7 @@
     },
     "reticulate": {
       "Package": "reticulate",
-      "Version": "1.37.0",
+      "Version": "1.42.0",
       "Source": "Repository",
       "Repository": "RSPM",
       "Requirements": [
@@ -5842,7 +6038,7 @@
         "utils",
         "withr"
       ],
-      "Hash": "9465d3bc6ec44eeaa52527ac2cba4020"
+      "Hash": "92bc19ed4057a728ddbe09b804a3d84d"
     },
     "rex": {
       "Package": "rex",
@@ -6177,6 +6373,51 @@
         "writexl"
       ],
       "Hash": "dcba508fe4c07ea4b01c9cc209c2f5ee"
+    },
+    "scRepertoire": {
+      "Package": "scRepertoire",
+      "Version": "2.3.4",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "BorchLab",
+      "RemoteRepo": "scRepertoire",
+      "RemoteRef": "master",
+      "RemoteSha": "52a0738c5fa18b9ebe00ac3b70a82d6d1ba98a16",
+      "Requirements": [
+        "R",
+        "Rcpp",
+        "S4Vectors",
+        "SeuratObject",
+        "SingleCellExperiment",
+        "SummarizedExperiment",
+        "VGAM",
+        "assertthat",
+        "cubature",
+        "dplyr",
+        "evmix",
+        "ggalluvial",
+        "ggdendro",
+        "ggplot2",
+        "ggraph",
+        "grDevices",
+        "iNEXT",
+        "igraph",
+        "immApex",
+        "lifecycle",
+        "methods",
+        "plyr",
+        "purrr",
+        "quantreg",
+        "reshape2",
+        "rjson",
+        "rlang",
+        "stringdist",
+        "stringr",
+        "tidygraph",
+        "truncdist"
+      ],
+      "Hash": "0be4aeac702929a370fb3dd08d66711e"
     },
     "scales": {
       "Package": "scales",
@@ -6823,6 +7064,17 @@
       ],
       "Hash": "26e158d12052c279bdd4ba858b80fb1f"
     },
+    "stringdist": {
+      "Package": "stringdist",
+      "Version": "0.9.15",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "parallel"
+      ],
+      "Hash": "749b8805a3026202a959edbf790425b0"
+    },
     "stringfish": {
       "Package": "stringfish",
       "Version": "0.16.0",
@@ -6926,6 +7178,26 @@
       "Repository": "RSPM",
       "Hash": "25cfab6cf405c15bccf7e69ec39df090"
     },
+    "tensorflow": {
+      "Package": "tensorflow",
+      "Version": "2.16.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "config",
+        "grDevices",
+        "lifecycle",
+        "processx",
+        "reticulate",
+        "rstudioapi",
+        "tfautograph",
+        "tfruns",
+        "utils",
+        "yaml"
+      ],
+      "Hash": "7ac4bb91e88d010d750a8cdf45914f7c"
+    },
     "tester": {
       "Package": "tester",
       "Version": "0.2.0",
@@ -6977,6 +7249,39 @@
         "systemfonts"
       ],
       "Hash": "5142f8bc78ed3d819d26461b641627ce"
+    },
+    "tfautograph": {
+      "Package": "tfautograph",
+      "Version": "0.3.2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "backports",
+        "reticulate"
+      ],
+      "Hash": "f49f95df7561c477ac2370809fde9d61"
+    },
+    "tfruns": {
+      "Package": "tfruns",
+      "Version": "1.5.3",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "base64enc",
+        "config",
+        "jsonlite",
+        "magrittr",
+        "reticulate",
+        "rlang",
+        "rstudioapi",
+        "tidyselect",
+        "utils",
+        "whisker",
+        "yaml"
+      ],
+      "Hash": "84569fd1acfb6c2744df727ab4a34591"
     },
     "tibble": {
       "Package": "tibble",
@@ -7176,6 +7481,18 @@
         "yulab.utils"
       ],
       "Hash": "9e0a0b700763836cd36cb3a49be5a15d"
+    },
+    "truncdist": {
+      "Package": "truncdist",
+      "Version": "1.0-2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "evd",
+        "stats4"
+      ],
+      "Hash": "ed3ed12875e0417a645baaecc07dd536"
     },
     "tweenr": {
       "Package": "tweenr",
@@ -7388,6 +7705,13 @@
       ],
       "Hash": "fea474d578b1cbcb696ae6ac8bdcc439"
     },
+    "whisker": {
+      "Package": "whisker",
+      "Version": "0.4.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "c6abfa47a46d281a7d5159d0a8891e88"
+    },
     "withr": {
       "Package": "withr",
       "Version": "3.0.0",
@@ -7497,6 +7821,13 @@
         "utils"
       ],
       "Hash": "6298953be4b60e23b75cf48c9bf9b0a2"
+    },
+    "zeallot": {
+      "Package": "zeallot",
+      "Version": "0.1.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "ee9b643aa8331c45d8d82eb3a137c9bc"
     },
     "zip": {
       "Package": "zip",

@@ -167,7 +167,9 @@ sc_tcr <- subset(
             "CD8TCM",
             "CD8TEM_1",
             "CD8TEM_2",
-            "CD8_NK"
+            "CD8_NK", 
+            "NKCD56dim",
+            "NKCD56bright"
         )
 )
 
@@ -175,7 +177,6 @@ sc_tcr <- subset(
 DimPlot(sc_tcr, reduction = "umap.stacas.ss.all")
 head(colnames(sc_tcr))
 head(combined_tcr[[1]]$barcode)
-
 
 #combine Seurat object with scRepertoire
 sc_tcr <- scRepertoire::combineExpression(
@@ -203,8 +204,8 @@ qs::qsave(
 str(sc_tcr@meta.data)
 table(sc_tcr$clonalFrequency)
 table(sc_tcr$cloneSize)
-sum(!is.na(sc_tcr$CTaa)) / dim(sc_tcr)[2] #75% T cells with TCR
-sum(sapply(combined_tcr, nrow)) - sum(!is.na(sc_tcr$CTaa)) # 6010 (8.6%) TCR not assigned to a cell
+# sum(!is.na(sc_tcr$CTaa)) / dim(sc_tcr)[2] T cells with TCR
+# sum(sapply(combined_tcr, nrow)) - sum(!is.na(sc_tcr$CTaa)) # 6010 (8.6%) TCR not assigned to a cell
 
 #find out most frequent aa
 CTaa_sample <- dplyr::count(sc_tcr@meta.data, CTaa, sample) |>
@@ -218,73 +219,66 @@ CTaa_sample <- dplyr::count(sc_tcr@meta.data, CTaa, sample) |>
     dplyr::select(sort(tidyselect::peek_vars())) |> # sort coolumns
     dplyr::relocate(CTaa) # move CTaa to start
 
-write_csv(CTaa_sample, file.path("results", "repertoire", "CTaa_sample.csv"))
+write_csv(CTaa_sample, file.path("results", "tcr", "CTaa_sample.csv"))
 
-## ## pay attention with frequency, probably based on all contigs from all clusters not only B cell clusters, therefore replace Frequency by counts of the CTaa
-## table(sc_tcr$Frequency)
-## sc_tcr$Frequency_old <- sc_tcr$Frequency
-## sc_tcr$Frequency <- NULL
-## sc_tcr$barcode <- NULL
+# ## ## pay attention with frequency, probably based on all contigs from all clusters not only B cell clusters, therefore replace Frequency by counts of the CTaa
+# # sanity check
+# table(sc_tcr$clonalFrequency)
+# sc_tcr$clonalFrequency_old <- sc_tcr$clonalFrequency
+# sc_tcr$clonalFrequency <- NULL
 
-## sc_tcr@meta.data <-
-##     sc_tcr@meta.data |>
-##     tibble::rownames_to_column("barcode") |>
-##     dplyr::left_join(CTaa_freq_tcr, by = "CTaa") |>
-##     dplyr::rename(Frequency = n) |>
-##     tibble::column_to_rownames("barcode")
+# CTaa_freq_tcr <- dplyr::count(sc_tcr@meta.data, CTaa) |>
+#     drop_na() |>
+#     arrange(desc(n)) |>
+#     tibble()
 
-## CTaa_sample |>
-##     pivot_longer(-CTaa)
-
-## sc_tcr@meta.data |>
-##     tibble::rownames_to_column("barcode") |>
-##     dplyr::left_join(select(CTaa_sample, CTaa), by = "CTaa") |>
-##     dplyr::rename(Frequency = n) |>
-##     tibble::column_to_rownames("barcode")
-
-## sc_tcr$cloneType <-
-##     factor(
-##         cut(sc_tcr$Frequency,
-##             breaks = c(0,1,5,20,100, 2000),
-##             labels = clone_labels),
-##         levels = rev(clone_labels))
-
-sc_tcr$cloneType <-
-    factor(
-        sc_tcr$cloneType,
-        levels = rev(clone_labels)
-    )
-
-## table(sc_tcr$Frequency)
+# sc_tcr@meta.data <-
+#     sc_tcr@meta.data |>
+#     tibble::rownames_to_column("barcode") |>
+#     dplyr::left_join(CTaa_freq_tcr, by = "CTaa") |>
+#     dplyr::rename(clonalFrequency = n) |>
+#     tibble::column_to_rownames("barcode")
 
 #plot UMAP with frequency of clonotypes
-umap_clone <- DimPlot(
+clone_labels <- levels(sc_tcr$cloneSize)
+clone_cols <- setNames(rev(viridis::turbo(length(clone_labels))), clone_labels)
+
+umap_tcr_clone <- DimPlot(
     sc_tcr,
-    group.by = "cloneType",
+    group.by = "cloneSize",
     pt.size = .1,
+    reduction = "umap.stacas.ss.all",
+    raster = FALSE,
     cols = clone_cols
 ) +
-    theme_rect()
-#umap_clone[[1]]$layers[[1]]$aes_params$alpha <- ifelse(is.na(sc_tcr@meta.data$cloneType), .01, 0.5)
-umap_clone[[1]]$layers[[1]]$aes_params$alpha <-
+    theme_rect() +
+    xlab("UMAP1") +
+    ylab("UMAP2") +
+    ggtitle("")
+
+umap_tcr_clone[[1]]$layers[[1]]$aes_params$alpha <-
     case_when(
-        is.na(sc_tcr$cloneType) ~ 0.01,
-        sc_tcr$cloneType == "Single (0 < X <= 1)" ~ 0.2,
-        sc_tcr$cloneType == "Small (1 < X <= 5)" ~ 0.3,
-        sc_tcr$cloneType == "Medium (5 < X <= 20)" ~ 0.5,
-        sc_tcr$cloneType == "Large (20 < X <= 100)" ~ 0.7
+        is.na(sc_tcr$cloneSize) ~ 0.01,
+        sc_tcr$cloneSize == "Single (0 < X <= 1)" ~ 0.02,
+        sc_tcr$cloneSize == "Small (1 < X <= 5)" ~ 0.2,
+        sc_tcr$cloneSize == "Medium (5 < X <= 20)" ~ 0.3,
+        sc_tcr$cloneSize == "Large (20 < X <= 100)" ~ 0.5,
+        sc_tcr$cloneSize == "Hyperexpanded (X > 100)" ~ 1.0
+
     )
+
 ggsave(
-    file.path("results", "repertoire", "screp_cloneType.pdf"),
-    width = 7,
-    height = 5
+    file.path("results", "tcr", "umap_cloneSize.pdf"),
+    plot = umap_tcr_clone,
+    width = 10,
+    height = 7
 )
 
 #abundance plot screpertoire
 stackedPlot(
     object = sc_tcr,
     x_axis = "sample",
-    y_axis = "cloneType",
+    y_axis = "cloneSize",
     x_order = unique(sc_tcr$sample),
     y_order = rev(clone_labels),
     color = clone_cols,
@@ -296,7 +290,7 @@ stackedPlot(
 stackedPlot(
     object = sc_tcr,
     x_axis = "tissue_level1",
-    y_axis = "cloneType",
+    y_axis = "cloneSize",
     x_order = unique(sc_tcr$tissue_level1),
     y_order = rev(clone_labels),
     color = clone_cols,
@@ -307,7 +301,7 @@ stackedPlot(
 stackedPlot(
     object = sc_tcr,
     x_axis = "tissue_level2",
-    y_axis = "cloneType",
+    y_axis = "cloneSize",
     x_order = unique(sc_tcr$tissue_level2),
     y_order = rev(clone_labels),
     color = clone_cols,
@@ -321,7 +315,7 @@ sc_tcr_csf <- subset(sc_tcr, subset = tissue == "CSF")
 stackedPlot(
     object = sc_tcr_csf,
     x_axis = "tissue_level2",
-    y_axis = "cloneType",
+    y_axis = "cloneSize",
     x_order = unique(sc_tcr_csf$tissue_level2),
     y_order = rev(clone_labels),
     color = clone_cols,
@@ -335,7 +329,7 @@ sc_tcr_pbmc <- subset(sc_tcr, subset = tissue == "PBMC")
 stackedPlot(
     object = sc_tcr_pbmc,
     x_axis = "tissue_level2",
-    y_axis = "cloneType",
+    y_axis = "cloneSize",
     x_order = unique(sc_tcr_pbmc$tissue_level2),
     y_order = rev(clone_labels),
     color = clone_cols,

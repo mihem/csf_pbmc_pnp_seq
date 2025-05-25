@@ -151,26 +151,40 @@ ggsave(file.path("results", "tcr", "tcr_length_aa.pdf"))
 # screpertoire analysis with seurat object
 #################################################################################################################
 
-sc_rep <- qs::qread("tcells.qs")
-
-sc_rep <- tcells
+sc_tcr <- subset(
+    sc_merge,
+    cluster %in%
+        c(
+            "CD4naive_1",
+            "CD4TCM_1",
+            "CD4TCM_2",
+            "CD4TEM",
+            "Treg",
+            "MAIT",
+            "gdT",
+            "CD4CTL",
+            "CD8naive",
+            "CD8TCM",
+            "CD8TEM_1",
+            "CD8TEM_2",
+            "CD8_NK"
+        )
+)
 
 #sanity check
-head(colnames(sc_rep))
+DimPlot(sc_tcr, reduction = "umap.stacas.ss.all")
+head(colnames(sc_tcr))
 head(combined_tcr[[1]]$barcode)
 
-#adjust colnames
-#colnames_new <- paste0(colnames(sc_rep), "-1")
-#sc_rep <- RenameCells(sc_rep, new.names = colnames_new)
 
-#combine seurat and screpertoire
-sc_rep <- scRepertoire::combineExpression(
+#combine Seurat object with scRepertoire
+sc_tcr <- scRepertoire::combineExpression(
     combined_tcr,
-    sc_rep,
+    sc_tcr,
     cloneCall = "aa",
     group.by = "none",
     proportion = FALSE,
-    cloneTypes = c(
+    cloneSize = c(
         Single = 1,
         Small = 5,
         Medium = 20,
@@ -179,15 +193,21 @@ sc_rep <- scRepertoire::combineExpression(
     )
 )
 
+# save Seurat object with TCR annotations
+qs::qsave(
+    sc_tcr,
+    file = file.path("objects", "sc_tcr.qs")
+)
 
-table(sc_rep$Frequency)
-table(sc_rep$cloneType)
-
-sum(!is.na(sc_rep$CTaa)) / dim(sc_rep)[2] #73.5% (21657) t cells with TCR
-sum(sapply(combined_tcr, nrow)) - sum(!is.na(sc_rep$CTaa)) # around 2777 TCR lost
+# sanity checks
+str(sc_tcr@meta.data)
+table(sc_tcr$clonalFrequency)
+table(sc_tcr$cloneSize)
+sum(!is.na(sc_tcr$CTaa)) / dim(sc_tcr)[2] #75% T cells with TCR
+sum(sapply(combined_tcr, nrow)) - sum(!is.na(sc_tcr$CTaa)) # 6010 (8.6%) TCR not assigned to a cell
 
 #find out most frequent aa
-CTaa_sample <- dplyr::count(sc_rep@meta.data, CTaa, sample) |>
+CTaa_sample <- dplyr::count(sc_tcr@meta.data, CTaa, sample) |>
     drop_na(CTaa) |>
     pivot_wider(names_from = "sample", values_from = "n") |>
     tibble() |>
@@ -201,13 +221,13 @@ CTaa_sample <- dplyr::count(sc_rep@meta.data, CTaa, sample) |>
 write_csv(CTaa_sample, file.path("results", "repertoire", "CTaa_sample.csv"))
 
 ## ## pay attention with frequency, probably based on all contigs from all clusters not only B cell clusters, therefore replace Frequency by counts of the CTaa
-## table(sc_rep$Frequency)
-## sc_rep$Frequency_old <- sc_rep$Frequency
-## sc_rep$Frequency <- NULL
-## sc_rep$barcode <- NULL
+## table(sc_tcr$Frequency)
+## sc_tcr$Frequency_old <- sc_tcr$Frequency
+## sc_tcr$Frequency <- NULL
+## sc_tcr$barcode <- NULL
 
-## sc_rep@meta.data <-
-##     sc_rep@meta.data |>
+## sc_tcr@meta.data <-
+##     sc_tcr@meta.data |>
 ##     tibble::rownames_to_column("barcode") |>
 ##     dplyr::left_join(CTaa_freq_tcr, by = "CTaa") |>
 ##     dplyr::rename(Frequency = n) |>
@@ -216,43 +236,43 @@ write_csv(CTaa_sample, file.path("results", "repertoire", "CTaa_sample.csv"))
 ## CTaa_sample |>
 ##     pivot_longer(-CTaa)
 
-## sc_rep@meta.data |>
+## sc_tcr@meta.data |>
 ##     tibble::rownames_to_column("barcode") |>
 ##     dplyr::left_join(select(CTaa_sample, CTaa), by = "CTaa") |>
 ##     dplyr::rename(Frequency = n) |>
 ##     tibble::column_to_rownames("barcode")
 
-## sc_rep$cloneType <-
+## sc_tcr$cloneType <-
 ##     factor(
-##         cut(sc_rep$Frequency,
+##         cut(sc_tcr$Frequency,
 ##             breaks = c(0,1,5,20,100, 2000),
 ##             labels = clone_labels),
 ##         levels = rev(clone_labels))
 
-sc_rep$cloneType <-
+sc_tcr$cloneType <-
     factor(
-        sc_rep$cloneType,
+        sc_tcr$cloneType,
         levels = rev(clone_labels)
     )
 
-## table(sc_rep$Frequency)
+## table(sc_tcr$Frequency)
 
 #plot UMAP with frequency of clonotypes
 umap_clone <- DimPlot(
-    sc_rep,
+    sc_tcr,
     group.by = "cloneType",
     pt.size = .1,
     cols = clone_cols
 ) +
     theme_rect()
-#umap_clone[[1]]$layers[[1]]$aes_params$alpha <- ifelse(is.na(sc_rep@meta.data$cloneType), .01, 0.5)
+#umap_clone[[1]]$layers[[1]]$aes_params$alpha <- ifelse(is.na(sc_tcr@meta.data$cloneType), .01, 0.5)
 umap_clone[[1]]$layers[[1]]$aes_params$alpha <-
     case_when(
-        is.na(sc_rep$cloneType) ~ 0.01,
-        sc_rep$cloneType == "Single (0 < X <= 1)" ~ 0.2,
-        sc_rep$cloneType == "Small (1 < X <= 5)" ~ 0.3,
-        sc_rep$cloneType == "Medium (5 < X <= 20)" ~ 0.5,
-        sc_rep$cloneType == "Large (20 < X <= 100)" ~ 0.7
+        is.na(sc_tcr$cloneType) ~ 0.01,
+        sc_tcr$cloneType == "Single (0 < X <= 1)" ~ 0.2,
+        sc_tcr$cloneType == "Small (1 < X <= 5)" ~ 0.3,
+        sc_tcr$cloneType == "Medium (5 < X <= 20)" ~ 0.5,
+        sc_tcr$cloneType == "Large (20 < X <= 100)" ~ 0.7
     )
 ggsave(
     file.path("results", "repertoire", "screp_cloneType.pdf"),
@@ -262,10 +282,10 @@ ggsave(
 
 #abundance plot screpertoire
 stackedPlot(
-    object = sc_rep,
+    object = sc_tcr,
     x_axis = "sample",
     y_axis = "cloneType",
-    x_order = unique(sc_rep$sample),
+    x_order = unique(sc_tcr$sample),
     y_order = rev(clone_labels),
     color = clone_cols,
     width = 7,
@@ -274,10 +294,10 @@ stackedPlot(
 
 
 stackedPlot(
-    object = sc_rep,
+    object = sc_tcr,
     x_axis = "tissue_level1",
     y_axis = "cloneType",
-    x_order = unique(sc_rep$tissue_level1),
+    x_order = unique(sc_tcr$tissue_level1),
     y_order = rev(clone_labels),
     color = clone_cols,
     width = 5,
@@ -285,10 +305,10 @@ stackedPlot(
 )
 
 stackedPlot(
-    object = sc_rep,
+    object = sc_tcr,
     x_axis = "tissue_level2",
     y_axis = "cloneType",
-    x_order = unique(sc_rep$tissue_level2),
+    x_order = unique(sc_tcr$tissue_level2),
     y_order = rev(clone_labels),
     color = clone_cols,
     width = 5,
@@ -296,13 +316,13 @@ stackedPlot(
 )
 
 
-sc_rep_csf <- subset(sc_rep, subset = tissue == "CSF")
+sc_tcr_csf <- subset(sc_tcr, subset = tissue == "CSF")
 
 stackedPlot(
-    object = sc_rep_csf,
+    object = sc_tcr_csf,
     x_axis = "tissue_level2",
     y_axis = "cloneType",
-    x_order = unique(sc_rep_csf$tissue_level2),
+    x_order = unique(sc_tcr_csf$tissue_level2),
     y_order = rev(clone_labels),
     color = clone_cols,
     width = 5,
@@ -310,13 +330,13 @@ stackedPlot(
 )
 
 
-sc_rep_pbmc <- subset(sc_rep, subset = tissue == "PBMC")
+sc_tcr_pbmc <- subset(sc_tcr, subset = tissue == "PBMC")
 
 stackedPlot(
-    object = sc_rep_pbmc,
+    object = sc_tcr_pbmc,
     x_axis = "tissue_level2",
     y_axis = "cloneType",
-    x_order = unique(sc_rep_pbmc$tissue_level2),
+    x_order = unique(sc_tcr_pbmc$tissue_level2),
     y_order = rev(clone_labels),
     color = clone_cols,
     width = 5,
@@ -325,7 +345,7 @@ stackedPlot(
 
 
 #clonal overlay
-clonalOverlay(sc_rep, reduction = "umap", freq.cutpoint = 20, bins = 25) +
+clonalOverlay(sc_tcr, reduction = "umap", freq.cutpoint = 20, bins = 25) +
     scale_color_manual(values = cluster_col_tcells) +
     theme_rect()
 
@@ -337,7 +357,7 @@ ggsave(
 
 
 clonalOverlay(
-    sc_rep,
+    sc_tcr,
     reduction = "umap",
     freq.cutpoint = 20,
     bins = 50,
@@ -352,11 +372,11 @@ ggsave(
     height = 10
 )
 
-sc_rep$CTaa_top <- sc_rep$CTaa[sc_rep$Frequency > 20] #new column for top expanded clones
-#sc_rep$CTaa_top <- factor(sc_rep$CTaa_top, levels = CTaa_freq_bcr$CTaa) # level based on size
+sc_tcr$CTaa_top <- sc_tcr$CTaa[sc_tcr$Frequency > 20] #new column for top expanded clones
+#sc_tcr$CTaa_top <- factor(sc_tcr$CTaa_top, levels = CTaa_freq_bcr$CTaa) # level based on size
 
 alluvialClonotypes(
-    sc_rep,
+    sc_tcr,
     cloneCall = "aa",
     y.axes = c("sample", "tissue_level2"),
     color = "CTaa_top"
@@ -374,7 +394,7 @@ ggsave(
 
 
 alluvialClonotypes(
-    sc_rep,
+    sc_tcr,
     cloneCall = "aa",
     y.axes = c("sample"),
     color = "CTaa_top"
@@ -387,13 +407,13 @@ ggsave(
 )
 
 
-## clonalDiversity(sc_rep,
+## clonalDiversity(sc_tcr,
 ##                 split.by = "tissue_level2",
 ##                 cloneCall = "aa") +
 ##      scale_color_manual(values = pals::cols25(25))
 
 clonalOverlap(
-    sc_rep,
+    sc_tcr,
     cloneCall = "aa",
     split.by = "tissue_level2",
     method = "overlap"
@@ -410,7 +430,7 @@ ggsave(
 
 
 clonalOverlap(
-    sc_rep,
+    sc_tcr,
     cloneCall = "aa",
     split.by = "sample",
     method = "morisita"
@@ -425,7 +445,7 @@ ggsave(
 
 
 #find clones that are the same between patients
-sc_rep@meta.data |>
+sc_tcr@meta.data |>
     tibble() |>
     dplyr::select(sample, CTaa) |>
     dplyr::filter(sample %in% c("CSF_PNP08", "CSF_PNP10")) |>

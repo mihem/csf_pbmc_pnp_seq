@@ -24,7 +24,7 @@ gsea_path <- file.path("results", "enrich", "de_combined", "gsea", "de_combined_
 gsea_results <- read_all_excel_sheets(gsea_path)
 
 # get genes of the top 10 enriched pathways and split into individual genes
-gsea_genes <- gsea_results$gbs_ctrl_pbm$core_enrichment[1:10] |>
+gsea_genes <- gsea_results$gbs_ctrl_pbmc$core_enrichment[1:10] |>
     strsplit(split = "/") |>
     unlist() |>
     unique() |>

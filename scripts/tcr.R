@@ -167,7 +167,7 @@ sc_tcr <- subset(
             "CD8TCM",
             "CD8TEM_1",
             "CD8TEM_2",
-            "CD8_NK", 
+            "CD8_NK",
             "NKCD56dim",
             "NKCD56bright"
         )
@@ -219,7 +219,7 @@ CTaa_sample <- dplyr::count(sc_tcr@meta.data, CTaa, sample) |>
     dplyr::select(sort(tidyselect::peek_vars())) |> # sort coolumns
     dplyr::relocate(CTaa) # move CTaa to start
 
-write_csv(CTaa_sample, file.path("results", "tcr", "CTaa_sample.csv"))
+write_xlsx(CTaa_sample, file.path("results", "tcr", "CTaa_sample.xlsx"))
 
 # ## ## pay attention with frequency, probably based on all contigs from all clusters not only B cell clusters, therefore replace Frequency by counts of the CTaa
 # # sanity check
@@ -264,7 +264,6 @@ umap_tcr_clone[[1]]$layers[[1]]$aes_params$alpha <-
         sc_tcr$cloneSize == "Medium (5 < X <= 20)" ~ 0.3,
         sc_tcr$cloneSize == "Large (20 < X <= 100)" ~ 0.5,
         sc_tcr$cloneSize == "Hyperexpanded (X > 100)" ~ 1.0
-
     )
 
 ggsave(
@@ -280,90 +279,177 @@ stackedPlot(
     x_axis = "sample",
     y_axis = "cloneSize",
     x_order = unique(sc_tcr$sample),
-    y_order = rev(clone_labels),
+    y_order = clone_labels,
     color = clone_cols,
-    width = 7,
+    width = 10,
     height = 3
 )
-
-
-stackedPlot(
-    object = sc_tcr,
-    x_axis = "tissue_level1",
-    y_axis = "cloneSize",
-    x_order = unique(sc_tcr$tissue_level1),
-    y_order = rev(clone_labels),
-    color = clone_cols,
-    width = 5,
-    height = 5
-)
+str(sc_tcr@meta.data)
 
 stackedPlot(
     object = sc_tcr,
-    x_axis = "tissue_level2",
+    x_axis = "tissue_group",
     y_axis = "cloneSize",
-    x_order = unique(sc_tcr$tissue_level2),
-    y_order = rev(clone_labels),
+    x_order = unique(sc_tcr$tissue_group),
+    y_order = clone_labels,
     color = clone_cols,
     width = 5,
     height = 5
 )
 
+sc_tcr_main_groups <- subset(
+    sc_tcr,
+    subset = diagnosis %in% c("CTRL", "CIAP", "CIDP", "GBS")
+)
 
-sc_tcr_csf <- subset(sc_tcr, subset = tissue == "CSF")
+# sanity chec
+table(sc_tcr_main_groups$diagnosis)
+sc_tcr_main_groups@misc
 
 stackedPlot(
-    object = sc_tcr_csf,
-    x_axis = "tissue_level2",
+    object = sc_tcr_main_groups,
+    x_axis = "tissue_diagnosis",
     y_axis = "cloneSize",
-    x_order = unique(sc_tcr_csf$tissue_level2),
-    y_order = rev(clone_labels),
+    x_order = sc_tcr_main_groups@misc$tissue_diagnosis_order,
+    y_order = clone_labels,
     color = clone_cols,
     width = 5,
     height = 5
 )
 
+# Custom clonalOverlay function with smaller point size and custom alpha
+customClonalOverlay <- function(
+    sc.data,
+    reduction = NULL,
+    cut.category = "clonalFrequency",
+    cutpoint = 30,
+    bins = 25,
+    pt.size = 0.5,
+    pt.alpha = 1,
+    facet.by = NULL
+) {
+    if (!requireNamespace("scRepertoire", quietly = TRUE)) {
+        stop("scRepertoire package is required")
+    }
 
-sc_tcr_pbmc <- subset(sc_tcr, subset = tissue == "PBMC")
+    #Forming the data frame to plot
+    tmp <- data.frame(
+        scRepertoire:::.grabMeta(sc.data),
+        scRepertoire:::.get.coord(sc.data, reduction)
+    )
 
-stackedPlot(
-    object = sc_tcr_pbmc,
-    x_axis = "tissue_level2",
-    y_axis = "cloneSize",
-    x_order = unique(sc_tcr_pbmc$tissue_level2),
-    y_order = rev(clone_labels),
-    color = clone_cols,
-    width = 5,
-    height = 5
-)
+    if (cut.category %!in% colnames(tmp)) {
+        stop(
+            "If filtering the data using a cutpoint, ensure the cut.category correspond to a variable in the meta data."
+        )
+    }
+    #Add facet variable if present
+    if (!is.null(facet.by)) {
+        facet.by <- tmp[, facet.by]
+        tmp <- data.frame(facet.by, tmp)
+    }
+    #If using cut.category for filtering
+    if (!is.null(cut.category) & !is.null(cutpoint)) {
+        tmp$include <- ifelse(tmp[, cut.category] >= cutpoint, "Yes", NA)
+        tmp2 <- subset(tmp, include == "Yes")
+    }
 
+    #Plotting
+    plot <- ggplot(
+        tmp2,
+        mapping = aes(
+            x = tmp2[, (ncol(tmp2) - 2)],
+            y = tmp2[, (ncol(tmp2) - 1)]
+        )
+    ) +
+        geom_point(
+            tmp,
+            mapping = aes(
+                x = as.numeric(tmp[, (ncol(tmp) - 2)]),
+                y = as.numeric(tmp[, (ncol(tmp) - 1)]),
+                color = tmp[, "ident"]
+            ),
+            size = pt.size,
+            alpha = pt.alpha
+        ) +
+        geom_density_2d(color = "black", lwd = 0.25, bins = bins) +
+        theme_classic() +
+        labs(color = "Active Identity") +
+        xlab("Dimension 1") +
+        ylab("Dimension 2")
+    if (!is.null(facet.by)) {
+        plot <- plot + facet_wrap(~facet.by)
+    }
+    return(plot)
+}
 
 #clonal overlay
-clonalOverlay(sc_tcr, reduction = "umap", freq.cutpoint = 20, bins = 25) +
-    scale_color_manual(values = cluster_col_tcells) +
-    theme_rect()
+tcr_clonal_overlay <- customClonalOverlay(
+    sc_tcr,
+    reduction = "umap.stacas.ss.all",
+    cutpoint = 20,
+    bins = 25,
+    pt.size = 0.1,
+    pt.alpha = 0.1
+) +
+    scale_color_manual(values = sc_tcr@misc$cluster_col) +
+    theme_rect() +
+    NoLegend() +
+    xlab("UMAP1") +
+    ylab("UMAP2")
 
 ggsave(
-    file.path("results", "repertoire", "screp_clonalOverlay.pdf"),
-    width = 15,
+    plot = tcr_clonal_overlay,
+    file.path("results", "tcr", "tcr_clonal_overlay.pdf"),
+    width = 10,
     height = 10
 )
 
 
-clonalOverlay(
-    sc_tcr,
-    reduction = "umap",
-    freq.cutpoint = 20,
-    bins = 50,
-    facet = "tissue_level2"
-) +
+tcr_clonal_overlay_group <-
+    customClonalOverlay(
+        sc_tcr,
+        reduction = "umap.stacas.ss.all",
+        cutpoint = 20,
+        bins = 25,
+        pt.size = 0.1,
+        pt.alpha = 0.1,
+        facet.by = "tissue_group"
+    ) +
+    scale_color_manual(values = sc_tcr@misc$cluster_col) +
     theme_rect() +
-    scale_color_manual(values = cluster_col_tcells)
+    NoLegend() +
+    xlab("UMAP1") +
+    ylab("UMAP2")
 
 ggsave(
-    file.path("results", "repertoire", "screp_clonalOverlay_split.pdf"),
-    width = 15,
-    height = 10
+    plot = tcr_clonal_overlay_group,
+    file.path("results", "tcr", "tcr_clonal_overlay_group.pdf"),
+    width = 5,
+    height = 7
+)
+
+tcr_clonal_overlay_diagnosis <-
+    customClonalOverlay(
+        sc_tcr_main_groups,
+        reduction = "umap.stacas.ss.all",
+        cutpoint = 20,
+        bins = 25,
+        pt.size = 0.1,
+        pt.alpha = 0.1,
+    ) +
+    scale_color_manual(values = sc_tcr_main_groups@misc$cluster_col) +
+    theme_rect() +
+    NoLegend() +
+    xlab("UMAP1") +
+    ylab("UMAP2") +
+    facet_wrap(~tissue_diagnosis, nrow = 2)
+
+ggsave(
+    plot = tcr_clonal_overlay_diagnosis,
+    file.path("results", "tcr", "tcr_clonal_overlay_diagnosis.pdf"),
+    width = 10,
+    height = 7
 )
 
 sc_tcr$CTaa_top <- sc_tcr$CTaa[sc_tcr$Frequency > 20] #new column for top expanded clones

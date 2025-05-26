@@ -8,6 +8,7 @@ library(qs)
 library(Seurat)
 library(tidyverse)
 library(scRepertoire)
+library(scMisc)
 
 # load filtered contig annotations ---
 tcr_files <- list.files(
@@ -317,74 +318,8 @@ stackedPlot(
     height = 5
 )
 
-# Custom clonalOverlay function with smaller point size and custom alpha
-customClonalOverlay <- function(
-    sc.data,
-    reduction = NULL,
-    cut.category = "clonalFrequency",
-    cutpoint = 30,
-    bins = 25,
-    pt.size = 0.5,
-    pt.alpha = 1,
-    facet.by = NULL
-) {
-    if (!requireNamespace("scRepertoire", quietly = TRUE)) {
-        stop("scRepertoire package is required")
-    }
-
-    #Forming the data frame to plot
-    tmp <- data.frame(
-        scRepertoire:::.grabMeta(sc.data),
-        scRepertoire:::.get.coord(sc.data, reduction)
-    )
-
-    if (cut.category %!in% colnames(tmp)) {
-        stop(
-            "If filtering the data using a cutpoint, ensure the cut.category correspond to a variable in the meta data."
-        )
-    }
-    #Add facet variable if present
-    if (!is.null(facet.by)) {
-        facet.by <- tmp[, facet.by]
-        tmp <- data.frame(facet.by, tmp)
-    }
-    #If using cut.category for filtering
-    if (!is.null(cut.category) & !is.null(cutpoint)) {
-        tmp$include <- ifelse(tmp[, cut.category] >= cutpoint, "Yes", NA)
-        tmp2 <- subset(tmp, include == "Yes")
-    }
-
-    #Plotting
-    plot <- ggplot(
-        tmp2,
-        mapping = aes(
-            x = tmp2[, (ncol(tmp2) - 2)],
-            y = tmp2[, (ncol(tmp2) - 1)]
-        )
-    ) +
-        geom_point(
-            tmp,
-            mapping = aes(
-                x = as.numeric(tmp[, (ncol(tmp) - 2)]),
-                y = as.numeric(tmp[, (ncol(tmp) - 1)]),
-                color = tmp[, "ident"]
-            ),
-            size = pt.size,
-            alpha = pt.alpha
-        ) +
-        geom_density_2d(color = "black", lwd = 0.25, bins = bins) +
-        theme_classic() +
-        labs(color = "Active Identity") +
-        xlab("Dimension 1") +
-        ylab("Dimension 2")
-    if (!is.null(facet.by)) {
-        plot <- plot + facet_wrap(~facet.by)
-    }
-    return(plot)
-}
-
 #clonal overlay
-tcr_clonal_overlay <- customClonalOverlay(
+tcr_clonal_overlay <- clonalOverlay(
     sc_tcr,
     reduction = "umap.stacas.ss.all",
     cutpoint = 20,
@@ -405,9 +340,8 @@ ggsave(
     height = 10
 )
 
-
 tcr_clonal_overlay_group <-
-    customClonalOverlay(
+    clonalOverlay(
         sc_tcr,
         reduction = "umap.stacas.ss.all",
         cutpoint = 20,
@@ -430,7 +364,7 @@ ggsave(
 )
 
 tcr_clonal_overlay_diagnosis <-
-    customClonalOverlay(
+    clonalOverlay(
         sc_tcr_main_groups,
         reduction = "umap.stacas.ss.all",
         cutpoint = 20,
@@ -452,21 +386,29 @@ ggsave(
     height = 7
 )
 
-sc_tcr$CTaa_top <- sc_tcr$CTaa[sc_tcr$Frequency > 20] #new column for top expanded clones
+sc_tcr$CTaa_top <- sc_tcr$CTaa[sc_tcr$clonalFrequency > 90] #new column for top expanded clones
 #sc_tcr$CTaa_top <- factor(sc_tcr$CTaa_top, levels = CTaa_freq_bcr$CTaa) # level based on size
 
-alluvialClonotypes(
-    sc_tcr,
-    cloneCall = "aa",
-    y.axes = c("sample", "tissue_level2"),
-    color = "CTaa_top"
-)
+# sanity check
+table(sc_tcr$CTaa_top)
+
+# alluvial plots
+tcr_alluvial_tisssue_diagnosis <-
+    alluvialClones(
+        sc_tcr,
+        cloneCall = "aa",
+        y.axes = c("sample", "cluster", "tissue_diagnosis"),
+        color = "CTaa_top"
+    ) +
+    # scale_fill_manual(values = colors_dutch)
+    scale_fill_manual(values = scales::hue_pal()(3))
 
 ggsave(
+    plot = tcr_alluvial_tisssue_diagnosis,
     file.path(
         "results",
-        "repertoire",
-        "screp_alluvial_sample_tissue_level2.pdf"
+        "tcr",
+        "tcr_alluvial_sample_tissue_diagnosis.pdf"
     ),
     width = 15,
     height = 10

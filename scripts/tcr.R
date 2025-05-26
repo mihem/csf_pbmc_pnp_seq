@@ -9,6 +9,7 @@ library(Seurat)
 library(tidyverse)
 library(scRepertoire)
 library(scMisc)
+library(writexl)
 
 # load filtered contig annotations ---
 tcr_files <- list.files(
@@ -184,16 +185,21 @@ sc_tcr <- scRepertoire::combineExpression(
     combined_tcr,
     sc_tcr,
     cloneCall = "aa",
-    group.by = "none",
-    proportion = FALSE,
-    cloneSize = c(
-        Single = 1,
-        Small = 5,
-        Medium = 20,
-        Large = 100,
-        Hyperexpanded = 500
-    )
+    group.by = "sample",
+    proportion = TRUE
+    # cloneSize = c(
+    #     Single = 1,
+    #     Small = 5,
+    #     Medium = 20,
+    #     Large = 100,
+    #     Hyperexpanded = 500
+    # )
 )
+
+str(sc_tcr@meta.data)
+table(sc_tcr$clonalFrequency)
+table(sc_tcr$cloneSize)
+
 
 # save Seurat object with TCR annotations
 qs::qsave(
@@ -386,22 +392,22 @@ ggsave(
     height = 7
 )
 
-sc_tcr$CTaa_top <- sc_tcr$CTaa[sc_tcr$clonalFrequency > 90] #new column for top expanded clones
-#sc_tcr$CTaa_top <- factor(sc_tcr$CTaa_top, levels = CTaa_freq_bcr$CTaa) # level based on size
+sc_tcr_main_groups$CTaa_top <-
+    sc_tcr_main_groups$CTaa[sc_tcr_main_groups$clonalFrequency >= 50] #new column for top expanded clones
 
 # sanity check
-table(sc_tcr$CTaa_top)
+table(sc_tcr_main_groups$CTaa_top)
 
 # alluvial plots
 tcr_alluvial_tisssue_diagnosis <-
     alluvialClones(
-        sc_tcr,
+        sc_tcr_main_groups,
         cloneCall = "aa",
-        y.axes = c("sample", "cluster", "tissue_diagnosis"),
+        y.axes = c("sample", "tissue_diagnosis", "cluster"),
         color = "CTaa_top"
     ) +
     # scale_fill_manual(values = colors_dutch)
-    scale_fill_manual(values = scales::hue_pal()(3))
+    scale_fill_manual(values = scales::hue_pal()(4))
 
 ggsave(
     plot = tcr_alluvial_tisssue_diagnosis,
@@ -414,22 +420,7 @@ ggsave(
     height = 10
 )
 
-
-alluvialClonotypes(
-    sc_tcr,
-    cloneCall = "aa",
-    y.axes = c("sample"),
-    color = "CTaa_top"
-)
-
-ggsave(
-    file.path("results", "repertoire", "screp_alluvial_sample.pdf"),
-    width = 15,
-    height = 10
-)
-
-
-## clonalDiversity(sc_tcr,
+## 6lonalDiversity(sc_tcr,
 ##                 split.by = "tissue_level2",
 ##                 cloneCall = "aa") +
 ##      scale_color_manual(values = pals::cols25(25))

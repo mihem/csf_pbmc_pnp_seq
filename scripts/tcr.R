@@ -124,8 +124,8 @@ combined_tcr <- scRepertoire::combineTCR(
     tcr_contig_list,
     samples = tcr_contig_tissue,
     ID = tcr_contig_sample,
-    removeNA = FALSE,
-    removeMulti = FALSE
+    removeNA = TRUE,
+    removeMulti = TRUE
 )
 
 #sanity check
@@ -311,10 +311,8 @@ sc_tcr_main_groups$tissue_diagnosis <- droplevels(
     sc_tcr_main_groups$tissue_diagnosis,
 )
 
-
 # sanity chec
 table(sc_tcr_main_groups$diagnosis)
-sc_tcr_main_groups@misc
 
 stackedPlot(
     object = sc_tcr_main_groups,
@@ -395,10 +393,8 @@ ggsave(
     height = 7
 )
 
-sc_tcr_main_groups$CTaa_top <- NULL
-
 tcr_top_clones <- dplyr::count(sc_tcr_main_groups@meta.data, CTaa) |>
-    slice_max(n, n = 5) |>
+    slice_max(n, n = 6, with_ties = FALSE) |>
     drop_na() |>
     arrange(desc(n))
 
@@ -420,8 +416,7 @@ tcr_alluvial_tisssue_diagnosis <-
         y.axes = c("sample", "tissue_diagnosis", "cluster"),
         color = "CTaa_top"
     ) +
-    # scale_fill_manual(values = colors_dutch)
-    scale_fill_manual(values = scales::hue_pal()(4))
+    scale_fill_manual(values = scales::hue_pal()(5))
 
 ggsave(
     plot = tcr_alluvial_tisssue_diagnosis,
@@ -452,6 +447,7 @@ ggsave(
     width = 15,
     height = 10
 )
+
 tcr_overlap_tissue_sample <-
     clonalOverlap(
         sc_tcr_main_groups,

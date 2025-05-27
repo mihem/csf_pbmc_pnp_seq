@@ -539,4 +539,62 @@ ggsave(
     height = 7
 )
 
-# analyzing MAIT
+Idents(sc_tcr_main_groups) <- sc_tcr_main_groups$cluster
+
+tcr_startrac_diversity <- StartracDiversity(
+    sc_tcr_main_groups,
+    cloneCall = "strict",
+    chain = "both",
+    type = "tissue",
+    group.by = "patient",
+) +
+    theme(
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+    )
+
+ggsave(
+    plot = tcr_startrac_diversity,
+    file.path("results", "tcr", "tcr_startrac_diversity.pdf"),
+    width = 4,
+    height = 5
+)
+
+# analyze MAIT cells
+sc_tcr <- annotateInvariant(
+    sc_tcr,
+    type = "MAIT",
+    species = "human"
+)
+
+# annotate iNKT cells
+sc_tcr <- annotateInvariant(
+    sc_tcr,
+    type = "iNKT",
+    species = "human"
+)
+
+
+# Custom plot highlighting iNKT cells (score=1) in red with alpha=1 and others in grey with alpha=0.1
+custom_iNKT_plot <- DimPlot(
+    sc_tcr,
+    reduction = "umap.stacas.ss.all",
+    group.by = "iNKT.score",
+    pt.size = 0.1,
+    cols = c("0" = "grey", "1" = "red"),
+    raster = FALSE
+)
+
+# Modify the plot to adjust transparency
+custom_iNKT_plot[[1]]$layers[[1]]$aes_params$alpha <- ifelse(
+    sc_tcr$iNKT.score == 1, 
+    1.0,  # Full opacity for iNKT cells (score=1)
+    0.1   # Low opacity for non-iNKT cells (score=0)
+)
+
+# Save the plot
+ggsave(
+    plot = custom_iNKT_plot,
+    file.path("results", "tcr", "highlighted_iNKT_cells.pdf"),
+    width = 10,
+    height = 7
+)

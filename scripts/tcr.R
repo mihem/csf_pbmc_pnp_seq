@@ -152,7 +152,6 @@ ggsave(file.path("results", "tcr", "tcr_length_aa.pdf"))
 #################################################################################################################
 # screpertoire analysis with seurat object
 #################################################################################################################
-
 sc_tcr <- subset(
     sc_merge,
     cluster %in%
@@ -186,20 +185,19 @@ sc_tcr <- scRepertoire::combineExpression(
     sc_tcr,
     cloneCall = "aa",
     group.by = "sample",
-    proportion = TRUE
-    # cloneSize = c(
-    #     Single = 1,
-    #     Small = 5,
-    #     Medium = 20,
-    #     Large = 100,
-    #     Hyperexpanded = 500
-    # )
+    proportion = FALSE,
+    cloneSize = c(
+        Single = 1,
+        Small = 5,
+        Medium = 20,
+        Large = 100,
+        Hyperexpanded = 500
+    )
 )
 
 str(sc_tcr@meta.data)
 table(sc_tcr$clonalFrequency)
 table(sc_tcr$cloneSize)
-
 
 # save Seurat object with TCR annotations
 qs::qsave(
@@ -309,6 +307,11 @@ sc_tcr_main_groups <- subset(
     subset = diagnosis %in% c("CTRL", "CIAP", "CIDP", "GBS")
 )
 
+sc_tcr_main_groups$tissue_diagnosis <- droplevels(
+    sc_tcr_main_groups$tissue_diagnosis,
+)
+
+
 # sanity chec
 table(sc_tcr_main_groups$diagnosis)
 sc_tcr_main_groups@misc
@@ -392,10 +395,21 @@ ggsave(
     height = 7
 )
 
-sc_tcr_main_groups$CTaa_top <-
-    sc_tcr_main_groups$CTaa[sc_tcr_main_groups$clonalFrequency >= 50] #new column for top expanded clones
+sc_tcr_main_groups$CTaa_top <- NULL
 
-# sanity check
+tcr_top_clones <- dplyr::count(sc_tcr_main_groups@meta.data, CTaa) |>
+    slice_max(n, n = 5) |>
+    drop_na() |>
+    arrange(desc(n))
+
+# Create CTaa_top column - keep only clones in test3, set all others to NA
+sc_tcr_main_groups$CTaa_top <- ifelse(
+    sc_tcr_main_groups$CTaa %in% tcr_top_clones$CTaa,
+    sc_tcr_main_groups$CTaa,
+    NA
+)
+
+# Check the results
 table(sc_tcr_main_groups$CTaa_top)
 
 # alluvial plots
@@ -420,48 +434,71 @@ ggsave(
     height = 10
 )
 
-## 6lonalDiversity(sc_tcr,
-##                 split.by = "tissue_level2",
-##                 cloneCall = "aa") +
-##      scale_color_manual(values = pals::cols25(25))
+tcr_overlap_tissue_diagnosis <-
+    clonalOverlap(
+        sc_tcr_main_groups,
+        cloneCall = "aa",
+        method = "overlap",
+        group.by = "tissue_diagnosis",
+    )
 
-clonalOverlap(
-    sc_tcr,
-    cloneCall = "aa",
-    split.by = "tissue_level2",
-    method = "overlap"
-)
 ggsave(
+    plot = tcr_overlap_tissue_diagnosis,
     file.path(
         "results",
-        "repertoire",
-        "screp_clonal_overlap_tissue_level2.pdf"
+        "tcr",
+        "tcr_clonal_overlap_tissue_diagnosis.pdf"
     ),
     width = 15,
     height = 10
 )
-
-
-clonalOverlap(
-    sc_tcr,
-    cloneCall = "aa",
-    split.by = "sample",
-    method = "morisita"
-) +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+tcr_overlap_tissue_sample <-
+    clonalOverlap(
+        sc_tcr_main_groups,
+        cloneCall = "aa",
+        method = "overlap",
+        group.by = "sample",
+    ) +
+    theme(
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+    )
 
 ggsave(
-    file.path("results", "repertoire", "screp_clonal_overlap_sample.pdf"),
-    width = 15,
-    height = 12
+    plot = tcr_overlap_tissue_sample,
+    file.path(
+        "results",
+        "tcr",
+        "tcr_clonal_overlap_tissue_sample.pdf"
+    ),
+    width = 20,
+    height = 17
 )
 
 
-#find clones that are the same between patients
-sc_tcr@meta.data |>
+#find clones that are the same between patients and create a table with samples
+shared_clones <- sc_tcr@meta.data |>
     tibble() |>
-    dplyr::select(sample, CTaa) |>
-    dplyr::filter(sample %in% c("CSF_PNP08", "CSF_PNP10")) |>
+    dplyr::select(sample, CTaa, tissue_diagnosis) |> # Add tissue_diagnosis
+    tidyr::drop_na() |>
     dplyr::distinct() |>
-    dplyr::mutate(overlap = duplicated(CTaa)) |>
-    dplyr::filter(overlap)
+    dplyr::group_by(CTaa) |>
+    dplyr::filter(n() > 1) |>
+    dplyr::arrange(CTaa) |>
+    dplyr::ungroup()
+
+# Create a table showing which samples have each clone, sorted by number of occurrences
+shared_clones_summary <- shared_clones |>
+    dplyr::group_by(CTaa) |>
+    dplyr::summarize(
+        samples = paste(sample, collapse = ", "),
+        tissue_diagnosis = paste(tissue_diagnosis, collapse = ", "), # Add tissue_diagnosis column
+        sample_count = n() # Count how many samples have this clone
+    ) |>
+    dplyr::arrange(desc(sample_count), CTaa) |> # Sort by count (desc) then by CTaa
+    dplyr::select(CTaa, samples, tissue_diagnosis, sample_count) # Keep the count column for reference
+
+# Save the results to an Excel file
+write_xlsx(
+    shared_clones_summary,
+    file.path("results", "tcr", "shared_clones_by_sample_summary.xlsx")
+)

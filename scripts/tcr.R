@@ -498,3 +498,34 @@ write_xlsx(
     shared_clones_summary,
     file.path("results", "tcr", "shared_clones_by_sample_summary.xlsx")
 )
+
+#
+tcr_clonal_distribution <- clonalSizeDistribution(
+    sc_tcr,
+    cloneCall = "aa",
+    method = "ward.D2",
+    group.by = "sample"
+)
+
+ggsave(
+    plot = tcr_clonal_distribution,
+    file.path("results", "tcr", "tcr_clonal_distribution.pdf"),
+    width = 10,
+    height = 7
+)
+
+tcr_clonal_diversity <- clonalDiversity(
+    sc_tcr_main_groups,
+    cloneCall = "gene",
+    group.by = "tissue_diagnosis"
+) +
+    scale_fill_manual(values = sc_tcr_main_groups@misc$tissue_diagnosis_col)
+
+ggsave(
+    plot = tcr_clonal_diversity,
+    file.path("results", "tcr", "tcr_clonal_diversity.pdf"),
+    width = 10,
+    height = 7
+)
+
+# analyzing MAIT

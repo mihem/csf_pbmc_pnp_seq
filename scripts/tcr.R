@@ -281,6 +281,17 @@ ggsave(
 #abundance plot screpertoire
 stackedPlot(
     object = sc_tcr,
+    x_axis = "cluster",
+    y_axis = "cloneSize",
+    x_order = sc_tcr@misc$cluster_order,
+    y_order = clone_labels,
+    color = clone_cols,
+    width = 5,
+    height = 3
+)
+
+stackedPlot(
+    object = sc_tcr,
     x_axis = "sample",
     y_axis = "cloneSize",
     x_order = unique(sc_tcr$sample),
@@ -289,7 +300,7 @@ stackedPlot(
     width = 10,
     height = 3
 )
-str(sc_tcr@meta.data)
+
 
 stackedPlot(
     object = sc_tcr,

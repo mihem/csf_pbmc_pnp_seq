@@ -501,7 +501,7 @@ fplot_selected_cd8_nk <-
     order = TRUE,
     cols = c("#F0F0F0", "#CB181D"),
     raster = FALSE,
-    ncol = 4
+    ncol = 3
   ) &
   theme(
     axis.text = element_blank(),
@@ -513,7 +513,7 @@ ggsave(
   plot = fplot_selected_cd8_nk,
   file = file.path("results", "featureplot", "fplot_selected_cd8_nk.png"),
   width = 20,
-  height = 10
+  height = 7
 )
 
 scMisc::fPlot(

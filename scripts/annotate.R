@@ -490,7 +490,30 @@ scMisc::fPlot(
   par = "cellmarkers_seed",
   reduction = "umap.stacas.ss.all",
   order = FALSE,
-  width = 24
+  width = 35
+)
+
+fplot_selected_cd8_nk <-
+  FeaturePlot(
+    object = sc_merge,
+    features = c("CD8A", "NCAM1", "IKZF2"),
+    reduction = "umap.stacas.ss.all",
+    order = TRUE,
+    cols = c("#F0F0F0", "#CB181D"),
+    raster = FALSE,
+    ncol = 4
+  ) &
+  theme(
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.border = element_rect(color = "black", linewidth = 1, fill = NA)
+  )
+
+ggsave(
+  plot = fplot_selected_cd8_nk,
+  file = file.path("results", "featureplot", "fplot_selected_cd8_nk.png"),
+  width = 20,
+  height = 10
 )
 
 scMisc::fPlot(
@@ -527,9 +550,13 @@ nk_cells <- readRDS(
   "/home/mischko/Documents/beruf/forschung/scRNA_reference/human_blood/nk_cells/nk_cells_rna.rds"
 )
 
-meta <- read_csv("/home/mischko/Documents/beruf/forschung/scRNA_reference/human_blood/all_pbmcs/all_pbmcs_metadata.csv")
+meta <- read_csv(
+  "/home/mischko/Documents/beruf/forschung/scRNA_reference/human_blood/all_pbmcs/all_pbmcs_metadata.csv"
+)
 
-meta <- read_csv("/home/mischko/Documents/beruf/forschung/scRNA_reference/human_blood/conventional_cd8_t_cells/conventional_cd8_metadata.csv")
+meta <- read_csv(
+  "/home/mischko/Documents/beruf/forschung/scRNA_reference/human_blood/conventional_cd8_t_cells/conventional_cd8_metadata.csv"
+)
 
 names(meta)
 

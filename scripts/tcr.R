@@ -573,28 +573,45 @@ sc_tcr <- annotateInvariant(
     species = "human"
 )
 
+# Function to create invariant cell plots with highlighting
+create_invariant_plot <- function(seurat_obj, cell_type, width = 5, height = 5) {
+    score_column <- paste0(cell_type, ".score")
+    title <- paste(cell_type, "Cells Highlighted")
+    filename <- paste0("highlighted_", cell_type, "_cells.pdf")
+    
+    # Create the plot
+    plot <- DimPlot(
+        seurat_obj,
+        reduction = "umap.stacas.ss.all",
+        group.by = score_column,
+        pt.size = 0.1,
+        cols = c("0" = "grey", "1" = "red"),
+        raster = FALSE
+    ) +
+        NoLegend() +
+        theme_rect() +
+        xlab("UMAP1") +
+        ylab("UMAP2") +
+        ggtitle(title)
+    
+    # Modify the plot to adjust transparency
+    plot[[1]]$layers[[1]]$aes_params$alpha <- ifelse(
+        seurat_obj@meta.data[[score_column]] == 1,
+        1.0, # Full opacity for positive cells (score=1)
+        0.01  # Low opacity for negative cells (score=0)
+    )
+    
+    # Save the plot
+    ggsave(
+        plot = plot,
+        file.path("results", "tcr", filename),
+        width = width,
+        height = height
+    )
+    
+    return(plot)
+}
 
-# Custom plot highlighting iNKT cells (score=1) in red with alpha=1 and others in grey with alpha=0.1
-custom_iNKT_plot <- DimPlot(
-    sc_tcr,
-    reduction = "umap.stacas.ss.all",
-    group.by = "iNKT.score",
-    pt.size = 0.1,
-    cols = c("0" = "grey", "1" = "red"),
-    raster = FALSE
-)
-
-# Modify the plot to adjust transparency
-custom_iNKT_plot[[1]]$layers[[1]]$aes_params$alpha <- ifelse(
-    sc_tcr$iNKT.score == 1, 
-    1.0,  # Full opacity for iNKT cells (score=1)
-    0.1   # Low opacity for non-iNKT cells (score=0)
-)
-
-# Save the plot
-ggsave(
-    plot = custom_iNKT_plot,
-    file.path("results", "tcr", "highlighted_iNKT_cells.pdf"),
-    width = 10,
-    height = 7
-)
+# Create plots for both MAIT and iNKT cells
+custom_MAIT_plot <- create_invariant_plot(sc_tcr, "MAIT")
+custom_iNKT_plot <- create_invariant_plot(sc_tcr, "iNKT")

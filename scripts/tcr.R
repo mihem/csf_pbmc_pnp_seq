@@ -424,7 +424,7 @@ tcr_alluvial_tisssue_diagnosis <-
     alluvialClones(
         sc_tcr_main_groups,
         cloneCall = "aa",
-        y.axes = c("sample", "tissue_diagnosis", "cluster"),
+        y.axes = c("sample", "patient", "diagnosis", "cluster"),
         color = "CTaa_top"
     ) +
     scale_fill_manual(values = scales::hue_pal()(5))
@@ -574,11 +574,16 @@ sc_tcr <- annotateInvariant(
 )
 
 # Function to create invariant cell plots with highlighting
-create_invariant_plot <- function(seurat_obj, cell_type, width = 5, height = 5) {
+create_invariant_plot <- function(
+    seurat_obj,
+    cell_type,
+    width = 5,
+    height = 5
+) {
     score_column <- paste0(cell_type, ".score")
     title <- paste(cell_type, "Cells Highlighted")
     filename <- paste0("highlighted_", cell_type, "_cells.pdf")
-    
+
     # Create the plot
     plot <- DimPlot(
         seurat_obj,
@@ -593,14 +598,14 @@ create_invariant_plot <- function(seurat_obj, cell_type, width = 5, height = 5) 
         xlab("UMAP1") +
         ylab("UMAP2") +
         ggtitle(title)
-    
+
     # Modify the plot to adjust transparency
     plot[[1]]$layers[[1]]$aes_params$alpha <- ifelse(
         seurat_obj@meta.data[[score_column]] == 1,
         1.0, # Full opacity for positive cells (score=1)
-        0.01  # Low opacity for negative cells (score=0)
+        0.01 # Low opacity for negative cells (score=0)
     )
-    
+
     # Save the plot
     ggsave(
         plot = plot,
@@ -608,10 +613,151 @@ create_invariant_plot <- function(seurat_obj, cell_type, width = 5, height = 5) 
         width = width,
         height = height
     )
-    
+
     return(plot)
 }
 
 # Create plots for both MAIT and iNKT cells
 custom_MAIT_plot <- create_invariant_plot(sc_tcr, "MAIT")
 custom_iNKT_plot <- create_invariant_plot(sc_tcr, "iNKT")
+
+# Calculate mean clonal frequency by tissue type (CSF vs PBMC) for each patient (summarized)
+correlation_data_mean <-
+    sc_tcr@meta.data |>
+    group_by(patient, tissue, diagnosis) |>
+    summarize(
+        clonalFrequency = mean(clonalFrequency, na.rm = TRUE),
+        .groups = "drop"
+    ) |>
+    pivot_wider(
+        names_from = tissue,
+        values_from = clonalFrequency,
+        names_prefix = "clonalFreq_"
+    ) |>
+    drop_na(clonalFreq_CSF, clonalFreq_PBMC)
+
+# Plot CSF vs PBMC clonal frequency (mean values)
+tissue_correlation_plot_mean <- correlation_data_mean |>
+    ggplot(aes(x = clonalFreq_CSF, y = clonalFreq_PBMC, color = diagnosis)) +
+    geom_point(size = 3) +
+    scale_color_manual(values = sc_tcr@misc$diagnosis_col) +
+    labs(
+        x = "Mean Clonal Frequency (CSF)",
+        y = "Mean Clonal Frequency (PBMC)",
+        title = "Mean Clonal Frequency per Patient"
+    ) +
+    theme_classic()
+
+# Save the mean plot
+ggsave(
+    plot = tissue_correlation_plot_mean,
+    file.path("results", "tcr", "tcr_csf_pbmc_correlation_mean.pdf"),
+    width = 8,
+    height = 6
+)
+
+# Use all individual cell values - match cells from same clones across tissues
+correlation_data_all <-
+    sc_tcr@meta.data |>
+    filter(!is.na(clonalFrequency) & !is.na(CTaa)) |>
+    select(patient, tissue, diagnosis, clonalFrequency, CTaa) |>
+    # Split into CSF and PBMC data
+    group_split(tissue) |>
+    # Name the list elements
+    setNames(c("CSF", "PBMC")) |>
+    # Join CSF and PBMC data by patient and clone (CTaa)
+    reduce(inner_join, by = c("patient", "diagnosis", "CTaa")) |>
+    # Rename columns to be clear
+    rename(
+        clonalFreq_CSF = clonalFrequency.x,
+        clonalFreq_PBMC = clonalFrequency.y
+    ) |>
+    distinct()
+
+
+# Plot CSF vs PBMC clonal frequency (matched clones)
+tissue_correlation_plot_all <- correlation_data_all |>
+    ggplot(aes(
+        x = clonalFreq_CSF,
+        y = clonalFreq_PBMC,
+        color = diagnosis
+    )) +
+    geom_jitter(size = 1, alpha = 0.6) +
+    scale_color_manual(values = sc_tcr@misc$diagnosis_col) +
+    labs(
+        x = "Clonal Frequency (CSF)",
+        y = "Clonal Frequency (PBMC)",
+        title = "Matched Clones Across Tissues"
+    ) +
+    theme_classic()
+
+# Save the all values plot
+ggsave(
+    plot = tissue_correlation_plot_all,
+    file.path("results", "tcr", "tcr_csf_pbmc_correlation_all.pdf"),
+    width = 8,
+    height = 6
+)
+
+# correlate TCR clonality with CSF protein
+sc_tcr_csf <- subset(sc_tcr, tissue %in% c("CSF"))
+
+csf_protein_lookup <-
+    lookup |>
+    select(pseudonym, csf_protein)
+
+sc_tcr_csf@meta.data <-
+    sc_tcr_csf@meta.data |>
+    tibble::rownames_to_column("barcode") |>
+    dplyr::left_join(csf_protein_lookup) |>
+    tibble::column_to_rownames("barcode")
+
+# Calculate correlation between clonality and CSF protein
+correlation_data <-
+    sc_tcr_csf@meta.data |>
+    group_by(sample) |>
+    summarize(
+        clonalFrequency = mean(clonalFrequency, na.rm = TRUE),
+        csf_protein = mean(csf_protein, na.rm = TRUE),
+        diagnosis = unique(diagnosis)
+    )
+
+# Calculate correlation statistics
+correlation_test <- cor.test(
+    correlation_data$csf_protein,
+    correlation_data$clonalFrequency,
+    method = "pearson"
+)
+
+# Extract statistics
+r_value <- correlation_test$estimate
+p_value <- correlation_test$p.value
+
+# Format statistics for display
+stats_text <- paste0(
+    "r = ",
+    signif(r_value, 3),
+    ", p = ",
+    signif(p_value, 3)
+)
+
+correlation_plot <-
+    correlation_data |>
+    ggplot(aes(x = csf_protein, y = clonalFrequency, color = diagnosis)) +
+    geom_point(size = 3) +
+    scale_color_manual(values = sc_tcr_csf@misc$diagnosis_col) +
+    geom_smooth(method = "lm", color = "blue") +
+    labs(
+        x = "CSF Protein (mg/L)",
+        y = "Mean Clonal Frequency",
+        subtitle = stats_text
+    ) +
+    theme_classic()
+
+# Save the correlation plot
+ggsave(
+    plot = correlation_plot,
+    file.path("results", "tcr", "tcr_clonality_csf_protein_correlation.pdf"),
+    width = 8,
+    height = 6
+)

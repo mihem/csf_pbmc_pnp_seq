@@ -6376,14 +6376,14 @@
     },
     "scRepertoire": {
       "Package": "scRepertoire",
-      "Version": "2.3.4",
+      "Version": "2.5.2",
       "Source": "GitHub",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteUsername": "BorchLab",
       "RemoteRepo": "scRepertoire",
       "RemoteRef": "master",
-      "RemoteSha": "52a0738c5fa18b9ebe00ac3b70a82d6d1ba98a16",
+      "RemoteSha": "77ed927cb3b62a5622d5222b5b004664640dedfe",
       "Requirements": [
         "R",
         "Rcpp",
@@ -6417,7 +6417,7 @@
         "tidygraph",
         "truncdist"
       ],
-      "Hash": "0be4aeac702929a370fb3dd08d66711e"
+      "Hash": "0ddc29c4e191b05742fee3a2adcc32ee"
     },
     "scales": {
       "Package": "scales",

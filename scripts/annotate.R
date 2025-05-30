@@ -184,6 +184,19 @@ sc_merge@meta.data <-
   dplyr::mutate(cluster = dplyr::coalesce(cluster, RNA_snn_res.1)) |>
   tibble::column_to_rownames(var = "cell_barcode")
 
+# separate cl23 in two clusters
+nk_cells <- read_csv(file.path("lookup", "nk_cd8_nk.csv")) |>
+  mutate(cluster_manual = "23_nk_cells") |>
+  select(cell_barcode, cluster_manual)
+
+sc_merge@meta.data <-
+  sc_merge@meta.data |>
+  tibble::rownames_to_column("cell_barcode") |>
+  dplyr::left_join(nk_cells) |>
+  dplyr::mutate(cluster = dplyr::coalesce(cluster_manual, cluster)) |>
+  dplyr::select(-cluster_manual) |>
+  tibble::column_to_rownames(var = "cell_barcode") 
+
 # annotate clusters ----
 Idents(sc_merge) <- factor(
   sc_merge$cluster,
@@ -308,7 +321,6 @@ ggsave(
 )
 
 qs::qsave(sc_merge, file.path("objects", "sc_merge.qs"))
-
 
 # find markers helper function
 findMarkers <- function(
@@ -546,18 +558,4 @@ scMisc::fPlot(
   height = 20
 )
 
-nk_cells <- readRDS(
-  "/home/mischko/Documents/beruf/forschung/scRNA_reference/human_blood/nk_cells/nk_cells_rna.rds"
-)
 
-meta <- read_csv(
-  "/home/mischko/Documents/beruf/forschung/scRNA_reference/human_blood/all_pbmcs/all_pbmcs_metadata.csv"
-)
-
-meta <- read_csv(
-  "/home/mischko/Documents/beruf/forschung/scRNA_reference/human_blood/conventional_cd8_t_cells/conventional_cd8_metadata.csv"
-)
-
-names(meta)
-
-unique(meta$Cluster_names)

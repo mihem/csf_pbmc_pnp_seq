@@ -20,26 +20,7 @@ sc_merge_csf <- subset(sc_merge, tissue %in% "CSF")
 sc_merge_pbmc <- subset(sc_merge, tissue %in% "PBMC")
 
 # meta data ----
-lookup <-
-  readxl::read_excel(file.path("lookup", "SEED_lookup_v6.xlsx")) |>
-  janitor::clean_names() |>
-  mutate(age = lubridate::time_length(difftime(date, birth_date), "years")) |>
-  mutate(
-    diagnosis = factor(
-      diagnosis,
-      levels = c(
-        "CTRL",
-        "CIAP",
-        "CIDP",
-        "GBS",
-        "MAG",
-        "MFS",
-        "PNC",
-        "CAN",
-        "PPN"
-      )
-    )
-  )
+lookup <- qs::qread(file.path("objects", "lookup.qs"))
 
 # abundance table
 scMisc::abundanceTbl(sc_merge, "cluster", "sample")
@@ -144,7 +125,7 @@ propeller_results <-
         lookup = lookup,
         sample_col = "patient",
         formula = "~0 + diagnosis + sex + age",
-        min_cells = 30
+        min_cells = 9
       )
     }
   )

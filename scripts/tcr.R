@@ -50,8 +50,6 @@ dplyr::count(tcr_contig_list[[tcr_names[1]]], pseudonym)
 # load preprocessed data ----
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthreads = 6)
 
-str(sc_merge@meta.data)
-
 #add doublet and unassigned
 pseudonym_lookup <- lookup |>
     dplyr::select(pseudonym, patient) |>
@@ -68,7 +66,6 @@ for (sample in tcr_names[!tcr_names %in% c("PNP38")]) {
 
 #sanity check
 dplyr::count(tcr_contig_list[[tcr_names[1]]], patient)
-
 tcr_contig_list[["PNP38"]]
 
 #assign patient names and remove doublets and unassigned
@@ -86,8 +83,6 @@ tcr_contig_list <- purrr::list_flatten(tcr_contig_list)
 
 # sanity check
 str(tcr_contig_list, max.level = 1)
-
-qsave(tcr_contig_list, file = file.path("objects", "tcr_contig_list.qs"))
 
 #str_remove(names(tcr_contig_list), "[^_]+_[^_]_+[^_]_+")
 #str_replace(names(tcr_contig_list), pattern = "([^_]+)_\\w+_([^_]+)", replacement = "\\1_\\2")
@@ -126,6 +121,11 @@ combined_tcr <- scRepertoire::combineTCR(
     ID = tcr_contig_sample,
     removeNA = TRUE,
     removeMulti = TRUE
+)
+
+qsave(
+    combined_tcr,
+    file = file.path("objects", "combined_tcr.qs")
 )
 
 #sanity check
@@ -168,9 +168,10 @@ sc_tcr <- subset(
             "CD8TCM",
             "CD8TEM_1",
             "CD8TEM_2",
-            "CD8_NK",
-            "NKCD56dim",
-            "NKCD56bright"
+            "CD8TEM_3",
+            "NKCD56bright_1",
+            "NKCD56bright_2",
+            "NKCD56dim"
         )
 )
 
@@ -194,10 +195,6 @@ sc_tcr <- scRepertoire::combineExpression(
         Hyperexpanded = 500
     )
 )
-
-str(sc_tcr@meta.data)
-table(sc_tcr$clonalFrequency)
-table(sc_tcr$cloneSize)
 
 # save Seurat object with TCR annotations
 qs::qsave(
@@ -225,24 +222,6 @@ CTaa_sample <- dplyr::count(sc_tcr@meta.data, CTaa, sample) |>
     dplyr::relocate(CTaa) # move CTaa to start
 
 write_xlsx(CTaa_sample, file.path("results", "tcr", "CTaa_sample.xlsx"))
-
-# ## ## pay attention with frequency, probably based on all contigs from all clusters not only B cell clusters, therefore replace Frequency by counts of the CTaa
-# # sanity check
-# table(sc_tcr$clonalFrequency)
-# sc_tcr$clonalFrequency_old <- sc_tcr$clonalFrequency
-# sc_tcr$clonalFrequency <- NULL
-
-# CTaa_freq_tcr <- dplyr::count(sc_tcr@meta.data, CTaa) |>
-#     drop_na() |>
-#     arrange(desc(n)) |>
-#     tibble()
-
-# sc_tcr@meta.data <-
-#     sc_tcr@meta.data |>
-#     tibble::rownames_to_column("barcode") |>
-#     dplyr::left_join(CTaa_freq_tcr, by = "CTaa") |>
-#     dplyr::rename(clonalFrequency = n) |>
-#     tibble::column_to_rownames("barcode")
 
 #plot UMAP with frequency of clonotypes
 clone_labels <- levels(sc_tcr$cloneSize)
@@ -300,7 +279,6 @@ stackedPlot(
     width = 10,
     height = 3
 )
-
 
 stackedPlot(
     object = sc_tcr,
@@ -713,7 +691,7 @@ sc_tcr_csf@meta.data <-
     tibble::column_to_rownames("barcode")
 
 # Calculate correlation between clonality and CSF protein
-correlation_data <-
+protein_correlation_data <-
     sc_tcr_csf@meta.data |>
     group_by(sample) |>
     summarize(
@@ -723,26 +701,26 @@ correlation_data <-
     )
 
 # Calculate correlation statistics
-correlation_test <- cor.test(
-    correlation_data$csf_protein,
-    correlation_data$clonalFrequency,
+protein_correlation_test <- cor.test(
+    protein_correlation_data$csf_protein,
+    protein_correlation_data$clonalFrequency,
     method = "pearson"
 )
 
 # Extract statistics
-r_value <- correlation_test$estimate
-p_value <- correlation_test$p.value
+r_value <- protein_correlation_test$estimate
+p_value <- protein_correlation_test$p.value
 
 # Format statistics for display
-stats_text <- paste0(
+protein_stats_text <- paste0(
     "r = ",
     signif(r_value, 3),
     ", p = ",
     signif(p_value, 3)
 )
 
-correlation_plot <-
-    correlation_data |>
+protein_correlation_plot <-
+    protein_correlation_data |>
     ggplot(aes(x = csf_protein, y = clonalFrequency, color = diagnosis)) +
     geom_point(size = 3) +
     scale_color_manual(values = sc_tcr_csf@misc$diagnosis_col) +
@@ -750,13 +728,13 @@ correlation_plot <-
     labs(
         x = "CSF Protein (mg/L)",
         y = "Mean Clonal Frequency",
-        subtitle = stats_text
+        subtitle = protein_stats_text
     ) +
     theme_classic()
 
 # Save the correlation plot
 ggsave(
-    plot = correlation_plot,
+    plot = protein_correlation_plot,
     file.path("results", "tcr", "tcr_clonality_csf_protein_correlation.pdf"),
     width = 8,
     height = 6

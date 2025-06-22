@@ -22,26 +22,7 @@ source(file.path("scripts", "dge_helper.R"))
 # load preprocessed data ----
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthread = 4)
 
-lookup <-
-    read_excel(file.path("lookup", "SEED_lookup_v6.xlsx")) |>
-    janitor::clean_names() |>
-    mutate(age = lubridate::time_length(difftime(date, birth_date), "years")) |>
-    mutate(
-        diagnosis = factor(
-            diagnosis,
-            levels = c(
-                "CTRL",
-                "CIAP",
-                "CIDP",
-                "GBS",
-                "MAG",
-                "MFS",
-                "PNC",
-                "CAN",
-                "PPN"
-            )
-        )
-    )
+lookup <- qs::qread(file.path("objects", "lookup.qs"), nthread = 4)
 
 # Run DE analysis for CIDP vs CTRL in CSF
 de_cidp_ctrl_csf <- performDEAnalysis(sc_merge, "CIDP", "CTRL", "CSF")

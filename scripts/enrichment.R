@@ -22,24 +22,24 @@ source(file.path("scripts", "enrichment_helper.R"))
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthread = 4)
 
 # Extract CD8/NK markers ----
-topmarkers_cd8_nk <- read_xlsx(
+topmarkers_cd8tem_3 <- read_xlsx(
     file.path("results", "de", "topmarkers.xlsx"),
-    sheet = "CD8_NK"
+    sheet = "CD8TEM_3"
 )
 
 # Get significant top markers with Entrez IDs
-cd8_nk_markers_filtered <- topmarkers_cd8_nk |>
+cd8tem_3_markers_filtered <- topmarkers_cd8tem_3 |>
     mutate(entrez_id = map_to_entrez(gene)) |>
     filter(!is.na(entrez_id), p_val_adj < 0.05, avg_log2FC > 1) |>
     slice_min(order_by = p_val_adj, n = 200)
 
-cd8_nk_logfc <- cd8_nk_markers_filtered$avg_log2FC
-names(cd8_nk_logfc) <- cd8_nk_markers_filtered$entrez_id
-cd8_nk_logfc <- sort(cd8_nk_logfc, decreasing = TRUE)
+cd8tem_3_logfc <- cd8tem_3_markers_filtered$avg_log2FC
+names(cd8tem_3_logfc) <- cd8tem_3_markers_filtered$entrez_id
+cd8tem_3_logfc <- sort(cd8tem_3_logfc, decreasing = TRUE)
 
-cd8_nk_logfc_gene <- cd8_nk_markers_filtered$avg_log2FC
-names(cd8_nk_logfc_gene) <- cd8_nk_markers_filtered$gene
-cd8_nk_logfc_gene <- sort(cd8_nk_logfc_gene, decreasing = TRUE)
+cd8tem_3_logfc_gene <- cd8tem_3_markers_filtered$avg_log2FC
+names(cd8tem_3_logfc_gene) <- cd8tem_3_markers_filtered$gene
+cd8tem_3_logfc_gene <- sort(cd8tem_3_logfc_gene, decreasing = TRUE)
 
 # Read DE genes of all clusters combined
 comparisons <- c(
@@ -58,15 +58,15 @@ de_top_combined_list <-
 de_cluster_parameters <- list(
     list(
         condition = "cidp_ctrl_csf",
-        clusters = c("CD4TCM_2", "CD8_NK")
+        clusters = c("CD4TCM_2", "CD8TEM_3")
     ),
     list(
         condition = "gbs_ctrl_csf",
-        clusters = c("pDC", "CD8_NK")
+        clusters = c("pDC", "CD8TEM_3")
     ),
     list(
         condition = "cidp_ctrl_pbmc",
-        clusters = c("CD4TCM_2", "NKCD56dim", "CD8_NK")
+        clusters = c("CD4TCM_2", "NKCD56dim", "CD8TEM_3")
     ),
     list(
         condition = "gbs_ctrl_pbmc",
@@ -99,9 +99,9 @@ background_genes <- background_genes[!is.na(background_genes)]
 
 # Prepare GSEA input ----
 # Get all CD8/NK markers for ranking
-all_cd8_nk_markers <- FindMarkers(
+all_cd8tem_3_markers <- FindMarkers(
     object = sc_merge,
-    ident.1 = "CD8_NK",
+    ident.1 = "CD8TEM_3",
     only.pos = FALSE,
     min.pct = 0.1,
     logfc.threshold = 0,
@@ -112,9 +112,9 @@ all_cd8_nk_markers <- FindMarkers(
     filter(!is.na(entrez_id))
 
 # Create ranked gene list for GSEA
-# CD8_NK
-ranked_genes <- all_cd8_nk_markers$avg_log2FC
-names(ranked_genes) <- all_cd8_nk_markers$entrez_id
+# cd8tem_3
+ranked_genes <- all_cd8tem_3_markers$avg_log2FC
+names(ranked_genes) <- all_cd8tem_3_markers$entrez_id
 ranked_genes <- sort(ranked_genes, decreasing = TRUE)
 
 # Get all DE genes of all clusters combined
@@ -187,8 +187,8 @@ names(ranked_genes_cluster_all) <- names(de_cluster_all)
 
 # Gene Ontology Analysis ----
 # Over-representation analysis (ORA)
-cd8_nk_go_ora <- enrichGO(
-    gene = cd8_nk_markers_filtered$entrez_id,
+cd8tem_3_go_ora <- enrichGO(
+    gene = cd8tem_3_markers_filtered$entrez_id,
     universe = background_genes,
     OrgDb = org.Hs.eg.db,
     ont = "BP",
@@ -199,14 +199,14 @@ cd8_nk_go_ora <- enrichGO(
 )
 
 write_xlsx(
-    data.frame(cd8_nk_go_ora),
-    file.path("results", "enrich", "cd8_nk_go_ora_results.xlsx")
+    data.frame(cd8tem_3_go_ora),
+    file.path("results", "enrich", "cd8tem_3", "cd8tem_3_go_ora_results.xlsx")
 )
 
 plot_enrichment_results(
-    cd8_nk_go_ora,
-    fold_change = cd8_nk_logfc,
-    prefix = "cd8_nk_go_ora",
+    cd8tem_3_go_ora,
+    fold_change = cd8tem_3_logfc,
+    prefix = file.path("cd8tem_3", "cd8tem_3_go_ora"),
     width_dp = 6,
     height_dp = 6,
     width_hm = 7,
@@ -214,9 +214,9 @@ plot_enrichment_results(
 )
 
 # Create and plot GO term similarity tree
-cd8_nk_go_ora_sim <- enrichplot::pairwise_termsim(cd8_nk_go_ora)
-cd8_nk_tree_plot <- enrichplot::treeplot(cd8_nk_go_ora_sim, showCategory = 10)
-save_plot(cd8_nk_tree_plot, "cd8_nk_go_ora_tree.pdf", width = 12, height = 8)
+cd8tem_3_go_ora_sim <- enrichplot::pairwise_termsim(cd8tem_3_go_ora)
+cd8tem_3_tree_plot <- enrichplot::treeplot(cd8tem_3_go_ora_sim, showCategory = 10)
+save_plot(cd8tem_3_tree_plot, file.path("cd8tem_3", "cd8tem_3_go_ora_tree.pdf"), width = 12, height = 8)
 
 # Run GO enrichment analysis for all conditions
 de_go_ora <- lapply(
@@ -392,21 +392,21 @@ for (condition in names(de_cluster_gsea_readable)) {
 cell_markers <- read_xlsx(file.path("lookup", "Cell_marker_Human.xlsx")) |>
     dplyr::select(cell_name, GeneID)
 
-cd8_nk_cell_markers_enrichment <- enricher(
-    cd8_nk_markers_filtered$entrez_id,
+cd8tem_3_cell_markers_enrichment <- enricher(
+    cd8tem_3_markers_filtered$entrez_id,
     TERM2GENE = cell_markers
 )
 
-cd8_nk_cell_markers_enrichment_readable <- setReadable(
-    cd8_nk_cell_markers_enrichment,
+cd8tem_3_cell_markers_enrichment_readable <- setReadable(
+    cd8tem_3_cell_markers_enrichment,
     OrgDb = org.Hs.eg.db,
     keyType = "ENTREZID"
 )
 
 plot_enrichment_results(
-    cd8_nk_cell_markers_enrichment_readable,
-    prefix = "cd8_nk_cell_markers",
-    fold_change = cd8_nk_logfc,
+    cd8tem_3_cell_markers_enrichment_readable,
+    prefix = file.path("cd8tem_3", "cd8tem_3_cell_markers"),
+    fold_change = cd8tem_3_logfc,
     width_dp = 6,
     height_dp = 3,
     width_hm = 7,
@@ -414,8 +414,8 @@ plot_enrichment_results(
 )
 
 write_xlsx(
-    data.frame(cd8_nk_cell_markers_enrichment_readable),
-    file.path("results", "enrich", "cd8_nk_cell_markers_results.xlsx")
+    data.frame(cd8tem_3_cell_markers_enrichment_readable),
+    file.path("results", "enrich", "cd8tem_3", "cd8tem_3_cell_markers_results.xlsx")
 )
 
 # MSigDB Analysis ----
@@ -424,16 +424,16 @@ msigdb_c8 <- msigdbr(species = "Homo sapiens", category = "C8") |>
     dplyr::select(gs_name, gene_symbol)
 
 # Perform enrichment analysis for each MSigDB category
-cd8_nk_msigdb_c8 <- enricher(
-    cd8_nk_markers_filtered$gene,
+cd8tem_3_msigdb_c8 <- enricher(
+    cd8tem_3_markers_filtered$gene,
     TERM2GENE = msigdb_c8,
     universe = rownames(sc_merge)
 )
 
 plot_enrichment_results(
-    cd8_nk_msigdb_c8,
-    prefix = "cd8_nk_msigdb_c8",
-    fold_change = cd8_nk_logfc_gene,
+    cd8tem_3_msigdb_c8,
+    prefix = file.path("cd8tem_3", "cd8tem_3_msigdb_c8"),
+    fold_change = cd8tem_3_logfc_gene,
     width_dp = 7,
     height_dp = 6,
     width_hm = 17,
@@ -441,6 +441,6 @@ plot_enrichment_results(
 )
 
 write_xlsx(
-    data.frame(cd8_nk_msigdb_c8),
-    file.path("results", "enrich", "cd8_nk_msigdb_c8_results.xlsx")
+    data.frame(cd8tem_3_msigdb_c8),
+    file.path("results", "enrich", "cd8tem_3", "cd8tem_3_msigdb_c8_results.xlsx")
 )

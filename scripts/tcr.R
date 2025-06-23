@@ -382,10 +382,10 @@ ggsave(
     height = 7
 )
 
-tcr_top_clones <- dplyr::count(sc_tcr_main_groups@meta.data, CTaa) |>
-    slice_max(n, n = 6, with_ties = FALSE) |>
-    drop_na() |>
-    arrange(desc(n))
+
+
+# Check the results
+table(sc_tcr_main_groups$CTaa_top)
 
 # Create CTaa_top column - keep only clones in test3, set all others to NA
 sc_tcr_main_groups$CTaa_top <- ifelse(
@@ -394,11 +394,52 @@ sc_tcr_main_groups$CTaa_top <- ifelse(
     NA
 )
 
-# Check the results
-table(sc_tcr_main_groups$CTaa_top)
+# alluvial plots main groups
+tcr_top_clones <- dplyr::count(sc_tcr@meta.data, CTaa) |>
+    slice_max(n, n = 10, with_ties = TRUE) |>
+    drop_na() |>
+    arrange(desc(n))
 
-# alluvial plots
-tcr_alluvial_tisssue_diagnosis <-
+sc_tcr$CTaa_top <- ifelse(
+    sc_tcr$CTaa %in% tcr_top_clones$CTaa,
+    sc_tcr$CTaa,
+    NA
+)
+
+# alluvial plots all groups
+tcr_alluvial_tissue_diagnosis <-
+    alluvialClones(
+        sc_tcr,
+        cloneCall = "aa",
+        y.axes = c("sample", "patient", "diagnosis", "cluster"),
+        color = "CTaa_top"
+    ) +
+    scale_fill_manual(values = scales::hue_pal()(10))
+
+ggsave(
+    plot = tcr_alluvial_tissue_diagnosis,
+    file.path(
+        "results",
+        "tcr",
+        "tcr_alluvial_sample_tissue_diagnosis.pdf"
+    ),
+    width = 15,
+    height = 10
+)
+
+# alluvial plots main groups
+tcr_top_clones_main_groups <- dplyr::count(sc_tcr_main_groups@meta.data, CTaa) |>
+    slice_max(n, n = 6, with_ties = FALSE) |>
+    drop_na() |>
+    arrange(desc(n))
+
+sc_tcr_main_groups$CTaa_top <- ifelse(
+    sc_tcr_main_groups$CTaa %in% tcr_top_clones_main_groups$CTaa,
+    sc_tcr_main_groups$CTaa,
+    NA
+)
+
+tcr_alluvial_tissue_diagnosis_main_groups <-
     alluvialClones(
         sc_tcr_main_groups,
         cloneCall = "aa",
@@ -408,11 +449,11 @@ tcr_alluvial_tisssue_diagnosis <-
     scale_fill_manual(values = scales::hue_pal()(5))
 
 ggsave(
-    plot = tcr_alluvial_tisssue_diagnosis,
+    plot = tcr_alluvial_tissue_diagnosis_main_groups,
     file.path(
         "results",
         "tcr",
-        "tcr_alluvial_sample_tissue_diagnosis.pdf"
+        "tcr_alluvial_sample_tissue_diagnosis_main_groups.pdf"
     ),
     width = 15,
     height = 10

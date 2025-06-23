@@ -62,7 +62,7 @@ de_cluster_parameters <- list(
     ),
     list(
         condition = "gbs_ctrl_csf",
-        clusters = c("pDC", "CD8TEM_3")
+        clusters = c("pDC")
     ),
     list(
         condition = "cidp_ctrl_pbmc",
@@ -170,7 +170,7 @@ for (config in de_cluster_parameters) {
 names(de_cluster_all) <- sapply(de_cluster_parameters, `[[`, "condition")
 
 
-# Create ranked gene list for de cluster all
+# Create ranked gene list for de cluster specific all
 ranked_genes_cluster_all <- list()
 for (condition in names(de_cluster_all)) {
     ranked_genes_cluster_all[[condition]] <- list()

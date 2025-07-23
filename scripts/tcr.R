@@ -92,8 +92,8 @@ names(tcr_contig_list) <- gsub(
     replacement = "\\1_\\2"
 )
 
-# manually rename P14 (only CSF available, not multiplexing)
-names(tcr_contig_list)[61] <- "CSF_P14"
+# manually rename P14/PNP38 (only CSF available, not multiplexing)
+names(tcr_contig_list)[names(tcr_contig_list) == "PNP38"] <- "CSF_P14"
 
 #sort by name alphabetically
 tcr_contig_list <- tcr_contig_list[order(names(tcr_contig_list))]

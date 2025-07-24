@@ -130,3 +130,20 @@ qsave(
 str(combined_bcr, max.level = 1)
 
 
+#################################################################################################################
+# screpertoire basic analysis
+#################################################################################################################
+colors_samples <- Polychrome::createPalette(length(combined_bcr), colors_dutch)
+names(colors_samples) <- names(combined_bcr)
+
+
+## #abundance contig
+scRepertoire::clonalQuant(combined_bcr, cloneCall = "aa", scale = FALSE) +
+    scale_fill_manual(values = colors_samples) +
+    theme(legend.position = "none") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+ggsave(file.path("results", "bcr", "bcr_quant_abs.pdf"))
+
+## #length contig CD3
+scRepertoire::clonalLength(combined_bcr, cloneCall = "aa")
+ggsave(file.path("results", "bcr", "bcr_length_aa.pdf"))

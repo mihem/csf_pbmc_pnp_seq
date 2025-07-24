@@ -383,7 +383,6 @@ ggsave(
 )
 
 
-
 # Check the results
 table(sc_tcr_main_groups$CTaa_top)
 
@@ -428,7 +427,10 @@ ggsave(
 )
 
 # alluvial plots main groups
-tcr_top_clones_main_groups <- dplyr::count(sc_tcr_main_groups@meta.data, CTaa) |>
+tcr_top_clones_main_groups <- dplyr::count(
+    sc_tcr_main_groups@meta.data,
+    CTaa
+) |>
     slice_max(n, n = 6, with_ties = FALSE) |>
     drop_na() |>
     arrange(desc(n))
@@ -780,3 +782,23 @@ ggsave(
     width = 8,
     height = 6
 )
+
+sc_tcr <- qread(file.path("objects", "sc_tcr.qs"))
+str(sc_tcr@meta.data)
+
+clonal_bias <-
+    clonalBias(
+        sc_tcr,
+        cloneCall = "aa",
+        split.by = "patient",
+        group.by = "cluster",
+        n.boots = 10,
+        min.expand = 5
+    )
+
+ggsave(file.path("results", "tcr", "clonal_bias.pdf"), clonal_bias)
+
+percent_aa <-
+    percentAA(sc_tcr, chain = "TRB", aa.length = 20, group.by = "tissue_diagnosis")
+
+ggsave(file.path("results", "tcr", "percent_aa.pdf"), percent_aa, width = 10, height = 20)

@@ -828,4 +828,76 @@ ggsave(
     height = 5
 )
 
+viz_genes <-
+    vizGenes(
+        sc_tcr,
+        x.axis = "TRBV",
+        y.axis = NULL,
+        plot = "heatmap",
+        group.by = "tissue_diagnosis"
+    )
 
+ggsave(
+    file.path("results", "tcr", "viz_genes.pdf"),
+    viz_genes,
+    width = 5,
+    height = 5
+)
+
+df_genes <- percentGenes(
+    sc_tcr_main_groups,
+    chain = "TRB",
+    gene = "Vgene",
+    exportTable = TRUE,
+    group.by = "tissue_diagnosis"
+)
+
+# Performing PCA on the gene usage matrix
+pc <- prcomp(df_genes)
+
+# Getting data frame to plot from
+df_plot <- as.data.frame(cbind(pc$x[, 1:2], rownames(df_genes)))
+colnames(df_plot) <- c("PC1", "PC2", "Sample")
+df_plot$PC1 <- as.numeric(df_plot$PC1)
+df_plot$PC2 <- as.numeric(df_plot$PC2)
+
+pca_tcr <-
+    ggplot(df_plot, aes(x = PC1, y = PC2)) +
+    geom_point(aes(fill = Sample), shape = 21, size = 5) +
+    guides(fill = guide_legend(title = "Samples")) +
+    scale_fill_manual(values = sc_tcr_main_groups@misc$tissue_diagnosis_col) +
+    theme_bw() +
+    labs(title = "PCA of TRBV Gene Usage")
+
+ggsave(
+    file.path("results", "tcr", "pca_tcr.pdf"),
+    pca_tcr,
+    width = 5,
+    height = 5
+)
+
+
+# Run clustering, but group calculations by "Patient"
+sc_tcr_clonal <- clonalCluster(
+    sc_tcr,
+    chain = "TRB",
+    sequence = "aa",
+    threshold = 0.85,
+    group.by = "patient"
+)
+
+#Define color palette
+num_clusters <- length(unique(na.omit(sc_tcr_clonal$TRA_cluster)))
+cluster_colors <- hcl.colors(n = num_clusters, palette = "inferno")
+
+umap_clonal <-
+    DimPlot(sc_tcr_clonal, group.by = "TRA_cluster", raster = FALSE) +
+    scale_color_manual(values = cluster_colors, na.value = "grey") +
+    NoLegend()
+
+ggsave(
+    file.path("results", "tcr", "umap_trb.pdf"),
+    umap_clonal,
+    width = 5,
+    height = 5
+)

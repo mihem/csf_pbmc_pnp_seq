@@ -799,6 +799,33 @@ clonal_bias <-
 ggsave(file.path("results", "tcr", "clonal_bias.pdf"), clonal_bias)
 
 percent_aa <-
-    percentAA(sc_tcr, chain = "TRB", aa.length = 20, group.by = "tissue_diagnosis")
+    percentAA(
+        sc_tcr_main_groups,
+        chain = "TRB",
+        aa.length = 20,
+        group.by = "tissue_diagnosis"
+    )
 
-ggsave(file.path("results", "tcr", "percent_aa.pdf"), percent_aa, width = 10, height = 20)
+ggsave(
+    file.path("results", "tcr", "percent_aa.pdf"),
+    percent_aa,
+    width = 10,
+    height = 20
+)
+
+positional_entropy <-
+    positionalEntropy(
+        sc_tcr_main_groups,
+        chain = "TRB",
+        aa.length = 20,
+        group.by = "tissue_diagnosis"
+    )
+
+ggsave(
+    file.path("results", "tcr", "positional_entropy.pdf"),
+    positional_entropy,
+    width = 5,
+    height = 5
+)
+
+

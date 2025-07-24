@@ -1,5 +1,5 @@
 ##################################################
-# analyze T cell receptor (TCR) data
+# analyze B cell receptor (BCR) data
 # requires running annotate.R first
 ##################################################
 

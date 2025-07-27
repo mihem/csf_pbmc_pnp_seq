@@ -861,11 +861,28 @@ colnames(df_plot) <- c("PC1", "PC2", "Sample")
 df_plot$PC1 <- as.numeric(df_plot$PC1)
 df_plot$PC2 <- as.numeric(df_plot$PC2)
 
+paired_levels <- c(
+    "PBMC_CTRL",
+    "CSF_CTRL",
+    "PBMC_CIDP",
+    "CSF_CIDP",
+    "PBMC_CIAP",
+    "CSF_CIAP",
+    "PBMC_GBS",
+    "CSF_GBS"
+)
+
+paired_colors <- setNames(
+    RColorBrewer::brewer.pal(8, "Paired"),
+    paired_levels
+)
+
 pca_tcr <-
     ggplot(df_plot, aes(x = PC1, y = PC2)) +
     geom_point(aes(fill = Sample), shape = 21, size = 5) +
     guides(fill = guide_legend(title = "Samples")) +
-    scale_fill_manual(values = sc_tcr_main_groups@misc$tissue_diagnosis_col) +
+    scale_fill_manual(values = paired_colors) +
+    # scale_fill_manual(values = sc_tcr_main_groups@misc$tissue_diagnosis_col) +
     theme_bw() +
     labs(title = "PCA of TRBV Gene Usage")
 
@@ -875,7 +892,6 @@ ggsave(
     width = 5,
     height = 5
 )
-
 
 # Run clustering, but group calculations by "Patient"
 sc_tcr_clonal <- clonalCluster(

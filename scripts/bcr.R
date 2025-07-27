@@ -387,9 +387,9 @@ ggsave(
 )
 
 # alluvial plots main groups
-# use 4 here because all other clones have less than 5 cells
+# use 6 here because all other clones are less than 3
 bcr_top_clones <- dplyr::count(sc_bcr@meta.data, CTaa) |>
-    slice_max(n, n = 4, with_ties = TRUE) |>
+    slice_max(n, n = 6, with_ties = TRUE) |>
     drop_na() |>
     arrange(desc(n))
 

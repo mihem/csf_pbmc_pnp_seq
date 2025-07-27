@@ -383,7 +383,6 @@ ggsave(
 )
 
 
-
 # alluvial plots main groups
 tcr_top_clones <- dplyr::count(sc_tcr@meta.data, CTaa) |>
     slice_max(n, n = 10, with_ties = TRUE) |>
@@ -422,41 +421,6 @@ ggsave(
         "results",
         "tcr",
         "tcr_alluvial_sample_tissue_diagnosis.pdf"
-    ),
-    width = 15,
-    height = 10
-)
-
-# alluvial plots main groups
-tcr_top_clones_main_groups <- dplyr::count(
-    sc_tcr_main_groups@meta.data,
-    CTaa
-) |>
-    slice_max(n, n = 6, with_ties = FALSE) |>
-    drop_na() |>
-    arrange(desc(n))
-
-sc_tcr_main_groups$CTaa_top <- ifelse(
-    sc_tcr_main_groups$CTaa %in% tcr_top_clones_main_groups$CTaa,
-    sc_tcr_main_groups$CTaa,
-    NA
-)
-
-tcr_alluvial_tissue_diagnosis_main_groups <-
-    alluvialClones(
-        sc_tcr_main_groups,
-        cloneCall = "aa",
-        y.axes = c("sample", "patient", "diagnosis", "cluster"),
-        color = "CTaa_top"
-    ) +
-    scale_fill_manual(values = scales::hue_pal()(5))
-
-ggsave(
-    plot = tcr_alluvial_tissue_diagnosis_main_groups,
-    file.path(
-        "results",
-        "tcr",
-        "tcr_alluvial_sample_tissue_diagnosis_main_groups.pdf"
     ),
     width = 15,
     height = 10
@@ -507,7 +471,7 @@ ggsave(
 #find clones that are the same between patients and create a table with samples
 shared_clones <- sc_tcr@meta.data |>
     tibble() |>
-    dplyr::select(sample, CTaa, tissue_diagnosis) |> # Add tissue_diagnosis
+    dplyr::select(sample, CTaa, tissue_diagnosis) |>
     tidyr::drop_na() |>
     dplyr::distinct() |>
     dplyr::group_by(CTaa) |>
@@ -520,8 +484,8 @@ shared_clones_summary <- shared_clones |>
     dplyr::group_by(CTaa) |>
     dplyr::summarize(
         samples = paste(sample, collapse = ", "),
-        tissue_diagnosis = paste(tissue_diagnosis, collapse = ", "), # Add tissue_diagnosis column
-        sample_count = n() # Count how many samples have this clone
+        tissue_diagnosis = paste(tissue_diagnosis, collapse = ", "),
+        sample_count = n()
     ) |>
     dplyr::arrange(desc(sample_count), CTaa) |> # Sort by count (desc) then by CTaa
     dplyr::select(CTaa, samples, tissue_diagnosis, sample_count) # Keep the count column for reference

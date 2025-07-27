@@ -213,6 +213,23 @@ CTaa_sample <- dplyr::count(sc_bcr@meta.data, CTaa, sample) |>
 
 write_xlsx(CTaa_sample, file.path("results", "bcr", "CTaa_sample.xlsx"))
 
+# Count number of unique clones (clonotypes) per clone size category
+cloneSize_count <- sc_bcr@meta.data |>
+    dplyr::filter(!is.na(CTaa)) |>  # Only include cells with BCR data
+    dplyr::group_by(cloneSize) |>
+    dplyr::summarize(
+        n_clones = n_distinct(CTaa),  # Number of unique clones
+        n_cells = n(),                # Number of cells
+        .groups = "drop"
+    ) |>
+    dplyr::arrange(cloneSize)
+
+# Optionally save to Excel
+write_xlsx(
+    cloneSize_count,
+    file.path("results", "bcr", "cloneSize_count.xlsx")
+)
+
 #plot UMAP with frequency of clonotypes
 clone_labels <- levels(sc_bcr$cloneSize)
 clone_cols <- setNames(rev(viridis::turbo(length(clone_labels))), clone_labels)
@@ -475,7 +492,7 @@ shared_clones_summary <- shared_clones |>
         sample_count = n(),
         clone_size = unique(cloneSize),
         clonal_frequency = unique(clonalFrequency)
-    )  |>
+    ) |>
     dplyr::arrange(desc(sample_count), desc(clonal_frequency), CTaa)
 
 
@@ -541,10 +558,10 @@ ab_type_abundance_plot <-
     geom_col(color = "black", position = "fill") +
     theme_classic() +
     xlab(NULL) +
-    ylab("Number of clonotypes") + 
+    ylab("Number of clonotypes") +
     theme(
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
-    ) 
+    )
 
 ggsave(
     file.path("results", "bcr", "ab_type_abundance.pdf"),

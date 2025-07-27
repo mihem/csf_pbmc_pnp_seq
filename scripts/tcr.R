@@ -386,7 +386,7 @@ ggsave(
 # Check the results
 table(sc_tcr_main_groups$CTaa_top)
 
-# Create CTaa_top column - keep only clones in test3, set all others to NA
+# Create CTaa_top column - keep only clones in tcr_top_clones, set all others to NA
 sc_tcr_main_groups$CTaa_top <- ifelse(
     sc_tcr_main_groups$CTaa %in% tcr_top_clones$CTaa,
     sc_tcr_main_groups$CTaa,

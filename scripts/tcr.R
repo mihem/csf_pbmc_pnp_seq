@@ -471,7 +471,7 @@ ggsave(
 #find clones that are the same between patients and create a table with samples
 shared_clones <- sc_tcr@meta.data |>
     tibble() |>
-    dplyr::select(sample, CTaa, tissue_diagnosis) |>
+    dplyr::select(sample, CTaa, tissue_diagnosis, cloneSize, clonalFrequency) |>
     tidyr::drop_na() |>
     dplyr::distinct() |>
     dplyr::group_by(CTaa) |>
@@ -482,13 +482,14 @@ shared_clones <- sc_tcr@meta.data |>
 # Create a table showing which samples have each clone, sorted by number of occurrences
 shared_clones_summary <- shared_clones |>
     dplyr::group_by(CTaa) |>
-    dplyr::summarize(
+    dplyr::reframe(
         samples = paste(sample, collapse = ", "),
         tissue_diagnosis = paste(tissue_diagnosis, collapse = ", "),
-        sample_count = n()
-    ) |>
-    dplyr::arrange(desc(sample_count), CTaa) |> # Sort by count (desc) then by CTaa
-    dplyr::select(CTaa, samples, tissue_diagnosis, sample_count) # Keep the count column for reference
+        sample_count = n(),
+        clone_size = unique(cloneSize),
+        clonal_frequency = unique(clonalFrequency)
+    )  |>
+    dplyr::arrange(desc(sample_count), desc(clonal_frequency), CTaa)
 
 # Save the results to an Excel file
 write_xlsx(

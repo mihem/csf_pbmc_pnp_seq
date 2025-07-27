@@ -417,7 +417,7 @@ bcr_alluvial_tissue_diagnosis <-
         y.axes = c("sample", "patient", "diagnosis", "cluster"),
         color = "CTaa_top"
     ) +
-    scale_fill_manual(values = scales::hue_pal()(3))
+    scale_fill_manual(values = scales::hue_pal()(6))
 
 ggsave(
     plot = bcr_alluvial_tissue_diagnosis,

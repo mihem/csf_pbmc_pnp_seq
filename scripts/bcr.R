@@ -497,3 +497,56 @@ ggsave(
     width = 10,
     height = 7
 )
+
+str(sc_bcr@meta.data$CTgene)
+
+scRepertoire::clonalAbundance(
+    combined_bcr,
+    cloneCall = "gene",
+    scale = FALSE,
+    exportTable = TRUE
+)
+
+str(sc_bcr@meta.data)
+
+sc_bcr$CT
+
+# abundance of antibody type
+ab_type_abundance <- sc_bcr@meta.data |>
+    dplyr::select(
+        sample,
+        patient,
+        diagnosis,
+        CTgene,
+        CTnt,
+        CTaa,
+        clonalFrequency,
+        cloneSize
+    ) |>
+    filter(str_detect(CTgene, "IGH")) |>
+    mutate(IgType = str_extract(CTgene, "IGH[AGMD]")) |>
+    filter(!is.na(IgType)) |>
+    group_by(IgType, cloneSize) |>
+    dplyr::summarize(n = n())
+
+write_xlsx(
+    ab_type_abundance,
+    file.path("results", "bcr", "ab_type_abundance.xlsx")
+)
+
+ab_type_abundance_plot <-
+    ggplot(ab_type_abundance, aes(x = cloneSize, y = n, fill = IgType)) +
+    geom_col(color = "black", position = "fill") +
+    theme_classic() +
+    xlab(NULL) +
+    ylab("Number of clonotypes") + 
+    theme(
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+    ) 
+
+ggsave(
+    file.path("results", "bcr", "ab_type_abundance.pdf"),
+    plot = ab_type_abundance_plot,
+    width = 3,
+    height = 5,
+)

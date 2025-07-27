@@ -147,3 +147,353 @@ ggsave(file.path("results", "bcr", "bcr_quant_abs.pdf"))
 ## #length contig CD3
 scRepertoire::clonalLength(combined_bcr, cloneCall = "aa")
 ggsave(file.path("results", "bcr", "bcr_length_aa.pdf"))
+
+#################################################################################################################
+# screpertoire analysis with seurat object
+#################################################################################################################
+sc_bcr <- subset(
+    sc_merge,
+    cluster %in%
+        c(
+            "Bmemory",
+            "Bnaive",
+            "Plasma"
+        )
+)
+
+#sanity check
+sc_bcr_plot <- DimPlot(sc_bcr, reduction = "umap.stacas.ss.all", label = TRUE)
+ggsave("sc_bcr_plot.pdf")
+head(colnames(sc_bcr))
+head(combined_bcr[[1]]$barcode)
+
+# remove empty samples from combined_bcr (CSF_P25)
+combined_bcr <- combined_bcr[sapply(combined_bcr, nrow) > 0]
+
+#combine Seurat object with scRepertoire
+sc_bcr <- scRepertoire::combineExpression(
+    combined_bcr,
+    sc_bcr,
+    cloneCall = "aa",
+    group.by = "sample",
+    proportion = FALSE,
+    cloneSize = c(
+        Single = 1,
+        Small = 5,
+        Medium = 20,
+        Large = 100,
+        Hyperexpanded = 500
+    )
+)
+
+# save Seurat object with bcr annotations
+qs::qsave(
+    sc_bcr,
+    file = file.path("objects", "sc_bcr.qs")
+)
+
+# sanity checks
+str(sc_bcr@meta.data)
+table(sc_bcr$clonalFrequency)
+table(sc_bcr$cloneSize)
+# sum(!is.na(sc_bcr$CTaa)) / dim(sc_bcr)[2] T cells with bcr
+# sum(sapply(combined_bcr, nrow)) - sum(!is.na(sc_bcr$CTaa)) # 6010 (8.6%) bcr not assigned to a cell
+
+#find out most frequent aa
+CTaa_sample <- dplyr::count(sc_bcr@meta.data, CTaa, sample) |>
+    drop_na(CTaa) |>
+    pivot_wider(names_from = "sample", values_from = "n") |>
+    tibble() |>
+    dplyr::mutate(across(everything(), function(x) replace(x, is.na(x), 0))) |>
+    dplyr::mutate(sum = rowSums(across(where(is.numeric)))) |> #calculcate rowsum in all numeric
+    dplyr::arrange(desc(sum)) |>
+    dplyr::select(-sum) |>
+    dplyr::select(sort(tidyselect::peek_vars())) |> # sort coolumns
+    dplyr::relocate(CTaa) # move CTaa to start
+
+write_xlsx(CTaa_sample, file.path("results", "bcr", "CTaa_sample.xlsx"))
+
+#plot UMAP with frequency of clonotypes
+clone_labels <- levels(sc_bcr$cloneSize)
+clone_cols <- setNames(rev(viridis::turbo(length(clone_labels))), clone_labels)
+
+umap_bcr_clone <- DimPlot(
+    sc_bcr,
+    group.by = "cloneSize",
+    pt.size = .1,
+    reduction = "umap.stacas.ss.all",
+    raster = FALSE,
+    cols = clone_cols
+) +
+    theme_rect() +
+    xlab("UMAP1") +
+    ylab("UMAP2") +
+    ggtitle("")
+
+umap_bcr_clone[[1]]$layers[[1]]$aes_params$alpha <-
+    case_when(
+        is.na(sc_bcr$cloneSize) ~ 0.01,
+        sc_bcr$cloneSize == "Single (0 < X <= 1)" ~ 0.02,
+        sc_bcr$cloneSize == "Small (1 < X <= 5)" ~ 0.2,
+        sc_bcr$cloneSize == "Medium (5 < X <= 20)" ~ 0.5,
+        sc_bcr$cloneSize == "Large (20 < X <= 100)" ~ 1.0,
+        sc_bcr$cloneSize == "Hyperexpanded (X > 100)" ~ 1.0
+    )
+
+ggsave(
+    file.path("results", "bcr", "umap_cloneSize.pdf"),
+    plot = umap_bcr_clone,
+    width = 10,
+    height = 7
+)
+
+#abundance plot screpertoire
+stackedPlot(
+    object = sc_bcr,
+    x_axis = "cluster",
+    y_axis = "cloneSize",
+    x_order = sc_bcr@misc$cluster_order,
+    y_order = clone_labels,
+    color = clone_cols,
+    width = 3,
+    height = 3
+)
+
+stackedPlot(
+    object = sc_bcr,
+    x_axis = "sample",
+    y_axis = "cloneSize",
+    x_order = unique(sc_bcr$sample),
+    y_order = clone_labels,
+    color = clone_cols,
+    width = 10,
+    height = 3
+)
+
+stackedPlot(
+    object = sc_bcr,
+    x_axis = "tissue_group",
+    y_axis = "cloneSize",
+    x_order = unique(sc_bcr$tissue_group),
+    y_order = clone_labels,
+    color = clone_cols,
+    width = 5,
+    height = 5
+)
+
+sc_bcr_main_groups <- subset(
+    sc_bcr,
+    subset = diagnosis %in% c("CTRL", "CIAP", "CIDP", "GBS")
+)
+
+sc_bcr_main_groups$tissue_diagnosis <- droplevels(
+    sc_bcr_main_groups$tissue_diagnosis,
+)
+
+stackedPlot(
+    object = sc_bcr_main_groups,
+    x_axis = "tissue_diagnosis",
+    y_axis = "cloneSize",
+    x_order = sc_bcr_main_groups@misc$tissue_diagnosis_order,
+    y_order = clone_labels,
+    color = clone_cols,
+    width = 5,
+    height = 5
+)
+
+#clonal overlay
+bcr_clonal_overlay <- clonalOverlay(
+    sc_bcr,
+    reduction = "umap.stacas.ss.all",
+    cutpoint = 20,
+    bins = 25,
+    pt.size = 0.1,
+    pt.alpha = 0.1
+) +
+    scale_color_manual(values = sc_bcr@misc$cluster_col) +
+    theme_rect() +
+    NoLegend() +
+    xlab("UMAP1") +
+    ylab("UMAP2")
+
+ggsave(
+    plot = bcr_clonal_overlay,
+    file.path("results", "bcr", "bcr_clonal_overlay.pdf"),
+    width = 10,
+    height = 10
+)
+
+bcr_clonal_overlay_group <-
+    clonalOverlay(
+        sc_bcr,
+        reduction = "umap.stacas.ss.all",
+        cutpoint = 20,
+        bins = 25,
+        pt.size = 0.1,
+        pt.alpha = 0.1,
+        facet.by = "tissue_group"
+    ) +
+    scale_color_manual(values = sc_bcr@misc$cluster_col) +
+    theme_rect() +
+    NoLegend() +
+    xlab("UMAP1") +
+    ylab("UMAP2")
+
+ggsave(
+    plot = bcr_clonal_overlay_group,
+    file.path("results", "bcr", "bcr_clonal_overlay_group.pdf"),
+    width = 5,
+    height = 7
+)
+
+bcr_clonal_overlay_diagnosis <-
+    clonalOverlay(
+        sc_bcr_main_groups,
+        reduction = "umap.stacas.ss.all",
+        cutpoint = 20,
+        bins = 25,
+        pt.size = 0.1,
+        pt.alpha = 0.1,
+    ) +
+    scale_color_manual(values = sc_bcr_main_groups@misc$cluster_col) +
+    theme_rect() +
+    NoLegend() +
+    xlab("UMAP1") +
+    ylab("UMAP2") +
+    facet_wrap(~tissue_diagnosis, nrow = 2)
+
+ggsave(
+    plot = bcr_clonal_overlay_diagnosis,
+    file.path("results", "bcr", "bcr_clonal_overlay_diagnosis.pdf"),
+    width = 10,
+    height = 7
+)
+
+# alluvial plots main groups
+# use 4 here because all other clones have less than 5 cells
+bcr_top_clones <- dplyr::count(sc_bcr@meta.data, CTaa) |>
+    slice_max(n, n = 4, with_ties = TRUE) |>
+    drop_na() |>
+    arrange(desc(n))
+
+sc_bcr$CTaa_top <- ifelse(
+    sc_bcr$CTaa %in% bcr_top_clones$CTaa,
+    sc_bcr$CTaa,
+    NA
+)
+
+# Create CTaa_top column - keep only clones in bcr_top_clones, set all others to NA
+sc_bcr_main_groups$CTaa_top <- ifelse(
+    sc_bcr_main_groups$CTaa %in% bcr_top_clones$CTaa,
+    sc_bcr_main_groups$CTaa,
+    NA
+)
+
+# Check the results
+table(sc_bcr_main_groups$CTaa_top)
+
+# alluvial plots all groups
+bcr_alluvial_tissue_diagnosis <-
+    alluvialClones(
+        sc_bcr,
+        cloneCall = "aa",
+        y.axes = c("sample", "patient", "diagnosis", "cluster"),
+        color = "CTaa_top"
+    ) +
+    scale_fill_manual(values = scales::hue_pal()(3))
+
+ggsave(
+    plot = bcr_alluvial_tissue_diagnosis,
+    file.path(
+        "results",
+        "bcr",
+        "bcr_alluvial_sample_tissue_diagnosis.pdf"
+    ),
+    width = 15,
+    height = 10
+)
+
+
+bcr_overlap_tissue_diagnosis <-
+    clonalOverlap(
+        sc_bcr_main_groups,
+        cloneCall = "aa",
+        method = "overlap",
+        group.by = "tissue_diagnosis",
+    )
+
+ggsave(
+    plot = bcr_overlap_tissue_diagnosis,
+    file.path(
+        "results",
+        "bcr",
+        "bcr_clonal_overlap_tissue_diagnosis.pdf"
+    ),
+    width = 15,
+    height = 10
+)
+
+bcr_overlap_tissue_sample <-
+    clonalOverlap(
+        sc_bcr_main_groups,
+        cloneCall = "aa",
+        method = "overlap",
+        group.by = "sample",
+    ) +
+    theme(
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+    )
+
+ggsave(
+    plot = bcr_overlap_tissue_sample,
+    file.path(
+        "results",
+        "bcr",
+        "bcr_clonal_overlap_tissue_sample.pdf"
+    ),
+    width = 20,
+    height = 17
+)
+
+#find clones that are the same between patients and create a table with samples
+shared_clones <- sc_bcr@meta.data |>
+    tibble() |>
+    dplyr::select(sample, CTaa, tissue_diagnosis) |>
+    tidyr::drop_na() |>
+    dplyr::distinct() |>
+    dplyr::group_by(CTaa) |>
+    dplyr::filter(n() > 1) |>
+    dplyr::arrange(CTaa) |>
+    dplyr::ungroup()
+
+# Create a table showing which samples have each clone, sorted by number of occurrences
+shared_clones_summary <- shared_clones |>
+    dplyr::group_by(CTaa) |>
+    dplyr::summarize(
+        samples = paste(sample, collapse = ", "),
+        tissue_diagnosis = paste(tissue_diagnosis, collapse = ", "),
+        sample_count = n()
+    ) |>
+    dplyr::arrange(desc(sample_count), CTaa) |> # Sort by count (desc) then by CTaa
+    dplyr::select(CTaa, samples, tissue_diagnosis, sample_count) # Keep the count column for reference
+
+# Save the results to an Excel file
+write_xlsx(
+    shared_clones_summary,
+    file.path("results", "bcr", "shared_clones_by_sample_summary.xlsx")
+)
+
+# clonal diversity
+bcr_clonal_diversity <- clonalDiversity(
+    sc_bcr_main_groups,
+    cloneCall = "gene",
+    group.by = "tissue_diagnosis"
+) +
+    scale_fill_manual(values = sc_bcr_main_groups@misc$tissue_diagnosis_col)
+
+ggsave(
+    plot = bcr_clonal_diversity,
+    file.path("results", "bcr", "bcr_clonal_diversity.pdf"),
+    width = 10,
+    height = 7
+)

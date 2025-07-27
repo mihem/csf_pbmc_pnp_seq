@@ -223,6 +223,23 @@ CTaa_sample <- dplyr::count(sc_tcr@meta.data, CTaa, sample) |>
 
 write_xlsx(CTaa_sample, file.path("results", "tcr", "CTaa_sample.xlsx"))
 
+# Count number of unique clones (clonotypes) per clone size category
+cloneSize_count <- sc_tcr@meta.data |>
+    dplyr::filter(!is.na(CTaa)) |>  # Only include cells with tcr data
+    dplyr::group_by(cloneSize) |>
+    dplyr::summarize(
+        n_clones = n_distinct(CTaa),  # Number of unique clones
+        n_cells = n(),                # Number of cells
+        .groups = "drop"
+    ) |>
+    dplyr::arrange(cloneSize)
+
+# Optionally save to Excel
+write_xlsx(
+    cloneSize_count,
+    file.path("results", "tcr", "cloneSize_count.xlsx")
+)
+
 #plot UMAP with frequency of clonotypes
 clone_labels <- levels(sc_tcr$cloneSize)
 clone_cols <- setNames(rev(viridis::turbo(length(clone_labels))), clone_labels)

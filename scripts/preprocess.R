@@ -31,6 +31,25 @@ lookup <-
     dplyr::filter(cohort %in% c("scRNA", "scRNA_flow")) |>
     mutate(age = lubridate::time_length(difftime(date, birth_date), "years")) |>
     mutate(
+        follow_up = lubridate::time_length(
+            difftime(date_follow_up, date),
+            "years"
+        )
+    ) |>
+    mutate(
+        incat_progress = (incat_follow_up - incat_at_lumbar_puncture) /
+            follow_up
+    ) |>
+    mutate(
+        onls_progress = (onls_follow_up - onls_at_lumbar_puncture) /
+            follow_up
+    ) |>
+    mutate(
+        mrc_sum_score_60_progress = (mrc_sum_score_60_follow_up -
+            mrc_sum_score_60_at_lumbar_puncture) /
+            follow_up
+    ) |>
+    mutate(
         diagnosis = factor(
             diagnosis,
             levels = c(
@@ -66,7 +85,11 @@ writexl::write_xlsx(
 )
 
 # find  raw files and match to names from lookup table ---
-h5_path <- list.files(file.path("raw", "rna"), pattern = ".h5", recursive = TRUE)
+h5_path <- list.files(
+    file.path("raw", "rna"),
+    pattern = ".h5",
+    recursive = TRUE
+)
 
 seq_names <-
     tibble(name = h5_path) |>

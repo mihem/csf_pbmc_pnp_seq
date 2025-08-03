@@ -1,5 +1,5 @@
 ##################################################
-# analyze disease severity
+# analyze correlations
 ##################################################
 library(tidyverse)
 library(qs)

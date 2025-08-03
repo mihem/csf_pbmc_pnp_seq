@@ -22,7 +22,7 @@ rcna_plot <- function(seu_obj, param) {
     if (
         file.exists(file.path(
             "results",
-            "severity",
+            "correlation",
             paste0("rcna_", param, ".pdf")
         ))
     ) {

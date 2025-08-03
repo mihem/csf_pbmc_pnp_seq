@@ -7,6 +7,7 @@ library(Seurat)
 library(rcna)
 library(glue)
 library(scMisc)
+library(viridis)
 
 # load data ----
 lookup <- qs::qread(file.path("objects", "lookup.qs"))
@@ -29,7 +30,6 @@ rcna_plot <- function(seu_obj, param) {
         return(paste0("File ", param, " already exists, skipping."))
     }
     seu_obj_filter <- seu_obj[, !is.na(seu_obj[[param]])]
-    # seu_obj_filter$pnp <- as.numeric(seu_obj_filter$level2 != "CTRL")
     seu_obj_filter$sex_numeric <- as.numeric(seu_obj_filter$sex == "male")
 
     seu_obj_filter <- association.Seurat(
@@ -44,7 +44,6 @@ rcna_plot <- function(seu_obj, param) {
     )
 
     title <- gsub(pattern = "_", replacement = " ", x = param)
-
     rcna_fplot <-
         FeaturePlot(
             seu_obj_filter,
@@ -56,12 +55,7 @@ rcna_plot <- function(seu_obj, param) {
             raster = FALSE,
             alpha = 0.2
         ) +
-        scale_colour_gradient2(
-            low = "#2166AC",
-            mid = "white",
-            high = "#B2182B",
-            midpoint = 0,
-        ) +
+        viridis::scale_color_viridis(option = "inferno") +
         theme_rect() +
         labs(
             title = title,

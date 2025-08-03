@@ -3876,6 +3876,25 @@
       ],
       "Hash": "a57f0f5dbcfd0d77ad4ff33032f5dc79"
     },
+    "ggthemes": {
+      "Package": "ggthemes",
+      "Version": "5.1.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "ggplot2",
+        "graphics",
+        "grid",
+        "lifecycle",
+        "methods",
+        "purrr",
+        "scales",
+        "stringr",
+        "tibble"
+      ],
+      "Hash": "16a4974681fc751a09a1250431361896"
+    },
     "ggtree": {
       "Package": "ggtree",
       "Version": "3.12.0",
@@ -5160,6 +5179,13 @@
       ],
       "Hash": "4f50122dc256b1b6996a4703fecea821"
     },
+    "moments": {
+      "Package": "moments",
+      "Version": "0.14.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "bb94fd8ee5f7f127eae2bddbff26864d"
+    },
     "msigdbr": {
       "Package": "msigdbr",
       "Version": "7.5.1",
@@ -5841,6 +5867,32 @@
         "utils"
       ],
       "Hash": "dfc034a172fd88fc66b1a703894c4185"
+    },
+    "rcna": {
+      "Package": "rcna",
+      "Version": "0.0.99",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "rcna",
+      "RemoteUsername": "korsunskylab",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "e3683c55e4fdb8a3dc55aaeab8735922e360609d",
+      "Requirements": [
+        "Matrix",
+        "R",
+        "RSpectra",
+        "dplyr",
+        "ggplot2",
+        "ggthemes",
+        "glue",
+        "moments",
+        "patchwork",
+        "purrr",
+        "rlang",
+        "tibble"
+      ],
+      "Hash": "0e0b97138e178e6d3c759144a2dda2c5"
     },
     "readr": {
       "Package": "readr",

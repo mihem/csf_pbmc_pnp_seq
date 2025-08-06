@@ -204,142 +204,104 @@ top_results <- limma::topTable(
     sort.by = "p"
 )
 
-# Function to create regression plots with statistical results
-create_regression_plot <- function(cell_type, props_data, meta_data, stats_results) {
-    # Get stats for this cell type
-    cell_stats <- stats_results[cell_type, ]
-    coef_val <- round(cell_stats$logFC, 3)  # This is the regression coefficient (slope), not logFC
-    p_val <- cell_stats$P.Value
-    adj_p_val <- cell_stats$adj.P.Val
+# Function to create regression plots using limma fit object
+create_regression_plot_limma <- function(cell_type, fit_object, props_data, meta_data) {
+    # Extract statistics from limma fit object
+    coef_val <- round(fit_object$coefficients[cell_type, "onls_at_lumbar_puncture"], 3)
+    p_val <- fit_object$p.value[cell_type, "onls_at_lumbar_puncture"]
+    t_val <- fit_object$t[cell_type, "onls_at_lumbar_puncture"]
     
-    # Calculate correlation coefficients for comparison
-    plot_data <- data.frame(
-        onls = meta_data$onls_at_lumbar_puncture,
-        proportion = props_data[cell_type, ],
-        age = meta_data$age,
-        sex_numeric = as.numeric(meta_data$sex == "male"),
-        stringsAsFactors = FALSE
-    )
+    # Calculate residuals from the limma model - these are already adjusted for age and sex
+    design_matrix <- fit_object$design
+    fitted_values <- design_matrix %*% t(fit_object$coefficients)
+    residuals_matrix <- props_data - t(fitted_values)
     
-    # Remove rows with missing data
-    complete_data <- plot_data[complete.cases(plot_data), ]
+    # Get residuals for this specific cell type (already adjusted for age and sex)
+    cell_residuals <- residuals_matrix[cell_type, ]
     
-    # Calculate simple (unadjusted) correlations
-    simple_pearson <- round(cor(complete_data$onls, complete_data$proportion, method = "pearson"), 3)
+    # Calculate simple correlation for comparison (unadjusted)
+    simple_pearson <- round(cor(meta_data$onls_at_lumbar_puncture, props_data[cell_type, ], 
+                               method = "pearson", use = "complete.obs"), 3)
     
-    # Method 1: Partial correlations (residuals approach)
-    onls_residuals <- residuals(lm(onls ~ age + sex_numeric, data = complete_data))
-    prop_residuals <- residuals(lm(proportion ~ age + sex_numeric, data = complete_data))
-    partial_pearson <- round(cor(onls_residuals, prop_residuals, method = "pearson"), 3)
+    # For plotting, we need to show the relationship between ONLS and the cell proportions
+    # We can use the partial residuals approach: residuals + ONLS effect
+    onls_effect <- fit_object$coefficients[cell_type, "onls_at_lumbar_puncture"] * meta_data$onls_at_lumbar_puncture
+    partial_residuals <- cell_residuals + onls_effect
     
-    # Method 2: Adjusted proportions approach (more intuitive)
-    # Adjust proportions by removing age/sex effects
-    adjusted_proportions <- residuals(lm(proportion ~ age + sex_numeric, data = complete_data)) + mean(complete_data$proportion)
-    adjusted_onls <- residuals(lm(onls ~ age + sex_numeric, data = complete_data)) + mean(complete_data$onls)
-    adjusted_pearson <- round(cor(adjusted_onls, adjusted_proportions, method = "pearson"), 3)
+    # Calculate correlation from the model relationship
+    # The correlation can be derived from the t-statistic and degrees of freedom
+    df_residual <- fit_object$df.residual[1]  # All cell types have the same df.residual
+    adjusted_pearson <- round(t_val / sqrt(t_val^2 + df_residual), 3)
     
     # Format p-value
     p_text <- ifelse(p_val < 0.001, "p < 0.001", paste("p =", round(p_val, 3)))
-    adj_p_text <- ifelse(adj_p_val < 0.001, "adj.p < 0.001", paste("adj.p =", round(adj_p_val, 3)))
     
-    # Create plot with adjusted values
-    adjusted_data <- data.frame(
-        onls_adj = adjusted_onls,
-        prop_adj = adjusted_proportions
+    # Create plot data using partial residuals
+    plot_data <- data.frame(
+        onls = meta_data$onls_at_lumbar_puncture,
+        partial_residuals = partial_residuals,
+        stringsAsFactors = FALSE
     )
     
-    # Create plot with adjusted data
-    p <- ggplot(adjusted_data, aes(x = onls_adj, y = prop_adj)) +
+    # Remove incomplete cases
+    complete_cases <- complete.cases(plot_data)
+    plot_data <- plot_data[complete_cases, ]
+    
+    # Create plot
+    p <- ggplot(plot_data, aes(x = onls, y = partial_residuals)) +
         geom_point() +
         geom_smooth(method = "lm", se = TRUE) +
         theme_classic() +
         labs(
             title = gsub("_", " ", cell_type),
-            x = "ONLS (adjusted for age & sex)",
+            x = "ONLS at lumbar puncture",
             y = "Proportion (adjusted for age & sex)",
-            subtitle = paste("Slope:", coef_val, "| r =", simple_pearson, "| r.adj =", adjusted_pearson, "|", p_text)
+            subtitle = paste("Slope:", coef_val, "| r =", simple_pearson, "| r.adj =", adjusted_pearson, "|", p_text, "| t =", round(t_val, 2))
         )
     
     return(p)
 }
 
-# Function to calculate correlation statistics for all cell types
-calculate_correlation_stats <- function(props_data, meta_data) {
+# Function to extract correlation statistics from limma fit object
+extract_limma_correlation_stats <- function(fit_object, props_data, meta_data) {
+    cell_types <- rownames(fit_object$coefficients)
+    
     results <- data.frame(
-        cell_type = rownames(props_data),
+        cell_type = cell_types,
+        # Limma statistics (these are already adjusted for age and sex)
+        limma_coef = fit_object$coefficients[, "onls_at_lumbar_puncture"],
+        limma_t_stat = fit_object$t[, "onls_at_lumbar_puncture"],
+        limma_p_value = fit_object$p.value[, "onls_at_lumbar_puncture"],
+        limma_sigma = fit_object$sigma,
         # Simple correlations (unadjusted)
         simple_pearson_r = NA,
         simple_pearson_p = NA,
-        simple_spearman_rho = NA,
-        simple_spearman_p = NA,
-        # Partial correlations (residuals approach)
-        partial_pearson_r = NA,
-        partial_pearson_p = NA,
-        partial_spearman_rho = NA,
-        partial_spearman_p = NA,
-        # Adjusted values correlations (adjusted proportions approach)
+        # Adjusted correlation coefficient derived from limma t-statistic
         adjusted_pearson_r = NA,
-        adjusted_pearson_p = NA,
-        adjusted_spearman_rho = NA,
-        adjusted_spearman_p = NA,
         stringsAsFactors = FALSE
     )
     
-    for (i in 1:nrow(props_data)) {
-        cell_type <- rownames(props_data)[i]
+    for (i in 1:length(cell_types)) {
+        cell_type <- cell_types[i]
         
-        # Create complete dataset
-        complete_data <- data.frame(
-            onls = meta_data$onls_at_lumbar_puncture,
-            proportion = props_data[cell_type, ],
-            age = meta_data$age,
-            sex_numeric = as.numeric(meta_data$sex == "male")
-        )
-        complete_data <- complete_data[complete.cases(complete_data), ]
+        # Simple correlation (unadjusted)
+        simple_test <- cor.test(meta_data$onls_at_lumbar_puncture, 
+                               props_data[cell_type, ], 
+                               method = "pearson", 
+                               use = "complete.obs")
+        results$simple_pearson_r[i] <- simple_test$estimate
+        results$simple_pearson_p[i] <- simple_test$p.value
         
-        if (nrow(complete_data) > 4) {  # Need at least 5 points for partial correlation
-            # Simple correlations
-            simple_pearson_test <- cor.test(complete_data$onls, complete_data$proportion, method = "pearson")
-            results$simple_pearson_r[i] <- simple_pearson_test$estimate
-            results$simple_pearson_p[i] <- simple_pearson_test$p.value
-            
-            simple_spearman_test <- cor.test(complete_data$onls, complete_data$proportion, method = "spearman")
-            results$simple_spearman_rho[i] <- simple_spearman_test$estimate
-            results$simple_spearman_p[i] <- simple_spearman_test$p.value
-            
-            # Partial correlations (residuals approach)
-            onls_residuals <- residuals(lm(onls ~ age + sex_numeric, data = complete_data))
-            prop_residuals <- residuals(lm(proportion ~ age + sex_numeric, data = complete_data))
-            
-            partial_pearson_test <- cor.test(onls_residuals, prop_residuals, method = "pearson")
-            results$partial_pearson_r[i] <- partial_pearson_test$estimate
-            results$partial_pearson_p[i] <- partial_pearson_test$p.value
-            
-            partial_spearman_test <- cor.test(onls_residuals, prop_residuals, method = "spearman")
-            results$partial_spearman_rho[i] <- partial_spearman_test$estimate
-            results$partial_spearman_p[i] <- partial_spearman_test$p.value
-            
-            # Adjusted values approach (add back means for interpretability)
-            adjusted_onls <- onls_residuals + mean(complete_data$onls)
-            adjusted_prop <- prop_residuals + mean(complete_data$proportion)
-            
-            adjusted_pearson_test <- cor.test(adjusted_onls, adjusted_prop, method = "pearson")
-            results$adjusted_pearson_r[i] <- adjusted_pearson_test$estimate
-            results$adjusted_pearson_p[i] <- adjusted_pearson_test$p.value
-            
-            adjusted_spearman_test <- cor.test(adjusted_onls, adjusted_prop, method = "spearman")
-            results$adjusted_spearman_rho[i] <- adjusted_spearman_test$estimate
-            results$adjusted_spearman_p[i] <- adjusted_spearman_test$p.value
-        }
+        # Calculate adjusted correlation coefficient from t-statistic and degrees of freedom
+        # This represents the partial correlation controlling for age and sex
+        t_val <- fit_object$t[cell_type, "onls_at_lumbar_puncture"]
+        df_residual <- fit_object$df.residual[1]  # All cell types have the same df.residual
+        results$adjusted_pearson_r[i] <- t_val / sqrt(t_val^2 + df_residual)
     }
     
     # Add adjusted p-values
+    results$limma_p_adj <- p.adjust(results$limma_p_value, method = "BH")
     results$simple_pearson_p_adj <- p.adjust(results$simple_pearson_p, method = "BH")
-    results$simple_spearman_p_adj <- p.adjust(results$simple_spearman_p, method = "BH")
-    results$partial_pearson_p_adj <- p.adjust(results$partial_pearson_p, method = "BH")
-    results$partial_spearman_p_adj <- p.adjust(results$partial_spearman_p, method = "BH")
-    results$adjusted_pearson_p_adj <- p.adjust(results$adjusted_pearson_p, method = "BH")
-    results$adjusted_spearman_p_adj <- p.adjust(results$adjusted_spearman_p, method = "BH")
     
     return(results)
 }
@@ -352,40 +314,20 @@ top_results <- limma::topTable(
     sort.by = "p"
 )
 
-# Calculate correlation statistics
-correlation_stats <- calculate_correlation_stats(props$TransformedProps, meta_lookup)
+# Extract correlation statistics using limma fit object
+correlation_stats <- extract_limma_correlation_stats(fit, props$TransformedProps, meta_lookup)
 
 # Save correlation results
 write.csv(correlation_stats, 
-          file.path("results", "correlation", "onls_correlation_statistics.csv"), 
+          file.path("results", "correlation", "onls_correlation_statistics_limma.csv"), 
           row.names = FALSE)
 
-# Print significant correlations
-cat("Significant simple Pearson correlations (p < 0.05):\n")
-sig_simple_pearson <- correlation_stats[correlation_stats$simple_pearson_p < 0.05 & !is.na(correlation_stats$simple_pearson_p), ]
-if(nrow(sig_simple_pearson) > 0) {
-    print(sig_simple_pearson[order(sig_simple_pearson$simple_pearson_p), c("cell_type", "simple_pearson_r", "simple_pearson_p", "simple_pearson_p_adj")])
-}
+# Create plots for significant results based on limma p-values
+significant_cells <- correlation_stats$cell_type[correlation_stats$limma_p_value < 0.05 & !is.na(correlation_stats$limma_p_value)]
 
-cat("\nSignificant adjusted Pearson correlations (adjusted for age & sex, p < 0.05):\n")
-sig_adjusted_pearson <- correlation_stats[correlation_stats$adjusted_pearson_p < 0.05 & !is.na(correlation_stats$adjusted_pearson_p), ]
-if(nrow(sig_adjusted_pearson) > 0) {
-    print(sig_adjusted_pearson[order(sig_adjusted_pearson$adjusted_pearson_p), c("cell_type", "adjusted_pearson_r", "adjusted_pearson_p", "adjusted_pearson_p_adj")])
-}
-
-cat("\nSignificant partial Pearson correlations (residuals method, p < 0.05):\n")
-sig_partial_pearson <- correlation_stats[correlation_stats$partial_pearson_p < 0.05 & !is.na(correlation_stats$partial_pearson_p), ]
-if(nrow(sig_partial_pearson) > 0) {
-    print(sig_partial_pearson[order(sig_partial_pearson$partial_pearson_p), c("cell_type", "partial_pearson_r", "partial_pearson_p", "partial_pearson_p_adj")])
-}
-
-# Create plots for top significant results (e.g., adj.P.Val < 0.05)
-# significant_cells <- rownames(top_results)[top_results$adj.P.Val < 0.9]
-significant_cells <- rownames(top_results)[top_results$P.Val < 0.05]
-
-# Generate plots for significant cell types
+# Generate plots for significant cell types using limma fit object
 regression_plots <- lapply(significant_cells, function(cell_type) {
-    create_regression_plot(cell_type, props$TransformedProps, meta_lookup, top_results)
+    create_regression_plot_limma(cell_type, fit, props$TransformedProps, meta_lookup)
 })
 
 # Save plots
@@ -393,7 +335,7 @@ for (i in seq_along(regression_plots)) {
     cell_name <- significant_cells[i]
     ggsave(
         plot = regression_plots[[i]],
-        filename = file.path("results", "correlation", paste0("onls_", cell_name, "_regression.pdf")),
+        filename = file.path("results", "correlation", paste0("onls_", cell_name, "_regression_limma.pdf")),
         width = 8,
         height = 6
     )
@@ -405,7 +347,7 @@ if (length(significant_cells) > 0) {
     combined_plot <- plot_grid(plotlist = regression_plots, ncol = 2)
     ggsave(
         plot = combined_plot,
-        filename = file.path("results", "correlation", "onls_all_significant_regressions.pdf"),
+        filename = file.path("results", "correlation", "onls_all_significant_regressions_limma.pdf"),
         width = 16,
         height = 6 * ceiling(length(regression_plots) / 2)
     )

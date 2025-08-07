@@ -168,6 +168,7 @@ correlation_results_csf <- run_severity_correlation_analysis(
     lookup_data = lookup,
     tissue_type = "CSF",
     correlation_threshold = 0.3,
+    significance_threshold = 0.05,
     output_dir = file.path("results", "correlation")
 )
 
@@ -178,5 +179,6 @@ correlation_results_blood <- run_severity_correlation_analysis(
     lookup_data = lookup,
     tissue_type = "PBMC",
     correlation_threshold = 0.3,
+    significance_threshold = 0.05,
     output_dir = file.path("results", "correlation")
 )

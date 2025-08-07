@@ -65,7 +65,8 @@ create_combined_correlation_plot <- function(
     props_data,
     meta_data,
     severity_score,
-    correlation_threshold = 0.3
+    correlation_threshold,
+    significance_threshold
 ) {
     # Get correlation statistics
     correlation_stats <- extract_limma_correlation_stats(
@@ -75,19 +76,21 @@ create_combined_correlation_plot <- function(
         severity_score
     )
 
-    # Filter for high correlation cell types
-    high_corr_cells <- correlation_stats$cell_type[
+    # Filter for high correlation and significant cell types
+    high_corr_sig_cells <- correlation_stats$cell_type[
         abs(correlation_stats$adjusted_pearson_r) > correlation_threshold &
+            correlation_stats$limma_p_adj < significance_threshold &
+            !is.na(correlation_stats$limma_p_adj) &
             !is.na(correlation_stats$adjusted_pearson_r)
     ]
 
-    if (length(high_corr_cells) == 0) {
+    if (length(high_corr_sig_cells) == 0) {
         return(NULL)
     }
 
     # Order cell types by absolute correlation (strongest first)
     cell_order <- correlation_stats[
-        correlation_stats$cell_type %in% high_corr_cells,
+        correlation_stats$cell_type %in% high_corr_sig_cells,
     ] |>
         dplyr::arrange(desc(abs(adjusted_pearson_r))) |>
         dplyr::pull(cell_type)
@@ -131,8 +134,8 @@ create_combined_correlation_plot <- function(
         # Format p-value
         p_text <- ifelse(
             cell_stats$limma_p_value < 0.001,
-            "p < 0.001",
-            paste("p =", round(cell_stats$limma_p_value, 3))
+            "adj. p < 0.001",
+            paste("adj. p =", round(cell_stats$limma_p_value, 3))
         )
 
         # Create individual plot
@@ -150,7 +153,9 @@ create_combined_correlation_plot <- function(
                 title = gsub("_", " ", cell_type),
                 subtitle = paste(
                     "r =",
-                    round(cell_stats$adjusted_pearson_r, 3)
+                    round(cell_stats$adjusted_pearson_r, 3),
+                    ",",
+                    p_text
                 ),
                 x = score_label,
                 y = "Proportion\n(adj. for age & sex)"
@@ -207,6 +212,7 @@ process_correlation_results <- function(
     analysis_result,
     output_dir,
     correlation_threshold,
+    significance_threshold,
     tissue_type
 ) {
     if (is.null(analysis_result)) {
@@ -251,26 +257,29 @@ process_correlation_results <- function(
         row.names = FALSE
     )
 
-    # Create plots for results with high correlation coefficients
-    high_corr_cells <- correlation_stats$cell_type[
+    # Create plots for results with high correlation coefficients and significant p-values
+    high_corr_sig_cells <- correlation_stats$cell_type[
         abs(correlation_stats$adjusted_pearson_r) > correlation_threshold &
+            correlation_stats$limma_p_adj < significance_threshold &
+            !is.na(correlation_stats$limma_p_adj) &
             !is.na(correlation_stats$adjusted_pearson_r)
     ]
 
-    if (length(high_corr_cells) > 0) {
-        # Generate combined plot for all high correlation cell types
+    if (length(high_corr_sig_cells) > 0) {
+        # Generate combined plot for all high correlation and significant cell types
         combined_plot <- create_combined_correlation_plot(
             fit,
             props$TransformedProps,
             meta_lookup,
             severity_score,
-            correlation_threshold
+            correlation_threshold,
+            significance_threshold 
         )
 
         if (!is.null(combined_plot)) {
             # Calculate plot dimensions based on number of cell types
             # 3 plots per row, so calculate number of rows needed
-            n_plots <- length(high_corr_cells)
+            n_plots <- length(high_corr_sig_cells)
             n_rows <- ceiling(n_plots / 3)
 
             # Base height per row (adjust as needed)
@@ -303,9 +312,11 @@ process_correlation_results <- function(
                 tissue_type,
                 severity_score,
                 "with",
-                length(high_corr_cells),
+                length(high_corr_sig_cells),
                 "cell types (|r| >",
                 correlation_threshold,
+                "and p <",
+                significance_threshold,
                 ") - dimensions:",
                 plot_width,
                 "x",
@@ -317,6 +328,8 @@ process_correlation_results <- function(
         cat(
             "No correlations with |r| >",
             correlation_threshold,
+            "and p <",
+            significance_threshold,
             "found for",
             tissue_type,
             severity_score,
@@ -327,7 +340,7 @@ process_correlation_results <- function(
     return(list(
         correlation_stats = correlation_stats,
         top_results = top_results,
-        high_correlation_cells = high_corr_cells
+        high_correlation_cells = high_corr_sig_cells
     ))
 }
 
@@ -338,7 +351,8 @@ run_severity_correlation_analysis <- function(
     lookup_data,
     tissue_type,
     correlation_threshold,
-    output_dir
+    output_dir,
+    significance_threshold
 ) {
     results <- list()
 
@@ -346,15 +360,15 @@ run_severity_correlation_analysis <- function(
         cat("Analyzing correlations for:", score, "\n")
 
         # Check if plot file already exists - skip entire analysis if it does
-        plot_file <- file.path(
+        output_file <- file.path(
             "results",
             "correlation",
-            paste0("correlation_", score, "_", tissue_type, ".pdf")
+            paste0("correlation_", score, "_", tissue_type, ".csv")
         )
 
-        if (file.exists(plot_file)) {
+        if (file.exists(output_file)) {
             cat(
-                "Plot file already exists for",
+                "File already exists for",
                 tissue_type,
                 score,
                 "- skipping entire analysis\n"
@@ -381,7 +395,8 @@ run_severity_correlation_analysis <- function(
             analysis_result,
             correlation_threshold = correlation_threshold,
             output_dir = output_dir,
-            tissue_type = tissue_type
+            tissue_type = tissue_type,
+            significance_threshold = significance_threshold
         )
 
         results[[score]] <- processed_result

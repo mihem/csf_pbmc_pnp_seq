@@ -1,0 +1,12 @@
+# Ignore everything
+/*
+
+# But not scripts
+!scripts/
+!renv.lock
+!Dockerfile
+!.gitignore
+
+# But not download.sh
+scripts/download.sh
+

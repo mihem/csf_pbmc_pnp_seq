@@ -62,14 +62,15 @@ sukenikova_reactive_plot <-
     ) +
     geom_alluvium(aes(fill = sukenikova_specificity)) +
     geom_stratum() +
-    geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+    geom_text(stat = "stratum", aes(label = after_stat(stratum)), angle = 90, size = 3) +
     theme_minimal() +
-    ylab("Frequency")
+    ylab("Frequency") + 
+    theme(legend.position = "none")
 
 ggsave(
     plot = sukenikova_reactive_plot,
     filename = file.path("results", "tcr", "sukenikova_reactive_alluvial.pdf"),
-    width = 8,
+    width = 6,
     height = 6
 )
 

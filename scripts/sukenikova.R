@@ -1,12 +1,12 @@
 ##################################################
-# compare data with sukenikova Nature 2024
+# compare data with Sukenikova Nature 2024
 # https://www.nature.com/articles/s41586-023-06916-6
 ##################################################
 library(tidyverse)
 library(qs)
 
 
-# sukenikova supp table 2
+# Sukenikova supp table 2
 # PNS-myelin-reactivi clones
 sukenikova_reactive_clones <-
     readr::read_csv(
@@ -15,7 +15,7 @@ sukenikova_reactive_clones <-
     dplyr::rename(CTAA = cdr3b_aa) |>
     dplyr::rename_with(function(x) paste0("sukenikova_", x), .cols = -CTAA)
 
-# sukenikova public files
+# Sukenikova public files
 sukenikova_files <- list.files(
     file.path("raw", "sukenikova"),
     pattern = ".tsv",

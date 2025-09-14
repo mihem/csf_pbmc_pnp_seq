@@ -55,19 +55,23 @@ sukenikova_table_clean <- sukenikova_reactive_shared |>
     dplyr::arrange(heming_tissue, heming_diagnosis, CTaa) |>
     dplyr::select(
         CTaa,
+        heming_patient,
         heming_tissue,
         heming_diagnosis,
-        sukenikova_specificity,
+        sukenikova_pt,
         sukenikova_diagnosis,
-        sukenikova_source
+        sukenikova_source,
+        sukenikova_specificity
     ) |>
     dplyr::rename(
         "CDR3 beta" = CTaa,
+        "Patient" = heming_patient,
         "Tissue" = heming_tissue,
         "Diagnosis" = heming_diagnosis,
-        "Sukenikova Specificity" = sukenikova_specificity,
+        "Sukenikova Patient" = sukenikova_pt,
         "Sukenikova Diagnosis" = sukenikova_diagnosis,
-        "Sukenikova Tissue" = sukenikova_source
+        "Sukenikova Tissue" = sukenikova_source,
+        "Sukenikova Specificity" = sukenikova_specificity
     )
 
 table_plot <- gridExtra::tableGrob(

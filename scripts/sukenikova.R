@@ -5,7 +5,8 @@
 library(tidyverse)
 library(qs)
 library(ggplot2)
-library(ggalluvial)
+library(gridExtra)
+library(grid)
 
 # Sukenikova supp table 2
 # PNS-myelin-reactivi clones
@@ -14,6 +15,7 @@ sukenikova_reactive_clones <-
         file.path("lookup", "sukenikova_nature_gbs_supp_table_2.csv")
     ) |>
     dplyr::rename(CTAA = cdr3b_aa) |>
+    dplyr::mutate(diagnosis = "GBS") |>
     dplyr::rename_with(function(x) paste0("sukenikova_", x), .cols = -CTAA)
 
 # read this dataset
@@ -21,9 +23,9 @@ sc_tcr <- qread(file.path("objects", "sc_tcr.qs"))
 
 # extract CTaa from TRB data from sc_tcr object
 heming_tcr <- sc_tcr@meta.data |>
-    dplyr::select(sample, CTaa, tissue, diagnosis) |>
+    dplyr::select(patient, CTaa, tissue, diagnosis) |>
     tidyr::separate_wider_delim(CTaa, names = c("TRA", "TRB"), delim = "_") |>
-    dplyr::select(sample, TRB, tissue, diagnosis) |>
+    dplyr::select(patient, TRB, tissue, diagnosis) |>
     tidyr::drop_na() |>
     dplyr::distinct() |>
     dplyr::rename(CTaa = TRB) |>
@@ -47,32 +49,48 @@ writexl::write_xlsx(
     path = file.path("results", "tcr", "sukenikova_reactive_shared.xlsx")
 )
 
-# alluvial plot
-sukenikova_reactive_plot <-
-    sukenikova_reactive_shared |>
-    ggplot(aes(
-        axis1 = CTaa,
-        axis2 = heming_tissue,
-        axis3 = heming_diagnosis,
-        axis4 = sukenikova_specificity
-    )) +
-    scale_x_discrete(
-        limits = c("CTaa", "Tissue",  "Diagnosis", "Specificity"),
-        expand = c(.1, .05)
-    ) +
-    geom_alluvium(aes(fill = sukenikova_specificity)) +
-    geom_stratum() +
-    geom_text(stat = "stratum", aes(label = after_stat(stratum)), angle = 90, size = 3) +
-    theme_minimal() +
-    ylab("Frequency") + 
-    theme(legend.position = "none")
 
-ggsave(
-    plot = sukenikova_reactive_plot,
-    filename = file.path("results", "tcr", "sukenikova_reactive_alluvial.pdf"),
-    width = 6,
-    height = 6
+# Prepare clean data for the table
+sukenikova_table_clean <- sukenikova_reactive_shared |>
+    dplyr::arrange(heming_tissue, heming_diagnosis, CTaa) |>
+    dplyr::select(
+        CTaa,
+        heming_tissue,
+        heming_diagnosis,
+        sukenikova_specificity,
+        sukenikova_diagnosis,
+        sukenikova_source
+    ) |>
+    dplyr::rename(
+        "CDR3 beta" = CTaa,
+        "Tissue" = heming_tissue,
+        "Diagnosis" = heming_diagnosis,
+        "Sukenikova Specificity" = sukenikova_specificity,
+        "Sukenikova Diagnosis" = sukenikova_diagnosis,
+        "Sukenikova Tissue" = sukenikova_source
+    )
+
+table_plot <- gridExtra::tableGrob(
+    sukenikova_table_clean,
+    rows = NULL,
+    theme = gridExtra::ttheme_default(
+        core = list(
+            fg_params = list(cex = 0.8),
+            bg_params = list(fill = c("white", "lightgray"), alpha = 0.5)
+        ),
+        colhead = list(
+            fg_params = list(cex = 0.9, fontface = "bold"),
+            bg_params = list(fill = "darkgray", alpha = 0.8)
+        )
+    )
 )
+
+# Save as PDF using base R graphics (very reliable)
+pdf(file.path("results", "table", "sukenikova_reactive_table_grid.pdf"), 
+    width = 12, height = 8)
+grid::grid.draw(table_plot)
+dev.off()
+
 
 # # Sukenikova public files
 # sukenikova_files <- list.files(

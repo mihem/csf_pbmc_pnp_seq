@@ -14,30 +14,30 @@ sukenikova_reactive_clones <-
     readr::read_csv(
         file.path("lookup", "sukenikova_nature_gbs_supp_table_2.csv")
     ) |>
-    dplyr::rename(CTAA = cdr3b_aa) |>
+    dplyr::rename(CTaa_TRB = cdr3b_aa) |>
     dplyr::mutate(diagnosis = "GBS") |>
-    dplyr::rename_with(function(x) paste0("sukenikova_", x), .cols = -CTAA)
+    dplyr::rename_with(function(x) paste0("sukenikova_", x), .cols = -CTaa_TRB)
 
 # read this dataset
 sc_tcr <- qread(file.path("objects", "sc_tcr.qs"))
 
 # extract CTaa from TRB data from sc_tcr object
 heming_tcr <- sc_tcr@meta.data |>
-    dplyr::select(patient, CTaa, tissue, diagnosis) |>
+    dplyr::select(patient, CTaa, CTgene, CTnt, tissue, diagnosis) |>
     tidyr::separate_wider_delim(CTaa, names = c("TRA", "TRB"), delim = "_") |>
-    dplyr::select(patient, TRB, tissue, diagnosis) |>
     tidyr::drop_na() |>
     dplyr::distinct() |>
-    dplyr::rename(CTaa = TRB) |>
-    dplyr::rename_with(function(x) paste0("heming_", x), .cols = -CTaa)
+    dplyr::rename(CTaa_TRB = TRB) |>
+    dplyr::rename(CTaa_TRA = TRA) |>
+    dplyr::rename_with(function(x) paste0("heming_", x), .cols = -CTaa_TRB)
 
 # compare with latore supp table 2
 sukenikova_reactive_shared <- heming_tcr |>
     dplyr::inner_join(
         sukenikova_reactive_clones,
-        by = c("CTaa" = "CTAA")
+        by = c("CTaa_TRB" = "CTaa_TRB")
     ) |>
-    relocate(CTaa, .before = everything())
+    relocate(CTaa_TRB, .before = everything())
 
 qsave(
     sukenikova_reactive_shared,
@@ -52,9 +52,9 @@ writexl::write_xlsx(
 
 # Prepare clean data for the table
 sukenikova_table_clean <- sukenikova_reactive_shared |>
-    dplyr::arrange(heming_tissue, heming_diagnosis, CTaa) |>
+    dplyr::arrange(heming_tissue, heming_diagnosis, CTaa_TRB) |>
     dplyr::select(
-        CTaa,
+        CTaa_TRB,
         heming_patient,
         heming_tissue,
         heming_diagnosis,
@@ -64,7 +64,7 @@ sukenikova_table_clean <- sukenikova_reactive_shared |>
         sukenikova_specificity
     ) |>
     dplyr::rename(
-        "CDR3 beta" = CTaa,
+        "CDR3 beta" = CTaa_TRB,
         "Patient" = heming_patient,
         "Tissue" = heming_tissue,
         "Diagnosis" = heming_diagnosis,

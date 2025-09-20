@@ -10,6 +10,7 @@ library(tidyverse)
 library(scRepertoire)
 library(scMisc)
 library(writexl)
+library(readxl)
 
 # load filtered contig annotations ---
 tcr_files <- list.files(
@@ -225,11 +226,11 @@ write_xlsx(CTaa_sample, file.path("results", "tcr", "CTaa_sample.xlsx"))
 
 # Count number of unique clones (clonotypes) per clone size category
 cloneSize_count <- sc_tcr@meta.data |>
-    dplyr::filter(!is.na(CTaa)) |>  # Only include cells with tcr data
+    dplyr::filter(!is.na(CTaa)) |> # Only include cells with tcr data
     dplyr::group_by(cloneSize) |>
     dplyr::summarize(
-        n_clones = n_distinct(CTaa),  # Number of unique clones
-        n_cells = n(),                # Number of cells
+        n_clones = n_distinct(CTaa), # Number of unique clones
+        n_cells = n(), # Number of cells
         .groups = "drop"
     ) |>
     dplyr::arrange(cloneSize)
@@ -505,7 +506,7 @@ shared_clones_summary <- shared_clones |>
         sample_count = n(),
         clone_size = unique(cloneSize),
         clonal_frequency = unique(clonalFrequency)
-    )  |>
+    ) |>
     dplyr::arrange(desc(sample_count), desc(clonal_frequency), CTaa)
 
 # Save the results to an Excel file
@@ -900,3 +901,38 @@ ggsave(
     width = 5,
     height = 5
 )
+
+# Count the number of cloneSize per sample
+pbmc_leftover <- read_xlsx(file.path("lookup", "SEED_lookup_leftover.xlsx"))
+
+samples_expanded <-
+    dplyr::count(sc_tcr@meta.data, cloneSize, sample, patient, tissue) |>
+    dplyr::filter(tissue == "PBMC") |>
+    dplyr::filter(grepl("Hyperexpanded|Large|Medium", cloneSize))
+
+samples_expanded |>
+    dplyr::left_join(pbmc_leftover, by = join_by(patient)) |>
+    dplyr::select(
+        patient,
+        sample,
+        cloneSize,
+        n,
+        diagnosis,
+        leftover,
+        same_date,
+        date_sample,
+        date_leftover
+    ) |>
+    dplyr::arrange(patient, desc(cloneSize)) |>
+    dplyr::filter(leftover == "yes") |>
+    write_xlsx(file.path("results", "tcr", "leftover_pbmc_expanded.xlsx"))
+
+# analyze known self-reactive clones
+self_reactive_clones <- c(
+    "CVVNRGGGYQKVTF_CAWRGTGAEAFF",
+    "CAAKREGSNYKLTF_CASSLAYEQYF"
+)
+
+sc_tcr@meta.data |>
+    dplyr::filter(CTaa %in% self_reactive_clones) |>
+    dplyr::count(sample, cloneSize, cluster, tissue_diagnosis, diagnosis)

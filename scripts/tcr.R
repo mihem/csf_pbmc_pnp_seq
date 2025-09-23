@@ -936,3 +936,12 @@ self_reactive_clones <- c(
 sc_tcr@meta.data |>
     dplyr::filter(CTaa %in% self_reactive_clones) |>
     dplyr::count(sample, cloneSize, cluster, tissue_diagnosis, diagnosis)
+
+str(tcr_contig_list[["PBMC_pool_7_P26"]])
+
+# alpha chain of self reactive clone
+p26_self_reactive <- strsplit(self_reactive_clones[2], "_")[[1]]
+
+tcr_contig_list[["PBMC_pool_7_P26"]] |>
+    dplyr::filter(cdr3 %in% p26_self_reactive) |>
+    write_xlsx(file.path("results", "tcr", "p26_self_reactive_tcr.xlsx"))

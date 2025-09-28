@@ -5469,6 +5469,16 @@
       ],
       "Hash": "15da5a8412f317beeee6175fbc76f4bb"
     },
+    "piton": {
+      "Package": "piton",
+      "Version": "1.0.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "Rcpp"
+      ],
+      "Hash": "e3e637a1b4deb944a58e9ab22662fc4e"
+    },
     "pkgbuild": {
       "Package": "pkgbuild",
       "Version": "1.4.4",
@@ -7501,6 +7511,18 @@
         "xml2"
       ],
       "Hash": "c328568cd14ea89a83bd4ca7f54ae07e"
+    },
+    "tidyxl": {
+      "Package": "tidyxl",
+      "Version": "1.0.10",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "Rcpp",
+        "piton"
+      ],
+      "Hash": "bd231fb85aa208c87a131e6eb8e33e10"
     },
     "timeDate": {
       "Package": "timeDate",

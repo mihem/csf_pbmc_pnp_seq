@@ -1,3 +1,8 @@
+##################################################
+# Find genes of interest in Olink panel 
+# requires running annotate.R first
+##################################################
+
 library(tidyverse)
 library(readxl)
 

@@ -66,21 +66,6 @@ filterRedCells <- function(data, excel_file, value_col) {
     return(data_filtered)
 }
 
-##################################################
-# Filter red cells for both datasets
-##################################################
-
-olink_quant_filtered <- filterRedCells(
-    olink_quant,
-    olink_quant_file,
-    "Quantified_value"
-)
-
-olink_npx_filtered <- filterRedCells(
-    olink_npx,
-    olink_npx_file,
-    "NPX"
-)
 
 ##################################################
 # Helper functions for analysis

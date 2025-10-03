@@ -12,6 +12,9 @@ library(emmeans)
 library(writexl)
 library(patchwork)
 
+# source helper files
+source(file.path("scripts", "olink_analyze_helper.R"))
+
 # Read the metadata file
 olink_metadata_file <- file.path("lookup", "olink_lookup.xlsx")
 olink_metadata <- read_xlsx(olink_metadata_file)
@@ -40,6 +43,21 @@ olink_quant <- read_xlsx(olink_quant_file) |>
 
 olink_npx <- read_xlsx(olink_npx_file) |>
     mutate(NPX = as.numeric(NPX))
+
+
+# Filter red cells for both datasets
+
+olink_quant_filtered <- filterRedCells(
+    olink_quant,
+    olink_quant_file,
+    "Quantified_value"
+)
+
+olink_npx_filtered <- filterRedCells(
+    olink_npx,
+    olink_npx_file,
+    "NPX"
+)
 
 # Analyze QUANT data filtered
 results_quant <- processOlinkData(

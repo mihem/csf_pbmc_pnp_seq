@@ -46,7 +46,6 @@ olink_npx <- read_xlsx(olink_npx_file) |>
 
 
 # Filter red cells for both datasets
-
 olink_quant_filtered <- filterRedCells(
     olink_quant,
     olink_quant_file,

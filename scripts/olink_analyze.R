@@ -74,7 +74,7 @@ write_xlsx(
 
 ggsave(
     file.path("results", "olink", "olink_quant_boxplots.pdf"),
-    plot = results_quant_filtered$boxplots,
+    plot = results_quant$boxplots,
     width = 10,
     height = 12
 )

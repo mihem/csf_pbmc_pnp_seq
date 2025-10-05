@@ -80,7 +80,8 @@ calcStats <- function(data_wide, vars) {
             dplyr::count(group) |>
             dplyr::filter(n >= 2)
         if (nrow(var_counts) >= 2) {
-            formula <- paste0(var, "~ group + sex + age")
+            # formula <- paste0(var, "~ group + sex + age")
+            formula <- paste0(var, "~ group")
             fit <- lm(as.formula(formula), data = data_wide)
             contr[[var]] <- emmeans::emmeans(fit, "group", adjust = "none")
             contr[[var]] <- pairs(contr[[var]], adjust = "none")

@@ -58,6 +58,15 @@ olink_npx_filtered <- filterRedCells(
     "NPX"
 )
 
+# remove outlier samples
+olink_quant_filtered <-
+    olink_quant |>
+    dplyr::filter(!SampleID %in% c("11290_1_LS", "7785_1_LS"))
+
+olink_npx_filtered <- 
+    olink_npx |>
+    dplyr::filter(!SampleID %in% c("11290_1_LS", "7785_1_LS"))
+
 # Analyze QUANT data filtered
 results_quant <- processOlinkData(
     data = olink_quant_filtered,
@@ -73,7 +82,7 @@ write_xlsx(
 )
 
 ggsave(
-    file.path("results", "olink", "olink_quant_boxplots.pdf"),
+    file.path("results", "olink", "olink_quant_boxplots_2samplesremoved_unfiltered_noagesex.pdf"),
     plot = results_quant$boxplots,
     width = 10,
     height = 12

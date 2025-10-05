@@ -44,20 +44,6 @@ olink_quant <- read_xlsx(olink_quant_file) |>
 olink_npx <- read_xlsx(olink_npx_file) |>
     mutate(NPX = as.numeric(NPX))
 
-
-# Filter red cells for both datasets
-olink_quant_filtered <- filterRedCells(
-    olink_quant,
-    olink_quant_file,
-    "Quantified_value"
-)
-
-olink_npx_filtered <- filterRedCells(
-    olink_npx,
-    olink_npx_file,
-    "NPX"
-)
-
 # remove outlier samples
 olink_quant_filtered <-
     olink_quant |>
@@ -82,10 +68,10 @@ write_xlsx(
 )
 
 ggsave(
-    file.path("results", "olink", "olink_quant_boxplots_2samplesremoved_unfiltered_noagesex.pdf"),
+    file.path("results", "olink", "olink_quant_boxplot.pdf"),
     plot = results_quant$boxplots,
-    width = 10,
-    height = 12
+    width = 5,
+    height = 6
 )
 
 ##################################################
@@ -109,6 +95,6 @@ write_xlsx(
 ggsave(
     file.path("results", "olink", "olink_npx_boxplots.pdf"),
     plot = results_npx$boxplots,
-    width = 10,
-    height = 12
+    width = 5,
+    height = 6
 )

@@ -74,14 +74,14 @@ filterRedCells <- function(data, excel_file, value_col) {
 calcStats <- function(data_wide, vars) {
     contr <- list()
     for (var in vars) {
-        # Check if there are at least two non-NA values for two groups
+        # Check if there are at least four non-NA values for three groups
         var_counts <- data_wide |>
             dplyr::filter(!is.na(.data[[var]])) |>
             dplyr::count(group) |>
-            dplyr::filter(n >= 2)
-        if (nrow(var_counts) >= 2) {
-            # formula <- paste0(var, "~ group + sex + age")
-            formula <- paste0(var, "~ group")
+            dplyr::filter(n >= 4)
+        if (nrow(var_counts) >= 3) {
+            formula <- paste0(var, "~ group + sex + age")
+            # formula <- paste0(var, "~ group")
             fit <- lm(as.formula(formula), data = data_wide)
             contr[[var]] <- emmeans::emmeans(fit, "group", adjust = "none")
             contr[[var]] <- pairs(contr[[var]], adjust = "none")
@@ -103,7 +103,7 @@ calcStats <- function(data_wide, vars) {
                 p.adj,
                 corr = FALSE,
                 na = FALSE,
-                cutpoints = c(0, 0.001, 0.01, 0.05, 1),
+                cutpoints = c(0, 0.001, 0.01, 0.1, 1),
                 symbols = c("***", "**", "*", " ")
             ))
         )
@@ -111,7 +111,7 @@ calcStats <- function(data_wide, vars) {
 }
 
 createBoxplot <- function(var, data_wide, stats, unit_label) {
-    stats_var <- dplyr::filter(stats, var == !!var, p.adj < 0.05)
+    stats_var <- dplyr::filter(stats, var == !!var, p.adj < 0.1)
     if (nrow(stats_var) != 0) {
         stats_list <- list()
         stats_list$annotation <- stats_var$p.adj.signif
@@ -162,7 +162,10 @@ processOlinkData <- function(data, value_col, unit_label) {
         mutate(group = factor(group, levels = c("CTRL", "GBS", "CIDP")))
 
     # Get assay names and sort alphabetically
-    assays <- sort(unique(data_metadata$Assay))
+    # assays <- sort(unique(data_metadata$Assay))
+
+    # Define assays
+    assays <- c("CCL2", "CSF1", "CXCL10", "FASLG", "GZMA", "KLRD1", "TREM2")
 
     # Calculate statistics
     stats <- calcStats(data_wide, assays)
@@ -175,7 +178,7 @@ processOlinkData <- function(data, value_col, unit_label) {
         stats = stats,
         unit_label = unit_label
     )
-    
+
     boxplots <- patchwork::wrap_plots(boxplots_list)
 
     return(list(

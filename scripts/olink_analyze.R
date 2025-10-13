@@ -19,23 +19,34 @@ source(file.path("scripts", "olink_analyze_helper.R"))
 olink_metadata_file <- file.path("lookup", "olink_lookup.xlsx")
 olink_metadata <- read_xlsx(olink_metadata_file)
 
-# colors
-color_olink_diagnosis <- setNames(
-    pals::cols25(3),
-    c("CTRL", "GBS", "CIDP")
+# Define group configurations
+group_configs <- list(
+    group = list(
+        levels = c("CTRL", "GBS", "CIDP"),
+        colors = setNames(pals::cols25(3), c("CTRL", "GBS", "CIDP")),
+        suffix = ""
+    ),
+    meta_group = list(
+        levels = c("CTRL", "IN"),
+        colors = setNames(
+            pals::cols25(2),
+            c("CTRL", "IN")
+        ), 
+        suffix = "_meta"
+    )
 )
 
 # Read the Olink quantified data
 olink_quant_file <- file.path(
     "raw",
     "olink",
-    "P049E085_Müller-Miny_QUANT_long.xlsx"
+    "olink_quant_long_filtered.xlsx"
 )
 
 olink_npx_file <- file.path(
     "raw",
     "olink",
-    "P049E085_Müller-Miny_NPX_long.xlsx"
+    "olink_npx_long_filtered.xlsx"
 )
 
 olink_quant <- read_xlsx(olink_quant_file) |>
@@ -44,57 +55,77 @@ olink_quant <- read_xlsx(olink_quant_file) |>
 olink_npx <- read_xlsx(olink_npx_file) |>
     mutate(NPX = as.numeric(NPX))
 
-# remove outlier samples
-olink_quant_filtered <-
-    olink_quant |>
-    dplyr::filter(!SampleID %in% c("11290_1_LS", "7785_1_LS"))
+# Loop through both group and meta_group
+for (group_name in names(group_configs)) {
+    config <- group_configs[[group_name]]
 
-olink_npx_filtered <- 
-    olink_npx |>
-    dplyr::filter(!SampleID %in% c("11290_1_LS", "7785_1_LS"))
+    # Analyze QUANT data
+    results_quant <- processOlinkData(
+        data = olink_quant,
+        value_col = "Quantified_value",
+        unit_label = "pg/ml",
+        group_var = group_name,
+        group_levels = config$levels,
+        colors = config$colors
+    )
 
-# Analyze QUANT data filtered
-results_quant <- processOlinkData(
-    data = olink_quant_filtered,
-    value_col = "Quantified_value",
-    unit_label = "pg/ml"
-)
+    qs::qsave(
+        results_quant,
+        file.path("objects", paste0("olink_quant", config$suffix, ".qs"))
+    )
 
-qs::qsave(results_quant, file.path("objects", "olink_quant.qs"))
+    write_xlsx(
+        results_quant$stats,
+        file.path(
+            "results",
+            "olink",
+            paste0("olink_quant_stats_lme4", config$suffix, ".xlsx")
+        )
+    )
 
-write_xlsx(
-    results_quant$stats,
-    file.path("results", "olink", "olink_quant_stats.xlsx")
-)
+    ggsave(
+        file.path(
+            "results",
+            "olink",
+            paste0("olink_quant_boxplot_lme4", config$suffix, ".pdf")
+        ),
+        plot = results_quant$boxplots,
+        width = 8,
+        height = 12
+    )
 
-ggsave(
-    file.path("results", "olink", "olink_quant_boxplot.pdf"),
-    plot = results_quant$boxplots,
-    width = 5,
-    height = 6
-)
+    # Analyze NPX data
+    results_npx <- processOlinkData(
+        data = olink_npx,
+        value_col = "NPX",
+        unit_label = "NPX",
+        group_var = group_name,
+        group_levels = config$levels,
+        colors = config$colors
+    )
 
-##################################################
-# Analyze NPX data
-##################################################
+    qs::qsave(
+        results_npx$data_wide,
+        file.path("objects", paste0("olink_npx_wide", config$suffix, ".qs"))
+    )
 
-results_npx <- processOlinkData(
-    data = olink_npx_filtered,
-    value_col = "NPX",
-    unit_label = "NPX"
-)
+    write_xlsx(
+        results_npx$stats,
+        file.path(
+            "results",
+            "olink",
+            paste0("olink_npx_stats_all", config$suffix, ".xlsx")
+        )
+    )
 
-# Save NPX results
-qs::qsave(results_npx$data_wide, file.path("objects", "olink_npx_wide.qs"))
-
-write_xlsx(
-    results_npx$stats,
-    file.path("results", "olink", "olink_npx_stats_all.xlsx")
-)
-
-ggsave(
-    file.path("results", "olink", "olink_npx_boxplots.pdf"),
-    plot = results_npx$boxplots,
-    width = 5,
-    height = 6
-)
+    ggsave(
+        file.path(
+            "results",
+            "olink",
+            paste0("olink_npx_boxplots", config$suffix, ".pdf")
+        ),
+        plot = results_npx$boxplots,
+        width = 8,
+        height = 12
+    )
+}

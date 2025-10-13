@@ -71,19 +71,20 @@ filterRedCells <- function(data, excel_file, value_col) {
 # Helper functions for analysis
 ##################################################
 
-calcStats <- function(data_wide, vars) {
+calcStats <- function(data_wide, vars, group_var) {
+    n_group <- length(unique(data_wide[[group_var]]))
     contr <- list()
     for (var in vars) {
-        # Check if there are at least four non-NA values for three groups
+        # Check if there are at least four non-NA values for all groups
         var_counts <- data_wide |>
             dplyr::filter(!is.na(.data[[var]])) |>
-            dplyr::count(group) |>
+            dplyr::count(.data[[group_var]]) |>
             dplyr::filter(n >= 4)
-        if (nrow(var_counts) >= 3) {
-            formula <- paste0(var, "~ group + sex + age")
-            # formula <- paste0(var, "~ group")
-            fit <- lm(as.formula(formula), data = data_wide)
-            contr[[var]] <- emmeans::emmeans(fit, "group", adjust = "none")
+        if (nrow(var_counts) >= n_group) {
+            # Use mixed-effects model with orbis_id as random effect to account for repeated measurements
+            formula <- paste0(var, " ~ ", group_var, " + sex + age + (1|orbis_id)")
+            fit <- lme4::lmer(as.formula(formula), data = data_wide)
+            contr[[var]] <- emmeans::emmeans(fit, group_var, adjust = "none")
             contr[[var]] <- pairs(contr[[var]], adjust = "none")
             contr[[var]] <- broom::tidy(contr[[var]])
             contr[[var]] <- tidyr::separate_wider_regex(
@@ -110,7 +111,7 @@ calcStats <- function(data_wide, vars) {
     return(stats_df)
 }
 
-createBoxplot <- function(var, data_wide, stats, unit_label) {
+createBoxplot <- function(var, data_wide, stats, unit_label, group_var, colors) {
     stats_var <- dplyr::filter(stats, var == !!var, p.adj < 0.1)
     if (nrow(stats_var) != 0) {
         stats_list <- list()
@@ -124,12 +125,12 @@ createBoxplot <- function(var, data_wide, stats, unit_label) {
     }
     boxplot <-
         data_wide |>
-        ggplot(aes(x = group, y = .data[[var]], fill = group)) +
+        ggplot(aes(x = .data[[group_var]], y = .data[[var]], fill = .data[[group_var]])) +
         geom_boxplot() +
         geom_jitter(width = 0.2) +
         theme_bw() +
         theme(legend.position = "none") +
-        scale_fill_manual(values = color_olink_diagnosis) +
+        scale_fill_manual(values = colors) +
         ggtitle(paste0(var, " (", unit_label, ")")) +
         xlab(NULL) +
         ylab(NULL)
@@ -146,29 +147,27 @@ createBoxplot <- function(var, data_wide, stats, unit_label) {
     return(boxplot)
 }
 
-processOlinkData <- function(data, value_col, unit_label) {
+processOlinkData <- function(data, value_col, unit_label, group_var, group_levels, colors) {
     # Process data with metadata
     data_metadata <- data |>
         left_join(olink_metadata, by = "SampleID") |>
-        relocate(Assay, all_of(value_col), group, age, sex)
+        relocate(Assay, all_of(value_col), orbis_id, all_of(group_var), age, sex)
 
     # Convert to wide format
+    id_cols <- c("SampleID", "orbis_id", group_var, "age", "sex")
     data_wide <- data_metadata |>
         pivot_wider(
-            id_cols = c(SampleID, group, age, sex),
+            id_cols = all_of(id_cols),
             names_from = Assay,
             values_from = all_of(value_col)
         ) |>
-        mutate(group = factor(group, levels = c("CTRL", "GBS", "CIDP")))
+        mutate(!!group_var := factor(.data[[group_var]], levels = group_levels))
 
     # Get assay names and sort alphabetically
-    # assays <- sort(unique(data_metadata$Assay))
-
-    # Define assays
-    assays <- c("CCL2", "CSF1", "CXCL10", "FASLG", "GZMA", "KLRD1", "TREM2")
+    assays <- sort(unique(data_metadata$Assay))
 
     # Calculate statistics
-    stats <- calcStats(data_wide, assays)
+    stats <- calcStats(data_wide, assays, group_var)
 
     # Create boxplots in alphabetical order
     boxplots_list <- lapply(
@@ -176,7 +175,9 @@ processOlinkData <- function(data, value_col, unit_label) {
         createBoxplot,
         data_wide = data_wide,
         stats = stats,
-        unit_label = unit_label
+        unit_label = unit_label,
+        group_var = group_var,
+        colors = colors
     )
 
     boxplots <- patchwork::wrap_plots(boxplots_list)

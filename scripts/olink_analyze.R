@@ -11,6 +11,7 @@ library(broom)
 library(emmeans)
 library(writexl)
 library(patchwork)
+library(lme4)
 
 # source helper files
 source(file.path("scripts", "olink_analyze_helper.R"))

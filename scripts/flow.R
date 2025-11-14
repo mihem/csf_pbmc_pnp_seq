@@ -32,27 +32,34 @@ group_order <- c("CTRL", "PNP")
 group_color <- setNames(pals::cols25(length(group_order)), group_order)
 
 # load flow and lookup file ----
+# load flow data, keep only first measurement if multiple are available
 flow_pre <-
-  read_excel(file.path("raw", "flow", "SEED_flow_v6.xlsx")) |>
-  mutate(date = as_date(date))
+  read_excel(file.path("raw", "flow", "flowbasic_v3.xlsx")) |>
+  mutate(date = as_date(date)) |>
+  group_by(last_name, first_name, tissue) |>
+  filter(date == min(date)) |>
+  ungroup()
 
 lookup <-
-  read_excel(file.path("lookup", "SEED_lookup_v7.xlsx")) |>
+  read_excel(file.path("lookup", "SEED_lookup_v8.xlsx")) |>
   janitor::clean_names() |>
   mutate(age = lubridate::time_length(difftime(date, birth_date), "years")) |>
   mutate(diagnosis = factor(diagnosis, levels = diagnosis_order)) |>
   mutate(group = factor(group, levels = group_order))
 
-# sanity check
+# sanity checks
 lookup |>
-  anti_join(flow_pre, join_by(last_name, first_name, date)) |>
+  anti_join(flow_pre, join_by(last_name, first_name)) |>
   select(last_name, first_name, birth_date, date)
-# 5 missing because either no flow cytometry at all or only at another date
+
+flow_pre |>
+  anti_join(lookup, join_by(last_name, first_name, date)) |>
+  print(n = Inf)
 
 # join flow and lookup
 flow <-
   flow_pre |>
-  inner_join(lookup, join_by(last_name, first_name, date)) |>
+  inner_join(lookup, join_by(last_name, first_name)) |>
   (function(df) split(df, df$tissue))()
 
 # #function to show significant comparisons using dunn test

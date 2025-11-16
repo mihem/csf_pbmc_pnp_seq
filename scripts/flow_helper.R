@@ -81,6 +81,35 @@ logfcVolcano <- function(data, group, group1, group2) {
   return(data)
 }
 
+# Create boxplots for all flow variables
+createBoxplots <- function(data, flow_vars, group, cols) {
+  plots <- lapply(
+    flow_vars,
+    FUN = function(x) {
+      ggboxplotFun(
+        var = x,
+        data = data,
+        group = group,
+        cols = cols
+      )
+    }
+  )
+  return(plots)
+}
+
+# Create and save patchwork of boxplots
+createAndSaveBoxplots <- function(data, flow_vars, group, cols, output_file, ncol = 4, width = 5, height = 15) {
+  plots <- createBoxplots(data, flow_vars, group, cols)
+  patch <- patchwork::wrap_plots(plots, ncol = ncol)
+  ggsave(
+    file.path("results", "flow", output_file),
+    width = width,
+    height = height,
+    plot = patch
+  )
+  return(patch)
+}
+
 # Function to create volcano plots for different comparisons
 createVolcanoPlot <- function(
   data,

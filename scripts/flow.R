@@ -65,120 +65,56 @@ flow <-
   inner_join(lookup, join_by(last_name, first_name)) |>
   (function(df) split(df, df$tissue))()
 
-# CSF flow boxplots -----
+# Extract flow variables -----
 flow_vars <-
   flow$CSF |>
   select(Gran:intMono) |>
   names()
 
-csf_con_plots_group <- lapply(
-  flow_vars,
-  FUN = function(x) {
-    ggboxplotFun(
-      var = x,
-      data = flow$CSF,
-      group = "group",
-      # stats = stats_csf_con_group,
-      cols = group_color
-    )
-  }
-)
-
-csf_con_plots_patch_group <- patchwork::wrap_plots(
-  csf_con_plots_group,
-  ncol = 4
-)
-
-ggsave(
-  file.path("results", "flow", "csf_con_plots_group_new.pdf"),
+# Create all boxplots -----
+# CSF plots
+createAndSaveBoxplots(
+  data = flow$CSF,
+  flow_vars = flow_vars,
+  group = "group",
+  cols = group_color,
+  output_file = "csf_con_plots_group.pdf",
   width = 5,
-  height = 15,
-  plot = csf_con_plots_patch_group
+  height = 15
 )
 
-# compare diagnosis
-csf_con_plots_dx <- lapply(
-  flow_vars,
-  FUN = function(x) {
-    ggboxplotFun(
-      var = x,
-      data = flow$CSF,
-      group = "diagnosis",
-      # stats = stats_csf_con_dx,
-      cols = diagnosis_color
-    )
-  }
-)
-
-csf_con_plots_patch_dx <- patchwork::wrap_plots(csf_con_plots_dx, ncol = 4)
-
-ggsave(
-  file.path("results", "flow", "csf_con_plots_dx_new.pdf"),
+createAndSaveBoxplots(
+  data = flow$CSF,
+  flow_vars = flow_vars,
+  group = "diagnosis",
+  cols = diagnosis_color,
+  output_file = "csf_con_plots_dx.pdf",
   width = 10,
-  height = 15,
-  plot = csf_con_plots_patch_dx
+  height = 15
 )
 
-
-# blood flow boxplots -----
-
-blood_con_plots_group <- lapply(
-  flow_vars,
-  FUN = function(x) {
-    ggboxplotFun(
-      var = x,
-      data = flow$blood,
-      group = "group",
-      # stats = stats_blood_con_group,
-      cols = group_color
-    )
-  }
-)
-
-blood_con_plots_patch_group <- patchwork::wrap_plots(
-  blood_con_plots_group,
-  ncol = 4
-)
-
-ggsave(
-  file.path("results", "flow", "blood_con_plots_group_new.pdf"),
+# Blood plots
+createAndSaveBoxplots(
+  data = flow$blood,
+  flow_vars = flow_vars,
+  group = "group",
+  cols = group_color,
+  output_file = "blood_con_plots_group.pdf",
   width = 5,
-  height = 15,
-  plot = blood_con_plots_patch_group
+  height = 15
 )
 
-# compare diagnosis
-blood_con_plots_dx <- lapply(
-  flow_vars,
-  FUN = function(x) {
-    ggboxplotFun(
-      var = x,
-      data = flow$blood,
-      group = "diagnosis",
-      cols = diagnosis_color
-    )
-  }
-)
-
-blood_con_plots_patch_dx <- patchwork::wrap_plots(blood_con_plots_dx, ncol = 4)
-
-ggsave(
-  file.path("results", "flow", "blood_con_plots_dx_new.pdf"),
+createAndSaveBoxplots(
+  data = flow$blood,
+  flow_vars = flow_vars,
+  group = "diagnosis",
+  cols = diagnosis_color,
+  output_file = "blood_con_plots_dx.pdf",
   width = 10,
-  height = 15,
-  plot = blood_con_plots_patch_dx
+  height = 15
 )
 
 # abundance volcano plot ----
-
-
-
-new <- statVolcano(
-  flow_vars,
-  reference = "group",
-  data = flow$CSF
-)
-
 # set colors for flow variables
 flow_vars_cols <- setNames(pals::cols25(length(flow_vars)), flow_vars)
 

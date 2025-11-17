@@ -44,7 +44,7 @@ flow_pre <-
   ungroup()
 
 lookup <-
-  read_excel(file.path("lookup", "SEED_lookup_v8.xlsx")) |>
+  read_excel(file.path("lookup", "SEED_lookup_v9.xlsx")) |>
   janitor::clean_names() |>
   mutate(age = lubridate::time_length(difftime(date, birth_date), "years")) |>
   mutate(diagnosis = factor(diagnosis, levels = diagnosis_order)) |>
@@ -118,41 +118,38 @@ createAndSaveBoxplots(
 # set colors for flow variables
 flow_vars_cols <- setNames(pals::cols25(length(flow_vars)), flow_vars)
 
-diagnosis <- factor(
-  c("CIDP", "GBS", "CIAP", "CTRL"),
-  levels = c("CIDP", "GBS", "CIAP", "CTRL")
+# Create combinations for different groupings
+combinations_group <- createCombinations(
+  conditions = c("PNP", "CTRL"),
+  group_column_name = "group"
 )
 
-combinations <- crossing(
-  tissue = c("CSF", "blood"),
-  condition1 = diagnosis,
-  condition2 = diagnosis
-) |>
-  dplyr::filter(
-    condition1 != condition2,
-    as.numeric(condition1) < as.numeric(condition2)
-  ) |>
-  dplyr::mutate(across(everything(), as.character)) |>
-  dplyr::mutate(group_column = "diagnosis")
+combinations_group2 <- createCombinations(
+  conditions = c("IN", "NIN", "CTRL"),
+  group_column_name = "group2"
+)
 
+combinations_diagnosis <- createCombinations(
+  conditions = c("CIDP", "GBS", "CIAP", "CTRL"),
+  group_column_name = "diagnosis"
+)
 
 # Create a configuration table for all volcano plot comparisons
-volcano_configs <- tibble::tibble(
-  group_column = c(rep("group", 2), combinations$group_column),
-  group1 = c(rep("PNP", 2), combinations$condition1),
-  group2 = c(rep("CTRL", 2), combinations$condition2),
-  tissue = c("CSF", "blood", combinations$tissue)
+volcano_configs <- bind_rows(
+  combinations_group,
+  combinations_group2,
+  combinations_diagnosis
 )
 
 # Generate all volcano plots
 volcano_results_list <- pmap(
   volcano_configs,
-  function(group_column, group1, group2, tissue) {
+  function(tissue, condition1, condition2, group_column) {
     createVolcanoPlot(
       data = flow[[tissue]],
       group_column = group_column,
-      group1 = group1,
-      group2 = group2,
+      group1 = condition1,
+      group2 = condition2,
       tissue = tissue
     )
   }

@@ -148,10 +148,8 @@ createVolcanoPlot <- function(
         ".pdf"
     )
 
-    # Filter data if needed (when comparing specific diagnoses)
-    if (group_column == "diagnosis" && group1 != "PNP" && group2 != "PNP") {
-        data <- filter(data, .data[[group_column]] %in% c(group1, group2))
-    }
+    # data <- filter(data, .data[[group_column]] %in% c(group1, group2))
+    data <- data[data[[group_column]] %in% c(group1, group2),]
 
     # Get p-values
     pval_data <- statVolcano(
@@ -188,4 +186,23 @@ createVolcanoPlot <- function(
 
     # Return the data and plot for potential further use
     return(list(data = vol_data, plot = vol_plot))
+}
+
+# Helper function to create pairwise combinations
+createCombinations <- function(
+    conditions,
+    group_column_name,
+    tissues = c("CSF", "blood")
+) {
+    expand.grid(
+        tissue = tissues,
+        condition1 = conditions,
+        condition2 = conditions
+    ) |>
+        dplyr::filter(
+            condition1 != condition2,
+            as.numeric(condition1) < as.numeric(condition2)
+        ) |>
+        dplyr::mutate(across(everything(), as.character)) |>
+        dplyr::mutate(group_column = group_column_name)
 }

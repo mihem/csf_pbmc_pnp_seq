@@ -63,7 +63,7 @@ VolPlot <- function(data, cols, n) {
         )) +
         geom_point(size = 3) +
         geom_hline(
-            yintercept = -log10(0.05),
+            yintercept = -log10(0.1),
             color = "blue",
             linetype = "dashed"
         ) +
@@ -71,8 +71,6 @@ VolPlot <- function(data, cols, n) {
         geom_vline(xintercept = -1, color = "red", linetype = "dashed") +
         geom_vline(xintercept = 1, color = "red", linetype = "dashed") +
         ggrepel::geom_text_repel() +
-        # ggrepel::geom_label_repel() +
-        # geom_text(nudge_y = nudge_y) +
         theme_classic() +
         theme(legend.position = "none") +
         xlab(bquote(~ Log[2] ~ "fold change")) +

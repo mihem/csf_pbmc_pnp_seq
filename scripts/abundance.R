@@ -17,7 +17,7 @@ library(speckle)
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthread = 4)
 
 sc_merge_csf <- subset(sc_merge, tissue %in% "CSF")
-sc_merge_csf <- subset(sc_merge, tissue %in% "PBMC")
+sc_merge_pbmc <- subset(sc_merge, tissue %in% "PBMC")
 
 # meta data ----
 lookup <- qs::qread(file.path("objects", "lookup.qs"))

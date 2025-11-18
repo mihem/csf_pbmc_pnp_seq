@@ -26,7 +26,7 @@ options(future.globals.maxSize = 16000 * 1024^2)
 
 # meta data ----
 lookup <-
-    read_excel(file.path("lookup", "SEED_lookup_v7.xlsx")) |>
+    read_excel(file.path("lookup", "SEED_lookup_v9.xlsx")) |>
     janitor::clean_names() |>
     dplyr::filter(cohort %in% c("scRNA", "scRNA_flow")) |>
     mutate(age = lubridate::time_length(difftime(date, birth_date), "years")) |>
@@ -48,6 +48,13 @@ lookup <-
         mrc_sum_score_60_progress = (mrc_sum_score_60_follow_up -
             mrc_sum_score_60_at_lumbar_puncture) /
             follow_up
+    ) |>
+    mutate(group = factor(group, levels = c("CTRL", "PNP")), ) |>
+    mutate(
+        group2 = factor(
+            group2,
+            levels = c("CTRL", "NIN", "IN", "other")
+        )
     ) |>
     mutate(
         diagnosis = factor(

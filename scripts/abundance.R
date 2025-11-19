@@ -10,6 +10,9 @@ library(qs)
 library(pheatmap)
 library(speckle)
 
+# source functions ----
+source(file.path("scripts", "flow_helper.R"))
+
 # detach(package:scMisc, unload = TRUE)
 # remotes::install_github("mihem/scMisc")
 
@@ -90,68 +93,75 @@ scMisc::stackedPlot(
 
 # create all combinations with defined order
 # filter out same conditions and reverse combinations
-diagnosis <- factor(
-  c("CIDP", "GBS", "CIAP", "CTRL"),
-  levels = c("CIDP", "GBS", "CIAP", "CTRL")
-)
-
 seu_objects <- list(
   "CSF" = sc_merge_csf,
   "PBMC" = sc_merge_pbmc
 )
 
-combinations <- crossing(
-  tissue = names(seu_objects),
-  condition1 = diagnosis,
-  condition2 = diagnosis
-) |>
-  dplyr::filter(
-    condition1 != condition2,
-    as.numeric(condition1) < as.numeric(condition2)
-  ) |>
-  dplyr::mutate(across(everything(), as.character))
+# Create combinations for different groupings
+combinations_group <- createCombinations(
+  conditions = c("PNP", "CTRL"),
+  group_column_name = "group",
+  tissues = c("CSF", "PBMC")
+)
+
+combinations_group2 <- createCombinations(
+  conditions = c("IN", "NIN", "CTRL"),
+  group_column_name = "group2",
+  tissues = c("CSF", "PBMC")
+)
+
+combinations_diagnosis <- createCombinations(
+  conditions = c("CIDP", "GBS", "CIAP", "CTRL"),
+  group_column_name = "diagnosis",
+  tissues = c("CSF", "PBMC")
+)
+
+# Create a configuration table for all volcano plot comparisons
+abundance_configs <- bind_rows(
+  combinations_group,
+  combinations_group2,
+  combinations_diagnosis
+)
+
 
 # Calculate propeller results for all combinations
-propeller_results <-
-  pmap(
-    combinations,
-    function(tissue, condition1, condition2) {
-      scMisc::propellerCalc(
-        seu_obj1 = seu_objects[[tissue]],
-        condition1 = condition1,
-        condition2 = condition2,
-        cluster_col = "cluster",
-        meta_col = "diagnosis",
-        lookup = lookup,
-        sample_col = "patient",
-        formula = "~0 + diagnosis + sex + age",
-        min_cells = 9
-      )
-    }
+propeller_results <- lapply(seq_len(nrow(abundance_configs)), function(i) {
+  formula_str <- paste0(
+    "~0 + ",
+    abundance_configs$group_column[i],
+    " + sex + age"
   )
-
-# Create filenames
-filenames <- paste0(
-  combinations$tissue,
-  "_",
-  combinations$condition1,
-  "_",
-  combinations$condition2
-)
+  scMisc::propellerCalc(
+    seu_obj1 = seu_objects[[abundance_configs$tissue[i]]],
+    condition1 = abundance_configs$condition1[i],
+    condition2 = abundance_configs$condition2[i],
+    cluster_col = "cluster",
+    meta_col = abundance_configs$group_column[i],
+    lookup = lookup,
+    sample_col = "patient",
+    formula = as.formula(formula_str),
+    min_cells = 9
+  )
+})
 
 # Plot the results
-map2(
-  propeller_results,
-  filenames,
-  function(data, filename) {
-    scMisc::plotPropeller(
-      data = data,
-      color = sc_merge@misc$cluster_col,
-      filename = filename,
-      FDR = 0.1
-    )
-  }
-)
+lapply(seq_along(propeller_results), function(i) {
+  filename <- paste0(
+    abundance_configs$tissue[i],
+    "_",
+    abundance_configs$condition1[i],
+    "_",
+    abundance_configs$condition2[i]
+  )
+  scMisc::plotPropeller(
+    data = propeller_results[[i]],
+    color = sc_merge@misc$cluster_col,
+    filename = filename,
+    FDR = 0.1
+  )
+})
+
 
 # abundance box plot ----
 scMisc::abBoxPlot(

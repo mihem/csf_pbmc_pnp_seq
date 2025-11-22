@@ -17,7 +17,7 @@ library(lme4)
 source(file.path("scripts", "olink_analyze_helper.R"))
 
 # Read the metadata file
-olink_metadata_file <- file.path("lookup", "olink_lookup.xlsx")
+olink_metadata_file <- file.path("lookup", "olink_flow_lookup.xlsx")
 olink_metadata <- read_xlsx(olink_metadata_file)
 
 # Define group configurations

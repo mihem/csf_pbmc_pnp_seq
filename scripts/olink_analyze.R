@@ -22,12 +22,12 @@ olink_metadata <- read_xlsx(olink_metadata_file)
 
 # Define group configurations
 group_configs <- list(
-    group = list(
+    diagnosis = list(
         levels = c("CTRL", "GBS", "CIDP"),
         colors = setNames(pals::cols25(3), c("CTRL", "GBS", "CIDP")),
         suffix = ""
     ),
-    meta_group = list(
+    group2 = list(
         levels = c("CTRL", "IN"),
         colors = setNames(
             pals::cols25(2),

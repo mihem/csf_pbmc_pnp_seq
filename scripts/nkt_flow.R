@@ -76,3 +76,40 @@ createAndSaveBoxplots(
   width = 10,
   height = 10
 )
+
+# abundance volcano plot ----
+# set colors for flow variables
+flow_vars_cols <- setNames(pals::cols25(length(flow_vars)), flow_vars)
+
+# Create combinations for different groupings
+combinations_group2 <- createCombinations(
+  conditions = c("IN", "CTRL"),
+  group_column_name = "group2",
+  tissues = "PBMC"
+)
+
+combinations_diagnosis <- createCombinations(
+  conditions = c("CIDP", "GBS", "CTRL"),
+  group_column_name = "diagnosis",
+  tissues = "PBMC"
+)
+
+# Create a configuration table for all volcano plot comparisons
+volcano_configs <- bind_rows(
+  combinations_group2,
+  combinations_diagnosis
+)
+
+# Generate all volcano plots
+volcano_results_list <- pmap(
+  volcano_configs,
+  function(tissue, condition1, condition2, group_column) {
+    createVolcanoPlot(
+      data = nkt_flow,
+      group_column = group_column,
+      group1 = condition1,
+      group2 = condition2,
+      tissue = tissue
+    )
+  }
+)

@@ -101,15 +101,12 @@ volcano_configs <- bind_rows(
 )
 
 # Generate all volcano plots
-volcano_results_list <- pmap(
-  volcano_configs,
-  function(tissue, condition1, condition2, group_column) {
-    createVolcanoPlot(
-      data = nkt_flow,
-      group_column = group_column,
-      group1 = condition1,
-      group2 = condition2,
-      tissue = tissue
-    )
-  }
-)
+volcano_results_list <- lapply(seq_len(nrow(volcano_configs)), function(i) {
+  createVolcanoPlot(
+    data = nkt_flow,
+    group_column = volcano_configs$group_column[i],
+    group1 = volcano_configs$condition1[i],
+    group2 = volcano_configs$condition2[i],
+    tissue = volcano_configs$tissue[i]
+  )
+})

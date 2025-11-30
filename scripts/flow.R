@@ -37,9 +37,9 @@ group_color <- setNames(pals::cols25(length(group_order)), group_order)
 # load flow and lookup file ----
 # load flow data, keep only first measurement if multiple are available
 flow_pre <-
-  read_excel(file.path("raw", "flow", "flowbasic_v3.xlsx")) |>
+  read_excel(file.path("raw", "flow", "flowbasic_v4.xlsx")) |>
   mutate(date = as_date(date)) |>
-  group_by(last_name, first_name, tissue) |>
+  group_by(patient, tissue) |>
   filter(date == min(date)) |>
   ungroup()
 
@@ -52,17 +52,17 @@ lookup <-
 
 # sanity checks
 lookup |>
-  anti_join(flow_pre, join_by(last_name, first_name)) |>
-  select(last_name, first_name, birth_date, date)
+  anti_join(flow_pre, join_by(patient)) |>
+  select(patient, birth_date, date)
 
 flow_pre |>
-  anti_join(lookup, join_by(last_name, first_name, date)) |>
+  anti_join(lookup, join_by(patient, date)) |>
   print(n = Inf)
 
 # join flow and lookup
 flow <-
   flow_pre |>
-  inner_join(lookup, join_by(last_name, first_name)) |>
+  inner_join(lookup, join_by(patient)) |>
   (function(df) split(df, df$tissue))()
 
 # Extract flow variables -----

@@ -1013,6 +1013,7 @@ edge_list_patients <- data.frame(
     # Keep only edges between different patients (similar clones shared)
     dplyr::filter(patient_from != patient_to)
 
+
 # Count similar clones shared between each pair of patients
 patient_similarity <- edge_list_patients |>
     dplyr::count(patient_from, patient_to, name = "n_similar_clones") |>
@@ -1023,7 +1024,10 @@ patient_similarity <- edge_list_patients |>
             dplyr::rename(patient_from = patient_to, patient_to = patient_from)
     ) |>
     dplyr::group_by(patient_from, patient_to) |>
-    dplyr::summarize(n_similar_clones = sum(n_similar_clones), .groups = "drop") |>
+    dplyr::summarize(
+        n_similar_clones = sum(n_similar_clones),
+        .groups = "drop"
+    ) |>
     tidyr::pivot_wider(
         names_from = patient_to,
         values_from = n_similar_clones,
@@ -1033,15 +1037,25 @@ patient_similarity <- edge_list_patients |>
     as.matrix()
 
 # Make sure matrix is symmetric and square
-all_patients <- sort(unique(c(rownames(patient_similarity), colnames(patient_similarity))))
-full_matrix <- matrix(0, nrow = length(all_patients), ncol = length(all_patients),
-                      dimnames = list(all_patients, all_patients))
-full_matrix[rownames(patient_similarity), colnames(patient_similarity)] <- patient_similarity
+all_patients <- sort(unique(c(
+    rownames(patient_similarity),
+    colnames(patient_similarity)
+)))
+full_matrix <- matrix(
+    0,
+    nrow = length(all_patients),
+    ncol = length(all_patients),
+    dimnames = list(all_patients, all_patients)
+)
+full_matrix[
+    rownames(patient_similarity),
+    colnames(patient_similarity)
+] <- patient_similarity
 
 # Convert similarity matrix to distance matrix for proper clustering
 # Higher similarity should mean lower distance
 dist_matrix <- max(full_matrix) - full_matrix
-diag(dist_matrix) <- 0  # Distance to self should be 0
+diag(dist_matrix) <- 0 # Distance to self should be 0
 
 # Create annotation for patients with diagnosis
 patient_annotation <- tcr_metadata |>
@@ -1057,7 +1071,11 @@ annotation_colors <- list(
 
 # Plot heatmap (display original similarity values, but cluster by distance)
 library(pheatmap)
-pdf(file.path("results", "tcr", "tcr_similar_clones_heatmap.pdf"), width = 12, height = 10)
+pdf(
+    file.path("results", "tcr", "tcr_similar_clones_heatmap.pdf"),
+    width = 12,
+    height = 10
+)
 pheatmap::pheatmap(
     full_matrix,
     color = colorRampPalette(c("white", "red"))(100),
@@ -1075,4 +1093,3 @@ pheatmap::pheatmap(
     border_color = "grey80"
 )
 dev.off()
-

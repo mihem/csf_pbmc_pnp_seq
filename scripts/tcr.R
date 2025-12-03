@@ -515,6 +515,35 @@ write_xlsx(
     file.path("results", "tcr", "shared_clones_by_sample_summary.xlsx")
 )
 
+shared_clones_between_patients <-
+    sc_tcr@meta.data |>
+    dplyr::select(
+        patient,
+        CTaa,
+        tissue,
+        diagnosis,
+        cloneSize,
+        clonalFrequency
+    ) |>
+    tidyr::drop_na() |>
+    dplyr::group_by(CTaa) |>
+    dplyr::reframe(
+        patients = paste(sort(unique(patient)), collapse = ","),
+        n_patients = n_distinct(patient),
+        diagnosis = paste(sort(unique(diagnosis)), collapse = ","),
+        tissue = paste(sort(unique(tissue)), collapse = ","),
+        clone_size = unique(cloneSize),
+        clonal_frequency = unique(clonalFrequency)
+    ) |>
+    dplyr::mutate(shared = ifelse(n_patients > 1, "shared", "unique")) |>
+    dplyr::filter(n_patients > 1) |>
+    dplyr::arrange(desc(clonal_frequency), CTaa)
+
+write_xlsx(
+    shared_clones_between_patients,
+    file.path("results", "tcr", "shared_clones_between_patients.xlsx")
+)
+
 #
 tcr_clonal_distribution <- clonalSizeDistribution(
     sc_tcr,
@@ -767,7 +796,7 @@ ggsave(
     height = 6
 )
 
-sc_tcr <- qread(file.path("objects", "sc_tcr.qs"))
+sc_tcr <- qs::qread(file.path("objects", "sc_tcr.qs"))
 str(sc_tcr@meta.data)
 
 clonal_bias <-
@@ -945,3 +974,105 @@ p26_self_reactive <- strsplit(self_reactive_clones[2], "_")[[1]]
 tcr_contig_list[["PBMC_pool_7_P26"]] |>
     dplyr::filter(cdr3 %in% p26_self_reactive) |>
     write_xlsx(file.path("results", "tcr", "p26_self_reactive_tcr.xlsx"))
+
+
+# Build the edge list: connect sequences with an edit distance of 3 or less
+library(immApex)
+
+# Extract metadata with TCR sequences as a data frame
+tcr_metadata <- sc_tcr@meta.data |>
+    tibble::rownames_to_column("cell_id") |>
+    dplyr::filter(!is.na(CTaa)) # Keep only cells with TCR data
+
+# Build the edge list using the metadata data frame
+edge_list <- immApex::buildNetwork(
+    tcr_metadata,
+    seq_col = "CTaa",
+    threshold = 3
+)
+
+# Replace numerical edge list with the sequences and add patient info
+edge_list_patients <- data.frame(
+    from = tcr_metadata$CTaa[as.numeric(edge_list$from)],
+    to = tcr_metadata$CTaa[as.numeric(edge_list$to)],
+    dist = edge_list$dist
+) |>
+    # Add patient info for each clone
+    dplyr::left_join(
+        tcr_metadata |>
+            dplyr::distinct(CTaa, patient) |>
+            dplyr::rename(patient_from = patient),
+        by = c("from" = "CTaa")
+    ) |>
+    dplyr::left_join(
+        tcr_metadata |>
+            dplyr::distinct(CTaa, patient) |>
+            dplyr::rename(patient_to = patient),
+        by = c("to" = "CTaa")
+    ) |>
+    # Keep only edges between different patients (similar clones shared)
+    dplyr::filter(patient_from != patient_to)
+
+# Count similar clones shared between each pair of patients
+patient_similarity <- edge_list_patients |>
+    dplyr::count(patient_from, patient_to, name = "n_similar_clones") |>
+    # Make symmetric matrix
+    dplyr::bind_rows(
+        edge_list_patients |>
+            dplyr::count(patient_to, patient_from, name = "n_similar_clones") |>
+            dplyr::rename(patient_from = patient_to, patient_to = patient_from)
+    ) |>
+    dplyr::group_by(patient_from, patient_to) |>
+    dplyr::summarize(n_similar_clones = sum(n_similar_clones), .groups = "drop") |>
+    tidyr::pivot_wider(
+        names_from = patient_to,
+        values_from = n_similar_clones,
+        values_fill = 0
+    ) |>
+    tibble::column_to_rownames("patient_from") |>
+    as.matrix()
+
+# Make sure matrix is symmetric and square
+all_patients <- sort(unique(c(rownames(patient_similarity), colnames(patient_similarity))))
+full_matrix <- matrix(0, nrow = length(all_patients), ncol = length(all_patients),
+                      dimnames = list(all_patients, all_patients))
+full_matrix[rownames(patient_similarity), colnames(patient_similarity)] <- patient_similarity
+
+# Convert similarity matrix to distance matrix for proper clustering
+# Higher similarity should mean lower distance
+dist_matrix <- max(full_matrix) - full_matrix
+diag(dist_matrix) <- 0  # Distance to self should be 0
+
+# Create annotation for patients with diagnosis
+patient_annotation <- tcr_metadata |>
+    dplyr::distinct(patient, diagnosis) |>
+    dplyr::filter(patient %in% all_patients) |>
+    dplyr::arrange(patient) |>
+    tibble::column_to_rownames("patient")
+
+# Define annotation colors using existing diagnosis colors
+annotation_colors <- list(
+    diagnosis = sc_tcr@misc$diagnosis_col
+)
+
+# Plot heatmap (display original similarity values, but cluster by distance)
+library(pheatmap)
+pdf(file.path("results", "tcr", "tcr_similar_clones_heatmap.pdf"), width = 12, height = 10)
+pheatmap::pheatmap(
+    full_matrix,
+    color = colorRampPalette(c("white", "red"))(100),
+    main = "Similar TCR clones shared between patients\n(edit distance ≤ 3)",
+    display_numbers = TRUE,
+    number_format = "%.0f",
+    clustering_method = "ward.D2",
+    clustering_distance_rows = as.dist(dist_matrix),
+    clustering_distance_cols = as.dist(dist_matrix),
+    cutree_cols = 7,
+    cutree_rows = 7,
+    annotation_row = patient_annotation,
+    annotation_col = patient_annotation,
+    annotation_colors = annotation_colors,
+    border_color = "grey80"
+)
+dev.off()
+

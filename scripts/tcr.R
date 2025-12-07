@@ -989,6 +989,11 @@ edge_list <- immApex::buildNetwork(
     tcr_metadata,
     seq_col = "CTaa",
     threshold = 3
+    # dist_type = "hamming",
+    # normalize = "maxlen",
+    # threshold = 0.1
+    # threshold = 2,
+    # dist_type = "damerau"
 )
 
 # Replace numerical edge list with the sequences and add patient info

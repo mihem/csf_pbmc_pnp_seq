@@ -149,8 +149,7 @@ createVolcanoPlot <- function(
         ".pdf"
     )
 
-    # data <- filter(data, .data[[group_column]] %in% c(group1, group2))
-    data <- data[data[[group_column]] %in% c(group1, group2),]
+    data <- data[data[[group_column]] %in% c(group1, group2), ]
 
     # Get p-values
     pval_data <- statVolcano(

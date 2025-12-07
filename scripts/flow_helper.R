@@ -135,7 +135,8 @@ createVolcanoPlot <- function(
     group_column,
     group1,
     group2,
-    tissue
+    tissue,
+    output_dir
 ) {
     # Generate output file name based on parameters
     output_file <- paste0(
@@ -178,7 +179,7 @@ createVolcanoPlot <- function(
 
     # Save plot
     ggsave(
-        file.path("results", "flow", output_file),
+        file.path("results", output_dir, output_file),
         plot = vol_plot,
         width = 5,
         height = 5

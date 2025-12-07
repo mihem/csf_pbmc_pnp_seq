@@ -150,7 +150,8 @@ volcano_results_list <- pmap(
       group_column = group_column,
       group1 = condition1,
       group2 = condition2,
-      tissue = tissue
+      tissue = tissue,
+      output_dir = "flow"
     )
   }
 )

@@ -44,6 +44,11 @@ flow_vars_cols <- setNames(
     flow_vars
 )
 
+flow_vars_cols <- setNames(
+    rep("black", length(flow_vars)),
+    flow_vars
+)
+
 # Create combinations for different groupings
 combinations_group <- createCombinations(
     conditions = c("PNP", "CTRL"),
@@ -73,7 +78,10 @@ volcano_results_list <- pmap(
             group1 = condition1,
             group2 = condition2,
             tissue = tissue,
-            output_dir = "aurora"
+            output_dir = "aurora",
+            width = 10,
+            height = 10,
+            top_n = 100
         )
     }
 )

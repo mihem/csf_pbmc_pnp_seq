@@ -22,7 +22,13 @@ ggboxplotFun <- function(var, data, group, stats, cols) {
 
 # calculate statistics for volcano plot
 # using linear regression
-statVolcano <- function(vars, reference, data) {
+statVolcano <- function(
+    vars,
+    reference,
+    data,
+    fdr_threshold = 0.05,
+    n_perm = 100
+) {
     result <- vector("list")
     for (var in vars) {
         # Create formula with sex and age as covariates
@@ -43,27 +49,68 @@ statVolcano <- function(vars, reference, data) {
         )
     }
 
-    result <-
-        do.call(rbind, result) |>
-        dplyr::mutate(p.adj = p.adjust(p.value, method = "BH")) |>
-        mutate(neg_log10_p = -log10(p.value)) |>
-        mutate(neg_log10_p_adj = -log10(p.adj))
+    result <- do.call(rbind, result)
+
+    # Filter to only variables with valid p-values
+    valid_vars_final <- result$var
+
+    # Prepare data for permFDP
+    # Create data frame of quantities (rows = analytes/variables, columns = samples)
+    quant_df <- data |>
+        dplyr::select(all_of(valid_vars_final)) |>
+        t() |>
+        as.data.frame()
+
+    # Remove variables (rows) with any NA values to avoid skewing permutation test
+    complete_rows <- complete.cases(quant_df)
+    quant_df <- quant_df[complete_rows, , drop = FALSE]
+
+    # Also filter the result to match
+    result <- result[complete_rows, ]
+
+    if (nrow(quant_df) == 0) {
+        warning("No complete cases for permFDP")
+        return(NULL)
+    }
+
+    # Create group vector (1s and 2s)
+    group_levels <- unique(data[[reference]])
+    group_vector <- ifelse(data[[reference]] == group_levels[1], 1, 2)
+
+    # Get corrected threshold using permFDP
+    corrected_threshold <- permFDP::permFDP.adjust.threshold(
+        pVals = result$p.value,
+        threshold = fdr_threshold,
+        myDesign = group_vector,
+        intOnly = quant_df,
+        nPerms = n_perm
+    )
+
+    result <- result |>
+        dplyr::mutate(
+            p.adj.threshold = corrected_threshold,
+            significant = p.value < corrected_threshold
+        ) |>
+        mutate(neg_log10_p = -log10(p.value))
 
     return(result)
 }
 
 # volcano plot function for cell abundancies
 VolPlot <- function(data, cols, n) {
+    # Get the corrected threshold for the horizontal line
+    threshold_line <- -log10(data$p.adj.threshold[1])
+
     data |>
         ggplot(aes(
             x = log2_ratio,
-            y = neg_log10_p_adj,
+            y = neg_log10_p,
             color = var,
             label = var
         )) +
         geom_point(size = 3) +
         geom_hline(
-            yintercept = -log10(0.1),
+            yintercept = threshold_line,
             color = "blue",
             linetype = "dashed"
         ) +
@@ -74,7 +121,7 @@ VolPlot <- function(data, cols, n) {
         theme_classic() +
         theme(legend.position = "none") +
         xlab(bquote(~ Log[2] ~ "fold change")) +
-        ylab(bquote(~ -Log[10] ~ "adjusted p value")) +
+        ylab(bquote(~ -Log[10] ~ "p value")) +
         scale_color_manual(values = cols)
 }
 
@@ -138,7 +185,8 @@ createVolcanoPlot <- function(
     tissue,
     output_dir,
     width = 5,
-    height = 5
+    height = 5,
+    top_n = NULL
 ) {
     # Generate output file name based on parameters
     output_file <- paste0(
@@ -153,19 +201,29 @@ createVolcanoPlot <- function(
 
     data <- data[data[[group_column]] %in% c(group1, group2), ]
 
-    # Get p-values
-    pval_data <- statVolcano(
-        flow_vars,
-        reference = group_column,
-        data = data
-    )
-
-    # Get fold changes
+    # Get fold changes first
     fc_data <- logfcVolcano(
         data = data,
         group = group_column,
         group1 = group1,
         group2 = group2
+    )
+
+    # Filter to top N variables by absolute fold change if specified
+    if (!is.null(top_n)) {
+        fc_data <- fc_data |>
+            dplyr::arrange(desc(abs(log2_ratio))) |>
+            dplyr::slice_head(n = top_n)
+    }
+
+    # Get variables to test (after filtering)
+    vars_to_test <- fc_data$var
+
+    # Get p-values only for filtered variables
+    pval_data <- statVolcano(
+        vars_to_test,
+        reference = group_column,
+        data = data
     )
 
     # Join data
@@ -175,7 +233,7 @@ createVolcanoPlot <- function(
     vol_plot <- VolPlot(
         data = vol_data,
         cols = flow_vars_cols,
-        n = length(flow_vars)
+        n = length(vars_to_test)
     )
 
     # Save plot

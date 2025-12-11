@@ -5424,6 +5424,22 @@
       ],
       "Hash": "bf173fb42b60f8f404f7a9f9c3f95d0d"
     },
+    "permFDP": {
+      "Package": "permFDP",
+      "Version": "0.1.0",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "steven-shuken",
+      "RemoteRepo": "permFDP",
+      "RemoteRef": "master",
+      "RemoteSha": "3b0d833330236f164c0247f5c1a53a9cd4cbb4bd",
+      "Requirements": [
+        "BH",
+        "Rcpp"
+      ],
+      "Hash": "72d06780f2377098a54a5f7ac60195da"
+    },
     "permute": {
       "Package": "permute",
       "Version": "0.9-7",

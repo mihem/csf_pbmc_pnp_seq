@@ -53,13 +53,13 @@ flow_vars_cols <- setNames(
 combinations_group <- createCombinations(
     conditions = c("PNP", "CTRL"),
     group_column_name = "group",
-    tissue = "CSF"
+    tissue = "PBMC"
 )
 
 combinations_diagnosis <- createCombinations(
     conditions = c("CIDP", "GBS", "CTRL"),
     group_column_name = "diagnosis",
-    tissue = "CSF"
+    tissue = "PBMC"
 )
 
 # Create a configuration table for all volcano plot comparisons

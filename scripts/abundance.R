@@ -1,5 +1,5 @@
 ##################################################
-# annotate data
+# abundancce of scRNA clusters
 # requires running annotate.R first
 ##################################################
 #libraries ---

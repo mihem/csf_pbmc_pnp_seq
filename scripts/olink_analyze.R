@@ -132,41 +132,76 @@ for (group_name in names(group_configs)) {
 
     # Create volcano plots for diagnosis group (CIDP vs CTRL, GBS vs CTRL, CIDP vs GBS)
     if (group_name == "diagnosis") {
-        # CIDP vs CTRL
-        volcano_cidp_ctrl <- createVolcanoPlotOlink(
+        # Quant volcano plots
+        volcano_quant_cidp_ctrl <- createVolcanoPlotOlink(
+            data_wide = results_quant$data_wide,
+            assays = results_quant$assays,
+            group_column = group_name,
+            group1 = "CIDP",
+            group2 = "CTRL",
+            output_dir = "olink",
+            suffix = paste0(config$suffix, "_quant"),
+            width = 6,
+            height = 5
+        )
+
+        volcano_quant_gbs_ctrl <- createVolcanoPlotOlink(
+            data_wide = results_quant$data_wide,
+            assays = results_quant$assays,
+            group_column = group_name,
+            group1 = "GBS",
+            group2 = "CTRL",
+            output_dir = "olink",
+            suffix = paste0(config$suffix, "_quant"),
+            width = 6,
+            height = 5
+        )
+
+        volcano_quant_cidp_gbs <- createVolcanoPlotOlink(
+            data_wide = results_quant$data_wide,
+            assays = results_quant$assays,
+            group_column = group_name,
+            group1 = "CIDP",
+            group2 = "GBS",
+            output_dir = "olink",
+            suffix = paste0(config$suffix, "_quant"),
+            width = 6,
+            height = 5
+        )
+
+        # NPX volcano plots
+        volcano_npx_cidp_ctrl <- createVolcanoPlotOlink(
             data_wide = results_npx$data_wide,
             assays = results_npx$assays,
             group_column = group_name,
             group1 = "CIDP",
             group2 = "CTRL",
             output_dir = "olink",
-            suffix = config$suffix,
+            suffix = paste0(config$suffix, "_npx"),
             width = 6,
             height = 5
         )
 
-        # GBS vs CTRL
-        volcano_gbs_ctrl <- createVolcanoPlotOlink(
+        volcano_npx_gbs_ctrl <- createVolcanoPlotOlink(
             data_wide = results_npx$data_wide,
             assays = results_npx$assays,
             group_column = group_name,
             group1 = "GBS",
             group2 = "CTRL",
             output_dir = "olink",
-            suffix = config$suffix,
+            suffix = paste0(config$suffix, "_npx"),
             width = 6,
             height = 5
         )
 
-        # CIDP vs GBS
-        volcano_cidp_gbs <- createVolcanoPlotOlink(
+        volcano_npx_cidp_gbs <- createVolcanoPlotOlink(
             data_wide = results_npx$data_wide,
             assays = results_npx$assays,
             group_column = group_name,
             group1 = "CIDP",
             group2 = "GBS",
             output_dir = "olink",
-            suffix = config$suffix,
+            suffix = paste0(config$suffix, "_npx"),
             width = 6,
             height = 5
         )

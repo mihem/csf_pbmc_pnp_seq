@@ -200,73 +200,56 @@ statVolcanoOlink <- function(
     vars,
     reference,
     data,
-    fdr_threshold = 0.1,
-    n_perm = 100
+    fdr_threshold = 0.1
 ) {
     result <- vector("list")
+    n_group <- length(unique(data[[reference]]))
+    
     for (var in vars) {
-        # Create formula with sex and age as covariates and orbis_id as random effect
-        f_str <- paste0(var, " ~ ", reference, " + sex + age + (1|orbis_id)")
-
-        # Use mixed-effects model with orbis_id as random effect to account for repeated measurements
-        model <- lme4::lmer(as.formula(f_str), data = data)
-
-        # Extract p-value for the reference variable (group/diagnosis)
-        # Get emmeans for the reference variable and extract p-value from pairwise comparison
-        emm <- emmeans::emmeans(model, reference, adjust = "none")
-        contr <- pairs(emm, adjust = "none")
-        contr_tidy <- broom::tidy(contr)
+        # Check if there are at least four non-NA values for all groups
+        var_counts <- data |>
+            dplyr::filter(!is.na(.data[[var]])) |>
+            dplyr::count(.data[[reference]]) |>
+            dplyr::filter(n >= 4)
         
-        # Get p-value from the first contrast (assuming two groups)
-        p_value <- contr_tidy$p.value[1]
+        if (nrow(var_counts) >= n_group) {
+            # Create formula with sex and age as covariates and orbis_id as random effect
+            f_str <- paste0(var, " ~ ", reference, " + sex + age + (1|orbis_id)")
 
-        result[[var]] <- tibble(
-            var = var,
-            p.value = p_value
-        )
+            # Use mixed-effects model with orbis_id as random effect to account for repeated measurements
+            model <- lme4::lmer(as.formula(f_str), data = data)
+
+            # Extract p-value for the reference variable (group/diagnosis)
+            emm <- emmeans::emmeans(model, reference, adjust = "none")
+            contr <- pairs(emm, adjust = "none")
+            contr_tidy <- broom::tidy(contr)
+            
+            # Get p-value from the first contrast (assuming two groups)
+            p_value <- contr_tidy$p.value[1]
+
+            result[[var]] <- tibble(
+                var = var,
+                p.value = p_value
+            )
+        } else {
+            message("Skipping variable ", var, " due to insufficient data.")
+        }
+    }
+
+    # Check if we have any results
+    if (length(result) == 0) {
+        warning("No variables with sufficient data for analysis")
+        return(NULL)
     }
 
     result <- do.call(rbind, result)
 
-    # Filter to only variables with valid p-values
-    valid_vars_final <- result$var
-
-    # Prepare data for permFDP
-    # Create data frame of quantities (rows = analytes/variables, columns = samples)
-    quant_df <- data |>
-        dplyr::select(all_of(valid_vars_final)) |>
-        t() |>
-        as.data.frame()
-
-    # Remove variables (rows) with any NA values to avoid skewing permutation test
-    complete_rows <- complete.cases(quant_df)
-    quant_df <- quant_df[complete_rows, , drop = FALSE]
-
-    # Also filter the result to match
-    result <- result[complete_rows, ]
-
-    if (nrow(quant_df) == 0) {
-        warning("No complete cases for permFDP")
-        return(NULL)
-    }
-
-    # Create group vector (1s and 2s)
-    group_levels <- unique(data[[reference]])
-    group_vector <- ifelse(data[[reference]] == group_levels[1], 1, 2)
-
-    # Get corrected threshold using permFDP
-    corrected_threshold <- permFDP::permFDP.adjust.threshold(
-        pVals = result$p.value,
-        threshold = fdr_threshold,
-        myDesign = group_vector,
-        intOnly = quant_df,
-        nPerms = n_perm
-    )
-
+    # Apply BH correction (same as in calcStats for boxplots)
     result <- result |>
         dplyr::mutate(
-            p.adj.threshold = corrected_threshold,
-            significant = p.value < corrected_threshold
+            p.adj = p.adjust(p.value, method = "BH"),
+            significant = p.adj < fdr_threshold,
+            p.adj.threshold = fdr_threshold
         ) |>
         mutate(neg_log10_p = -log10(p.value))
 

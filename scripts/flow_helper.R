@@ -26,7 +26,7 @@ statVolcano <- function(
     vars,
     reference,
     data,
-    fdr_threshold = 0.05,
+    fdr_threshold = 0.1,
     n_perm = 100
 ) {
     result <- vector("list")

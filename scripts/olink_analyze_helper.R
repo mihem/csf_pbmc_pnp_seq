@@ -189,3 +189,212 @@ processOlinkData <- function(data, value_col, unit_label, group_var, group_level
         assays = assays
     ))
 }
+
+
+##################################################
+# Volcano plot functions for Olink data
+##################################################
+
+# Calculate statistics for volcano plot using linear mixed-effects model
+statVolcanoOlink <- function(
+    vars,
+    reference,
+    data,
+    fdr_threshold = 0.1,
+    n_perm = 100
+) {
+    result <- vector("list")
+    for (var in vars) {
+        # Create formula with sex and age as covariates and orbis_id as random effect
+        f_str <- paste0(var, " ~ ", reference, " + sex + age + (1|orbis_id)")
+
+        # Use mixed-effects model with orbis_id as random effect to account for repeated measurements
+        model <- lme4::lmer(as.formula(f_str), data = data)
+
+        # Extract p-value for the reference variable (group/diagnosis)
+        # Get emmeans for the reference variable and extract p-value from pairwise comparison
+        emm <- emmeans::emmeans(model, reference, adjust = "none")
+        contr <- pairs(emm, adjust = "none")
+        contr_tidy <- broom::tidy(contr)
+        
+        # Get p-value from the first contrast (assuming two groups)
+        p_value <- contr_tidy$p.value[1]
+
+        result[[var]] <- tibble(
+            var = var,
+            p.value = p_value
+        )
+    }
+
+    result <- do.call(rbind, result)
+
+    # Filter to only variables with valid p-values
+    valid_vars_final <- result$var
+
+    # Prepare data for permFDP
+    # Create data frame of quantities (rows = analytes/variables, columns = samples)
+    quant_df <- data |>
+        dplyr::select(all_of(valid_vars_final)) |>
+        t() |>
+        as.data.frame()
+
+    # Remove variables (rows) with any NA values to avoid skewing permutation test
+    complete_rows <- complete.cases(quant_df)
+    quant_df <- quant_df[complete_rows, , drop = FALSE]
+
+    # Also filter the result to match
+    result <- result[complete_rows, ]
+
+    if (nrow(quant_df) == 0) {
+        warning("No complete cases for permFDP")
+        return(NULL)
+    }
+
+    # Create group vector (1s and 2s)
+    group_levels <- unique(data[[reference]])
+    group_vector <- ifelse(data[[reference]] == group_levels[1], 1, 2)
+
+    # Get corrected threshold using permFDP
+    corrected_threshold <- permFDP::permFDP.adjust.threshold(
+        pVals = result$p.value,
+        threshold = fdr_threshold,
+        myDesign = group_vector,
+        intOnly = quant_df,
+        nPerms = n_perm
+    )
+
+    result <- result |>
+        dplyr::mutate(
+            p.adj.threshold = corrected_threshold,
+            significant = p.value < corrected_threshold
+        ) |>
+        mutate(neg_log10_p = -log10(p.value))
+
+    return(result)
+}
+
+# Calculate log2 fold change for volcano plot
+logfcVolcanoOlink <- function(data, group, group1, group2, vars) {
+    data <- select(data, .data[[group]], all_of(vars))
+    data <- group_by(data, .data[[group]])
+    data <- summarize(
+        data,
+        across(all_of(vars), function(x) mean(x, na.rm = TRUE))
+    )
+    data <- pivot_longer(data, all_of(vars), names_to = "var")
+    data <- pivot_wider(data, names_from = group, values_from = value)
+    data <- mutate(data, log2_ratio = log2(.data[[group1]] / .data[[group2]]))
+    return(data)
+}
+
+# Volcano plot visualization function
+VolPlotOlink <- function(data, colors, n) {
+    # Get the corrected threshold for the horizontal line
+    threshold_line <- -log10(data$p.adj.threshold[1])
+
+    data |>
+        ggplot(aes(
+            x = log2_ratio,
+            y = neg_log10_p,
+            color = var,
+            label = var
+        )) +
+        geom_point(size = 3) +
+        geom_hline(
+            yintercept = threshold_line,
+            color = "blue",
+            linetype = "dashed"
+        ) +
+        geom_vline(xintercept = 0, color = "red", linetype = "solid") +
+        geom_vline(xintercept = -1, color = "red", linetype = "dashed") +
+        geom_vline(xintercept = 1, color = "red", linetype = "dashed") +
+        ggrepel::geom_text_repel() +
+        theme_classic() +
+        theme(legend.position = "none") +
+        xlab(bquote(~ Log[2] ~ "fold change")) +
+        ylab(bquote(~ -Log[10] ~ "p value")) +
+        scale_color_manual(values = colors)
+}
+
+# Function to create volcano plots for different comparisons
+createVolcanoPlotOlink <- function(
+    data_wide,
+    assays,
+    group_column,
+    group1,
+    group2,
+    output_dir,
+    suffix = "",
+    width = 5,
+    height = 5,
+    top_n = NULL,
+    colors = NULL
+) {
+    # Generate output file name based on parameters
+    output_file <- paste0(
+        "volcano_",
+        group1,
+        "_vs_",
+        group2,
+        suffix,
+        ".pdf"
+    )
+
+    # Filter data to only include the two groups being compared
+    data <- data_wide[data_wide[[group_column]] %in% c(group1, group2), ]
+
+    # Get fold changes first
+    fc_data <- logfcVolcanoOlink(
+        data = data,
+        group = group_column,
+        group1 = group1,
+        group2 = group2,
+        vars = assays
+    )
+
+    # Filter to top N variables by absolute fold change if specified
+    if (!is.null(top_n)) {
+        fc_data <- fc_data |>
+            dplyr::arrange(desc(abs(log2_ratio))) |>
+            dplyr::slice_head(n = top_n)
+    }
+
+    # Get variables to test (after filtering)
+    vars_to_test <- fc_data$var
+
+    # Get p-values only for filtered variables
+    pval_data <- statVolcanoOlink(
+        vars_to_test,
+        reference = group_column,
+        data = data
+    )
+
+    # Join data
+    vol_data <- left_join(fc_data, pval_data, join_by(var))
+
+    # Set up colors for proteins if not provided
+    if (is.null(colors)) {
+        colors <- setNames(
+            rep("black", length(vars_to_test)),
+            vars_to_test
+        )
+    }
+
+    # Create plot
+    vol_plot <- VolPlotOlink(
+        data = vol_data,
+        colors = colors,
+        n = length(vars_to_test)
+    )
+
+    # Save plot
+    ggsave(
+        file.path("results", output_dir, output_file),
+        plot = vol_plot,
+        width = width,
+        height = height
+    )
+
+    # Return the data and plot for potential further use
+    return(list(data = vol_data, plot = vol_plot))
+}

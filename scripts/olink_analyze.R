@@ -129,4 +129,46 @@ for (group_name in names(group_configs)) {
         width = 8,
         height = 12
     )
+
+    # Create volcano plots for diagnosis group (CIDP vs CTRL, GBS vs CTRL, CIDP vs GBS)
+    if (group_name == "diagnosis") {
+        # CIDP vs CTRL
+        volcano_cidp_ctrl <- createVolcanoPlotOlink(
+            data_wide = results_npx$data_wide,
+            assays = results_npx$assays,
+            group_column = group_name,
+            group1 = "CIDP",
+            group2 = "CTRL",
+            output_dir = "olink",
+            suffix = config$suffix,
+            width = 6,
+            height = 5
+        )
+
+        # GBS vs CTRL
+        volcano_gbs_ctrl <- createVolcanoPlotOlink(
+            data_wide = results_npx$data_wide,
+            assays = results_npx$assays,
+            group_column = group_name,
+            group1 = "GBS",
+            group2 = "CTRL",
+            output_dir = "olink",
+            suffix = config$suffix,
+            width = 6,
+            height = 5
+        )
+
+        # CIDP vs GBS
+        volcano_cidp_gbs <- createVolcanoPlotOlink(
+            data_wide = results_npx$data_wide,
+            assays = results_npx$assays,
+            group_column = group_name,
+            group1 = "CIDP",
+            group2 = "GBS",
+            output_dir = "olink",
+            suffix = config$suffix,
+            width = 6,
+            height = 5
+        )
+    }
 }

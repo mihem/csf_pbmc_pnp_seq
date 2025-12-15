@@ -114,7 +114,7 @@ VolPlot <- function(data, cols, n) {
             color = "blue",
             linetype = "dashed"
         ) +
-        geom_vline(xintercept = 0, color = "red", linetyp = "solid") +
+        geom_vline(xintercept = 0, color = "red", linetype = "solid") +
         geom_vline(xintercept = -1, color = "red", linetype = "dashed") +
         geom_vline(xintercept = 1, color = "red", linetype = "dashed") +
         ggrepel::geom_text_repel() +

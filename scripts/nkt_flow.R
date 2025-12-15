@@ -107,6 +107,7 @@ volcano_results_list <- lapply(seq_len(nrow(volcano_configs)), function(i) {
     group_column = volcano_configs$group_column[i],
     group1 = volcano_configs$condition1[i],
     group2 = volcano_configs$condition2[i],
-    tissue = volcano_configs$tissue[i]
+    tissue = volcano_configs$tissue[i],
+    output_dir = file.path("flow", "nkt")
   )
 })

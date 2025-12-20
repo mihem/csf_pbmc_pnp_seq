@@ -71,7 +71,8 @@ lookup <-
                 "PPN"
             )
         )
-    )
+    ) |>
+    mutate(across(dml_median_motoric:ncv_sural_sensory, as.numeric))
 
 qsave(lookup, file.path("objects", "lookup.qs"))
 

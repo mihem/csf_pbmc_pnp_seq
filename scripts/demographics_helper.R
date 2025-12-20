@@ -11,11 +11,10 @@ create_boxplot <- function(
     title,
     color_palette,
     geom_type = "point",
-    ylim_range = NULL,
     filter_na = TRUE
 ) {
     # Filter NA values if requested
-    plot_data <- if (filter_na && y_var != "sex") {
+    plot_data <- if (filter_na) {
         data |> dplyr::filter(!is.na(.data[[y_var]]))
     } else {
         data
@@ -61,10 +60,24 @@ create_boxplot <- function(
         ggtitle(title) +
         theme(legend.position = "none")
 
-    # Add y-axis limits if specified
-    if (!is.null(ylim_range)) {
-        p <- p + ylim(ylim_range)
-    }
+    return(p)
+}
+
+create_barplot <- function(
+    data,
+    x_var,
+    fill_var,
+    title,
+    color_palette
+) {
+    p <- data |>
+        ggplot(aes(x = .data[[x_var]], fill = .data[[fill_var]])) +
+        geom_bar() +
+        theme_bw() +
+        scale_fill_manual(values = color_palette) +
+        xlab("") +
+        ylab("") +
+        ggtitle(title)
 
     return(p)
 }

@@ -44,7 +44,7 @@ flow_pre <-
   ungroup()
 
 lookup <-
-  read_excel(file.path("lookup", "SEED_lookup_v10.xlsx")) |>
+  read_excel(file.path("lookup", "SEED_lookup_v11.xlsx")) |>
   janitor::clean_names() |>
   mutate(age = lubridate::time_length(difftime(date, birth_date), "years")) |>
   mutate(diagnosis = factor(diagnosis, levels = diagnosis_order)) |>

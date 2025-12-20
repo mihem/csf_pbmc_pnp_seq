@@ -495,6 +495,17 @@ dotPlot(
   width = 12
 )
 
+
+dotPlot(
+  path = file.path("lookup", "markers.csv"),
+  object = sc_merge,
+  par = "olink_de",
+  dot_min = 0.01,
+  height = 8,
+  width = 6
+)
+
+
 # feature plots ---
 scMisc::fPlot(
   path = file.path("lookup", "markers.csv"),

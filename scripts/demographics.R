@@ -19,8 +19,6 @@ lookup <-
     qread(file.path("objects", "lookup.qs")) |>
     dplyr::filter(grepl("scRNA", cohort))
 
-lookup$ncv_tibial_motoric
-
 
 # Age Analysis ----
 # Compare age distribution between disease groups using boxplots
@@ -47,7 +45,8 @@ ncv_tibial_motoric_plot <- create_boxplot(
     y_var = "ncv_tibial_motoric",
     group_var = "diagnosis",
     title = "motoric NCV tibial nerve (m/s)",
-    color_palette = sc_merge@misc$diagnosis_col
+    color_palette = sc_merge@misc$diagnosis_col,
+    geom_type = "jitter"
 )
 ggsave(
     file.path("results", "demographics", "boxplot_ncv_tibial_motoric.pdf"),

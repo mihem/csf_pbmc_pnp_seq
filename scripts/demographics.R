@@ -75,6 +75,44 @@ ggsave(
     height = 5
 )
 
+# Disease Duration Analysis ----
+# Compare disease duration between groups
+disease_duration_plot <- create_boxplot(
+    data = lookup,
+    x_var = "diagnosis",
+    y_var = "disease_duration_in_months",
+    group_var = "diagnosis",
+    title = "disease duration (months)",
+    color_palette = sc_merge@misc$diagnosis_col,
+    geom_type = "jitter"
+)
+
+ggsave(
+    file.path("results", "demographics", "boxplot_disease_duration.pdf"),
+    plot = disease_duration_plot,
+    width = 5,
+    height = 5
+)
+
+# CSF Protein Analysis ----
+# Compare CSF protein levels between disease groups
+csf_protein_plot <- create_boxplot(
+    data = lookup,
+    x_var = "diagnosis",
+    y_var = "csf_protein",
+    group_var = "diagnosis",
+    title = "CSF protein (mg/L)",
+    color_palette = sc_merge@misc$diagnosis_col,
+    geom_type = "jitter"
+)
+
+ggsave(
+    file.path("results", "demographics", "boxplot_csf_protein.pdf"),
+    plot = csf_protein_plot,
+    width = 5,
+    height = 5
+)
+
 # Sex Distribution ----
 # Visualize male/female distribution across disease groups
 
@@ -93,12 +131,13 @@ ggsave(
     height = 5
 )
 
+# Therapy Status Distribution ----
 therapy_plot <- create_barplot(
     data = lookup,
     x_var = "diagnosis",
-    fill_var = "therapy_naive",
+    fill_var = "therapy",
     title = "therapy status",
-    color_palette = rev(pals::cols25(2))
+    color_palette = pals::cols25(2)
 )
 
 ggsave(
@@ -107,3 +146,4 @@ ggsave(
     width = 5,
     height = 5
 )
+

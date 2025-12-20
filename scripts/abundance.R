@@ -127,17 +127,28 @@ abundance_configs <- bind_rows(
 
 # Calculate propeller results for all combinations
 propeller_results <- lapply(seq_len(nrow(abundance_configs)), function(i) {
-  formula_str <- paste0(
-    "~0 + ",
-    abundance_configs$group_column[i],
-    " + sex + age"
-  )
+  # Filter lookup to the specific conditions being compared
+  group_col <- abundance_configs$group_column[i]
+  cond1 <- abundance_configs$condition1[i]
+  cond2 <- abundance_configs$condition2[i]
+  
+  lookup_subset <- lookup |>
+    dplyr::filter(.data[[group_col]] %in% c(cond1, cond2))
+  
+  # Build formula with covariates that have >1 level in the subset
+  formula_str <- paste0("~0 + ", group_col, " + sex + age")
+  
+  # Add therapy only if it varies in this specific comparison
+  if (length(unique(lookup_subset$therapy)) > 1) {
+    formula_str <- paste0(formula_str, " + therapy")
+  }
+  
   scMisc::propellerCalc(
     seu_obj1 = seu_objects[[abundance_configs$tissue[i]]],
-    condition1 = abundance_configs$condition1[i],
-    condition2 = abundance_configs$condition2[i],
+    condition1 = cond1,
+    condition2 = cond2,
     cluster_col = "cluster",
-    meta_col = abundance_configs$group_column[i],
+    meta_col = group_col,
     lookup = lookup,
     sample_col = "patient",
     formula = as.formula(formula_str),

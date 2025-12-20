@@ -57,8 +57,6 @@ ggsave(
 )
 
 # INCAT Score Analysis ----
-# Compare disability scores between disease groups
-# Scale fixed from 0-6 for consistent visualization
 incat_plot <- create_boxplot(
     data = lookup,
     x_var = "diagnosis",
@@ -75,8 +73,25 @@ ggsave(
     height = 5
 )
 
+# INCAT Progress Analysis ----
+incat_followup_plot <- create_boxplot(
+    data = lookup,
+    x_var = "diagnosis",
+    y_var = "incat_progress",
+    group_var = "diagnosis",
+    title = "INCAT score progress",
+    color_palette = sc_merge@misc$diagnosis_col,
+    geom_type = "jitter"
+)  
+
+ggsave(
+    file.path("results", "demographics", "boxplot_incat_progress.pdf"),
+    plot = incat_followup_plot,
+    width = 5,
+    height = 5
+)
+
 # Disease Duration Analysis ----
-# Compare disease duration between groups
 disease_duration_plot <- create_boxplot(
     data = lookup,
     x_var = "diagnosis",
@@ -95,7 +110,6 @@ ggsave(
 )
 
 # CSF Protein Analysis ----
-# Compare CSF protein levels between disease groups
 csf_protein_plot <- create_boxplot(
     data = lookup,
     x_var = "diagnosis",
@@ -114,8 +128,6 @@ ggsave(
 )
 
 # Sex Distribution ----
-# Visualize male/female distribution across disease groups
-
 sex_plot <- create_barplot(
     data = lookup,
     x_var = "diagnosis",

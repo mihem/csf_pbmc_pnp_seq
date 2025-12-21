@@ -130,7 +130,7 @@ logfcVolcano <- function(data, group, group1, group2) {
     data <- group_by(data, .data[[group]])
     data <- summarize(
         data,
-        across(flow_vars, function(x) mean(x, na.rm = TRUE))
+        across(all_of(flow_vars), function(x) mean(x, na.rm = TRUE))
     )
     data <- pivot_longer(data, flow_vars, names_to = "var")
     data <- pivot_wider(data, names_from = group, values_from = value)

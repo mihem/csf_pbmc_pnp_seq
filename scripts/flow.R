@@ -76,6 +76,8 @@ flow_frontiers <-
   # recode IIH to CTRL
   dplyr::mutate(dx = ifelse(dx == "IIH", "CTRL", dx)) |>
   dplyr::select(id, dx, age, sex, protein, disruption:cd4cd8ratio) |>
+  # recode sex to match flow dataset
+  dplyr::mutate(sex = ifelse(sex == "M", "male", "female")) |>
   # add tissue column
   mutate(tissue = "CSF") |>
   # adjust variable names to our naming scheme
@@ -107,13 +109,11 @@ flow_frontiers <-
     ncMono = monosatypical_pct,
     brightNK = nkcellsbright_pct,
     dimNK = nkcellsdim_pct
-  )
+  ) 
 
 flow$CSF <-
   bind_rows(flow$CSF, flow_frontiers) |>
   select(-Gran, -intMono, -dnTc) # remove Gran and intMono to match Heming et al.
-
-
 
 # sanity checks
 anyNA(flow$CSF |> dplyr::select(Lymph:ncMono))

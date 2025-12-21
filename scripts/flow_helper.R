@@ -115,8 +115,8 @@ VolPlot <- function(data, cols, n) {
             linetype = "dashed"
         ) +
         geom_vline(xintercept = 0, color = "red", linetype = "solid") +
-        geom_vline(xintercept = -1, color = "red", linetype = "dashed") +
-        geom_vline(xintercept = 1, color = "red", linetype = "dashed") +
+        geom_vline(xintercept = -0.5, color = "red", linetype = "dashed") +
+        geom_vline(xintercept = 0.5, color = "red", linetype = "dashed") +
         ggrepel::geom_text_repel() +
         theme_classic() +
         theme(legend.position = "none") +
@@ -126,14 +126,14 @@ VolPlot <- function(data, cols, n) {
 }
 
 logfcVolcano <- function(data, group, group1, group2) {
-    data <- select(data, .data[[group]], all_of(flow_vars))
+    data <- select(data, all_of(group), all_of(flow_vars))
     data <- group_by(data, .data[[group]])
     data <- summarize(
         data,
         across(all_of(flow_vars), function(x) mean(x, na.rm = TRUE))
     )
-    data <- pivot_longer(data, flow_vars, names_to = "var")
-    data <- pivot_wider(data, names_from = group, values_from = value)
+    data <- pivot_longer(data, all_of(flow_vars), names_to = "var")
+    data <- pivot_wider(data, names_from = all_of(group), values_from = value)
     data <- mutate(data, log2_ratio = log2(.data[[group1]] / .data[[group2]]))
     return(data)
 }

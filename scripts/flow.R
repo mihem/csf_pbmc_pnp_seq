@@ -41,7 +41,8 @@ flow_pre <-
   mutate(date = as_date(date)) |>
   group_by(patient, tissue) |>
   filter(date == min(date)) |>
-  ungroup()
+  ungroup() |>
+  mutate(cMono = cMono + intMono) # combine cMono and intMono as in Heming et al.
 
 lookup <-
   read_excel(file.path("lookup", "SEED_lookup_v11.xlsx")) |>
@@ -65,10 +66,68 @@ flow <-
   inner_join(lookup, join_by(patient)) |>
   (function(df) split(df, df$tissue))()
 
+
+# load flow data from Heming et al . Front Imm Paper ----
+# https://www.frontiersin.org/journals/immunology/articles/10.3389/fimmu.2019.00515/full
+flow_frontiers <-
+  read_excel(file.path("raw", "flow", "cidp_stats_safe.xls")) |>
+  # keep only relevant diagnoses
+  dplyr::filter(dx %in% c("CIDP", "IIH", "GBS")) |>
+  # recode IIH to CTRL
+  dplyr::mutate(dx = ifelse(dx == "IIH", "CTRL", dx)) |>
+  dplyr::select(id, dx, age, sex, protein, disruption:cd4cd8ratio) |>
+  # add tissue column
+  mutate(tissue = "CSF") |>
+  # adjust variable names to our naming scheme
+  dplyr::select(
+    -contains(
+      "_abs"
+    ),
+    -cd45cells_pct,
+    -cd4cd8cells_pct,
+    -tcellshladr_pct,
+    -nkcellshladr_pct,
+    -cd4cd8ratio
+  ) |>
+  dplyr::rename(
+    patient = id,
+    diagnosis = dx,
+    Lymph = lymphos_pct,
+    Mono = monos_pct,
+    T = tcells_pct,
+    CD4 = cd4cells_pct,
+    CD8 = cd8cells_pct,
+    B = bcells_pct,
+    NK = nkcells_pct,
+    NKT = nktcells_pct,
+    actCD4 = cd4cellshladr_pct,
+    actCD8 = cd8cellshladr_pct,
+    Plasma = plasmacells_pct,
+    cMono = monosclassical_pct,
+    ncMono = monosatypical_pct,
+    brightNK = nkcellsbright_pct,
+    dimNK = nkcellsdim_pct
+  )
+
+flow$CSF <-
+  bind_rows(flow$CSF, flow_frontiers) |>
+  select(-Gran, -intMono, -dnTc) # remove Gran and intMono to match Heming et al.
+
+
+
+# sanity checks
+anyNA(flow$CSF |> dplyr::select(Lymph:ncMono))
+
+flow$CSF |>
+  select(Lymph:ncMono) |>
+  summarize(across(everything(), function(x) sum(is.na(x)))) |>
+  print(width = Inf)
+
 # Extract flow variables -----
 flow_vars <-
   flow$CSF |>
-  select(Gran:intMono) |>
+  # select(Gran:intMono) |>
+  select(Lymph:ncMono) |>
   names()
 
 # Create all boxplots -----

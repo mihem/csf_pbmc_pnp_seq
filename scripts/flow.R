@@ -109,7 +109,7 @@ flow_frontiers <-
     ncMono = monosatypical_pct,
     brightNK = nkcellsbright_pct,
     dimNK = nkcellsdim_pct
-  ) 
+  )
 
 flow$CSF <-
   bind_rows(flow$CSF, flow_frontiers) |>
@@ -212,5 +212,30 @@ volcano_results_list <- pmap(
       tissue = tissue,
       output_dir = "flow"
     )
+  }
+)
+
+# Batch comparison plots for all flow variables ----
+flow_batch_plots <- lapply(
+  flow_vars,
+  function(var) {
+    plot <-
+      flow$CSF |>
+      mutate(batch = ifelse(grepl(patient, pattern = "P\\d{2}"), "scRNAseq", "Frontiers")) |>
+      select(patient, diagnosis, batch, all_of(var)) |>
+      dplyr::filter(diagnosis %in% c("CTRL", "CIDP", "GBS")) |>
+      ggplot(aes(x = batch, y = .data[[var]])) +
+      geom_boxplot() + 
+      facet_wrap(~diagnosis) +
+      labs(y = var, x = "Batch")
+    
+    ggsave(
+      file.path("results", "flow", "batch", paste0(var, "_csf.pdf")),
+      plot = plot,
+      width = 5,
+      height = 3
+    )
+    
+    return(plot)
   }
 )

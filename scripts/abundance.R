@@ -9,12 +9,11 @@ library(scMisc)
 library(qs)
 library(pheatmap)
 library(speckle)
+library(writexl)
+library(permFDP)
 
 # source functions ----
 source(file.path("scripts", "flow_helper.R"))
-
-# detach(package:scMisc, unload = TRUE)
-# remotes::install_github("mihem/scMisc")
 
 # load preprocessed data ----
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthread = 4)
@@ -141,9 +140,32 @@ propeller_results <- lapply(seq_len(nrow(abundance_configs)), function(i) {
     lookup = lookup,
     sample_col = "patient",
     formula = as.formula(formula_str),
-    min_cells = 9
+    min_cells = 9,
+    adjustment_method = "permFDP",
+    fdr_threshold = 0.1,
+    n_perms = 1000
   )
 })
+
+
+# Create named list of propeller results
+names(propeller_results) <- sapply(seq_along(propeller_results), function(i) {
+  sheet_name <- paste0(
+    abundance_configs$tissue[i],
+    "_",
+    abundance_configs$condition1[i],
+    "_vs_",
+    abundance_configs$condition2[i]
+  )
+  # Truncate sheet name to 31 characters (Excel limit)
+  substr(sheet_name, 1, 31)
+})
+
+# Save to Excel
+writexl::write_xlsx(
+  propeller_results,
+  path = file.path("results", "abundance", "propeller_results_all.xlsx")
+)
 
 # Plot the results
 lapply(seq_along(propeller_results), function(i) {
@@ -154,14 +176,15 @@ lapply(seq_along(propeller_results), function(i) {
     "_",
     abundance_configs$condition2[i]
   )
+
   scMisc::plotPropeller(
     data = propeller_results[[i]],
     color = sc_merge@misc$cluster_col,
     filename = filename,
-    FDR = 0.1
+    use_permFDP = TRUE,
+    dir_output = file.path("results", "abundance", "propeller_plots"),
   )
 })
-
 
 # abundance box plot ----
 scMisc::abBoxPlot(
@@ -186,74 +209,4 @@ scMisc::abBoxPlot(
   color = sc_merge_csf@misc$diagnosis_col,
   number_of_tests = choose(9, 2),
   width = 14
-)
-
-# investigate subgroup of CIDP/GBS which has NKCD56bright_1 cells
-sc_merge_csf_subgroup <- sc_merge_csf
-
-nkbright_high_group <- c("P16", "P17", "P18", "P21", "P23")
-sc_merge_csf_subgroup$subgroup <- ifelse(
-  sc_merge_csf_subgroup$patient %in% nkbright_high_group,
-  "NKhi",
-  as.character(sc_merge_csf_subgroup$diagnosis)
-)
-
-sc_merge_csf_subgroup@misc$diagnosis_order <- c(
-  "CTRL",
-  "NKhi",
-  "CIAP",
-  "GBS",
-  "CIDP",
-  "MAG",
-  "MFS",
-  "PNC",
-  "CAN",
-  "PPN"
-)
-
-scMisc::abBoxPlot(
-  object = sc_merge_csf_subgroup,
-  cluster_idents = "cluster",
-  sample = "sample",
-  cluster_order = sc_merge_csf_subgroup@misc$cluster_order,
-  group_by = "subgroup",
-  group_order = sc_merge_csf_subgroup@misc$diagnosis_order,
-  color = sc_merge_csf_subgroup@misc$diagnosis_col,
-  number_of_tests = choose(9, 2),
-  width = 16
-)
-
-lookup_subgroup <- lookup |>
-  dplyr::mutate(
-    subgroup = dplyr::case_when(
-      patient %in% nkbright_high_group ~ "NKhi",
-      diagnosis %in% c("CIDP", "GBS") ~ "IN",
-      TRUE ~ as.character(diagnosis)
-    )
-  )
-
-sc_merge_csf_subgroup$subgroup <- dplyr::case_when(
-  sc_merge_csf_subgroup$patient %in% nkbright_high_group ~ "NKhi",
-  sc_merge_csf_subgroup$diagnosis %in% c("CIDP", "GBS") ~ "IN",
-  TRUE ~ as.character(sc_merge_csf_subgroup$diagnosis)
-)
-
-propeller_results_subgroup_csf <-
-  scMisc::propellerCalc(
-    seu_obj1 = sc_merge_csf_subgroup,
-    condition1 = "NKhi",
-    condition2 = "IN",
-    cluster_col = "cluster",
-    meta_col = "subgroup",
-    lookup = lookup_subgroup,
-    sample_col = "patient",
-    formula = "~0 + subgroup + sex + age",
-    min_cells = 9
-  )
-
-scMisc::plotPropeller(
-  data = propeller_results_subgroup_csf,
-  color = sc_merge@misc$cluster_col,
-  filename = "CSF_NKhi_IN",
-  FDR = 0.1
 )

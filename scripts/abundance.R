@@ -12,9 +12,6 @@ library(speckle)
 library(writexl)
 library(permFDP)
 
-# source functions ----
-source(file.path("scripts", "flow_helper.R"))
-
 # load preprocessed data ----
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthread = 4)
 

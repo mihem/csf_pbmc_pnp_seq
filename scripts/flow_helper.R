@@ -121,7 +121,7 @@ VolPlot <- function(data, cols, n) {
         theme_classic() +
         theme(legend.position = "none") +
         xlab(bquote(~ Log[2] ~ "fold change")) +
-        ylab(bquote(~ -Log[10] ~ "p value")) +
+        ylab(bquote(~ -Log[10] ~ "adjusted p value")) +
         scale_color_manual(values = cols)
 }
 

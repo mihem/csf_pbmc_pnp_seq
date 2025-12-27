@@ -3,6 +3,15 @@
 # requires running annotate.R first
 # not part of final analysis
 ##################################################
+
+# libraries ---
+library(Seurat)
+library(tidyverse)
+library(scMisc)
+library(qs)
+library(FactoMineR)
+library(factoextra)
+
 # load preprocessed data ----
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthread = 4)
 

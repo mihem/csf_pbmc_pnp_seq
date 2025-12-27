@@ -3,8 +3,19 @@
 # requires running annotate.R first
 # not part of final analysis
 ##################################################
+# load preprocessed data ----
+sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthread = 4)
+
+sc_merge_csf <- subset(sc_merge, tissue %in% "CSF")
+sc_merge_pbmc <- subset(sc_merge, tissue %in% "PBMC")
+
 sc_merge_csf_main <- subset(
   sc_merge_csf,
+  subset = diagnosis %in% c("CIDP", "GBS", "CIAP", "CTRL")
+)
+
+sc_merge_pbmc_main <- subset(
+  sc_merge_pbmc,
   subset = diagnosis %in% c("CIDP", "GBS", "CIAP", "CTRL")
 )
 
@@ -16,13 +27,6 @@ scMisc::pcaSeurat(
   width = 20,
   height = 5,
   dir_output = file.path("results", "abundance")
-)
-
-
-props1 <- speckle::getTransformedProps(
-  clusters = sc_merge_csf_main$cluster,
-  sample = sc_merge_csf_main$sample,
-  transform = "logit"
 )
 
 pcaSeurat1 <- function(
@@ -160,6 +164,16 @@ pcaSeurat1 <- function(
 
 pcaSeurat1(
   object = sc_merge_csf_main,
+  cluster = "cluster",
+  sample = "sample",
+  condition = "diagnosis",
+  width = 20,
+  height = 5,
+  dir_output = file.path("results", "abundance")
+)
+
+pcaSeurat1(
+  object = sc_merge_pbmc_main,
   cluster = "cluster",
   sample = "sample",
   condition = "diagnosis",

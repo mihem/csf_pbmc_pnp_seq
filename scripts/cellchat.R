@@ -1,5 +1,5 @@
 ##################################################
-# cellular interaction analysis of scRNAseq data
+# cellular interaction analysis using CellChat
 # requires running annotate.R first
 ##################################################
 

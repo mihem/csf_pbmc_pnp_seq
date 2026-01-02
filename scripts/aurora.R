@@ -11,13 +11,18 @@ library(permFDP)
 # source functions -----
 source(file.path("scripts", "flow_helper.R"))
 
+names(aurora_flow_pre)
+flow_vars[637]
+
 # read flow data -----
 aurora_flow_pre <-
     read_excel(file.path("raw", "aurora", "final_data.xlsx")) |>
+    rename_with(tolower) |>
     janitor::clean_names() |>
     dplyr::select(file_id, starts_with("del5")) |>
-    rename_with(function(x) gsub("del5_", "", x)) |>
+    rename_with(function(x) gsub("del5_", "", x, fixed = TRUE)) |>
     mutate(file_id = gsub("^\\S+\\s+", "", file_id))
+
 
 # Read the metadata file
 aurora_metadata <- read_xlsx(file.path("lookup", "olink_flow_lookup.xlsx")) |>
@@ -35,8 +40,32 @@ aurora_flow_pre |>
 # Extract flow variables -----
 flow_vars <-
     aurora_flow |>
-    select(cd4_percent_t_cells:n_kmem_tn_fa) |>
+    select(cd4_percent_t_cells:n_kmem_tnfa) |>
     names()
+
+# olink data read -----
+olink_quant_file <- file.path(
+    "raw",
+    "olink",
+    "olink_quant_long_filtered.xlsx"
+)
+
+olink_quant <- read_xlsx(olink_quant_file) |>
+    mutate(Quantified_value = as.numeric(Quantified_value))
+
+olink_vars <- tolower(unique(olink_quant$Assay))
+olink_vars[olink_vars == "gzma"] <- "gr_a"
+
+# define CD8 TEM markers to filter flow variables -----
+cd8tem_3 <- c("CD194", "CXCR6", "SLAMF6", "FASLG", "M-CSF", "IL-10RA", "SIRT2", "TNFRSF9")
+
+# filter flow variables to those matching olink variables -----
+flow_vars <- flow_vars[grepl(
+    paste(olink_vars, collapse = "|"),
+    # paste(cd8tem_3, collapse = "|"),
+    flow_vars,
+    ignore.case = TRUE
+)]
 
 # abundance volcano plot ----
 # set colors for flow variables (use colorRampPalette for many variables)
@@ -79,10 +108,37 @@ volcano_results_list <- pmap(
             group1 = condition1,
             group2 = condition2,
             tissue = tissue,
-            output_dir = "aurora",
+            output_dir = file.path("aurora", "olink"),
             width = 10,
             height = 10,
-            top_n = 100
+            top_n = NULL
         )
     }
+)
+
+# Export volcano plot data to Excel (separate sheets per comparison)
+volcano_data_export <- lapply(seq_along(volcano_results_list), function(i) {
+    volcano_results_list[[i]]$data |>
+        arrange(p.value) |>
+        select(
+            var,
+            log2_ratio,
+            p.value,
+            p.adj.threshold,
+            neg_log10_p,
+            significant
+        )
+})
+
+names(volcano_data_export) <- paste0(
+    volcano_configs$condition1,
+    "_vs_",
+    volcano_configs$condition2,
+    "_",
+    volcano_configs$tissue
+)
+
+writexl::write_xlsx(
+    volcano_data_export,
+    file.path("results", "aurora", "olink", "volcano_results.xlsx")
 )

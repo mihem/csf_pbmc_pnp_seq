@@ -1007,13 +1007,13 @@ edge_list_patients <- data.frame(
         tcr_metadata |>
             dplyr::distinct(CTaa, patient) |>
             dplyr::rename(patient_from = patient),
-        by = c("from" = "CTaa")
+        by = c("from" => "CTaa")
     ) |>
     dplyr::left_join(
         tcr_metadata |>
             dplyr::distinct(CTaa, patient) |>
             dplyr::rename(patient_to = patient),
-        by = c("to" = "CTaa")
+        by = c("to" => "CTaa")
     ) |>
     # Keep only edges between different patients (similar clones shared)
     dplyr::filter(patient_from != patient_to)
@@ -1098,3 +1098,48 @@ pheatmap::pheatmap(
     border_color = "grey80"
 )
 dev.off()
+
+# annotating possible epiotopes
+library(Trex)
+
+# only use main groups for epitope annotation
+# because the number of the other groups is too small
+# to compare the number of epitopes
+sc_tcr_main_groups <- Trex::annotateDB(sc_tcr_main_groups, chains = "TRB")
+sc_tcr_main_groups <- Trex::annotateDB(sc_tcr_main_groups, chains = "TRA")
+
+# Helper function to create normalized epitope counts
+create_epitope_counts <- function(data, epitope_col) {
+    data |>
+        dplyr::filter(!is.na(.data[[epitope_col]])) |>
+        dplyr::group_by(across(all_of(c(epitope_col, "diagnosis", "tissue")))) |>
+        dplyr::summarise(n = n(), .groups = "drop") |>
+        dplyr::left_join(
+            data |>
+                dplyr::filter(!is.na(.data[[epitope_col]]), diagnosis == "CTRL") |>
+                dplyr::group_by(across(all_of(c(epitope_col, "tissue")))) |>
+                dplyr::summarise(n_ctrl = n(), .groups = "drop"),
+            by = c(epitope_col, "tissue")
+        ) |>
+        dplyr::mutate(n_normalized = n / n_ctrl) |>
+        dplyr::arrange(desc(n))
+}
+
+# use TRA chain for epitope analysis
+# since it is more frequently detected in our data
+epitope_species_counts <- create_epitope_counts(sc_tcr_main_groups@meta.data, "TRA_Epitope.species")
+epitope_target_counts <- create_epitope_counts(sc_tcr_main_groups@meta.data, "TRA_Epitope.target")
+
+epitope_species_list <- split(epitope_species_counts, epitope_species_counts$tissue)
+epitope_target_list <- split(epitope_target_counts, epitope_target_counts$tissue)
+
+# Write summary to Excel
+writexl::write_xlsx(
+    epitope_species_list,
+    file.path("results", "tcr", "epitope_species_list.xlsx")
+)
+
+writexl::write_xlsx(
+    epitope_target_list,
+    file.path("results", "tcr", "epitope_target_list.xlsx")
+)

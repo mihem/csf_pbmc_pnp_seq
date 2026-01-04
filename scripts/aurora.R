@@ -57,7 +57,16 @@ olink_vars <- tolower(unique(olink_quant$Assay))
 olink_vars[olink_vars == "gzma"] <- "gr_a"
 
 # define CD8 TEM markers to filter flow variables -----
-cd8tem_3 <- c("CD194", "CXCR6", "SLAMF6", "FASLG", "M-CSF", "IL-10RA", "SIRT2", "TNFRSF9")
+cd8tem_3 <- c(
+    "CD194",
+    "CXCR6",
+    "SLAMF6",
+    "FASLG",
+    "M-CSF",
+    "IL-10RA",
+    "SIRT2",
+    "TNFRSF9"
+)
 
 # filter flow variables to those matching olink variables -----
 flow_vars <- flow_vars[grepl(

@@ -8,9 +8,11 @@ library(qs)
 library(Seurat)
 library(tidyverse)
 library(scRepertoire)
+library(immApex)
 library(scMisc)
 library(writexl)
 library(readxl)
+library(pheatmap)
 
 # load filtered contig annotations ---
 tcr_files <- list.files(
@@ -976,8 +978,205 @@ tcr_contig_list[["PBMC_pool_7_P26"]] |>
     write_xlsx(file.path("results", "tcr", "p26_self_reactive_tcr.xlsx"))
 
 
+# annotating possible epiotopes
+library(Trex)
+
+# only use main groups for epitope annotation
+# because the number of the other groups is too small
+# to compare the number of epitopes
+sc_tcr_main_groups <- Trex::annotateDB(sc_tcr_main_groups, chains = "TRB")
+sc_tcr_main_groups <- Trex::annotateDB(sc_tcr_main_groups, chains = "TRA")
+
+# Helper function to create normalized epitope counts
+create_epitope_counts <- function(data, epitope_col) {
+    data |>
+        dplyr::filter(!is.na(.data[[epitope_col]])) |>
+        dplyr::group_by(across(all_of(c(
+            epitope_col,
+            "diagnosis",
+            "tissue"
+        )))) |>
+        dplyr::summarise(n = n(), .groups = "drop") |>
+        dplyr::left_join(
+            data |>
+                dplyr::filter(
+                    !is.na(.data[[epitope_col]]),
+                    diagnosis == "CTRL"
+                ) |>
+                dplyr::group_by(across(all_of(c(epitope_col, "tissue")))) |>
+                dplyr::summarise(n_ctrl = n(), .groups = "drop"),
+            by = c(epitope_col, "tissue")
+        ) |>
+        dplyr::mutate(n_normalized = n / n_ctrl) |>
+        dplyr::arrange(desc(n))
+}
+
+# use TRA chain for epitope analysis
+# since it is more frequently detected in our data
+epitope_species_counts <- create_epitope_counts(
+    sc_tcr_main_groups@meta.data,
+    "TRA_Epitope.species"
+)
+epitope_target_counts <- create_epitope_counts(
+    sc_tcr_main_groups@meta.data,
+    "TRA_Epitope.target"
+)
+
+epitope_species_list <- split(
+    epitope_species_counts,
+    epitope_species_counts$tissue
+)
+epitope_target_list <- split(
+    epitope_target_counts,
+    epitope_target_counts$tissue
+)
+
+# Write summary to Excel
+writexl::write_xlsx(
+    epitope_species_list,
+    file.path("results", "tcr", "epitope_species_list.xlsx")
+)
+
+writexl::write_xlsx(
+    epitope_target_list,
+    file.path("results", "tcr", "epitope_target_list.xlsx")
+)
+
+##################################################
+# Motif similarity analysis for disease clustering
+# Using immApex functions to identify disease-specific patterns
+##################################################
+
+# Extract kmer data for different groupings ----
+# Group by diagnosis to identify disease-specific motifs
+# Get kmers for both TRA and TRB chains
+kmer_table_trb <- percentKmer(
+    sc_tcr,
+    chain = "TRB",
+    cloneCall = "aa",
+    group.by = "sample",
+    motif.length = 9,
+    min.depth = 1,
+    top.motifs = 30,
+    exportTable = TRUE
+)
+
+# Filter columns (motifs) based on threshold:
+# Keep only motifs where at least one sample has proportion > threshold
+max_proportion_threshold <- 0.01
+motif_colsums <- colSums(kmer_table_trb)
+motifs_to_keep <- motif_colsums > max_proportion_threshold
+kmer_table_trb <- kmer_table_trb[, motifs_to_keep]
+
+# Hierarchical clustering of samples based on motif similarity ----
+# Use tissue_diagnosis grouping for detailed analysis
+library(pheatmap)
+
+lookup_kmer <-
+    lookup |>
+    dplyr::select(patient, diagnosis)
+
+# Create annotation for heatmap
+annotation_df <- data.frame(
+    sample = rownames(kmer_table_trb)
+) |>
+    mutate(
+        tissue = factor(gsub("_.*", "", sample), levels = c("CSF", "PBMC")),
+        patient = gsub(".*_", "", sample)
+    ) |>
+    left_join(lookup_kmer, by = join_by(patient)) |>
+    mutate(diagnosis = factor(diagnosis)) |>
+    select(tissue, diagnosis)
+
+# Set rownames to match the matrix
+rownames(annotation_df) <- rownames(kmer_table_trb)
+
+# Define annotation colors - only include diagnoses present in the data
+diagnosis_levels_present <- levels(annotation_df$diagnosis)
+diagnosis_colors_subset <- sc_tcr@misc$diagnosis_col[diagnosis_levels_present]
+
+annotation_colors <- list(
+    tissue = c("CSF" = "#E41A1C", "PBMC" = "#377EB8"),
+    diagnosis = diagnosis_colors_subset
+)
+
+# Create heatmap with clustering
+pheatmap(
+    t(kmer_table_trb),
+    cluster_rows = TRUE,
+    cluster_cols = TRUE,
+    clustering_method = "complete",
+    clustering_distance_rows = "euclidean",
+    clustering_distance_cols = "euclidean",
+    scale = "none",
+    main = "TCR Motif Similarity (9-mers, TRB chain)",
+    fontsize_row = 5,
+    fontsize_col = 5,
+    cellheight = 10,
+    cellwidth = 10,
+    annotation_col = annotation_df,
+    annotation_colors = annotation_colors,
+    color = viridis::inferno(100),
+    filename = file.path("results", "tcr", "kmer_motif_trb_9mers.pdf"),
+    border_color = NULL,
+    cutree_cols = 6,
+    width = 12,
+    height = 5
+)
+
+# PCA analysis of motif patterns ----
+# Perform PCA on the motif matrix (transposed so samples are rows)
+# here it makes sense to use smaller motif length to capture more general patterns
+kmer_table_tra <- percentKmer(
+    sc_tcr,
+    chain = "TRB",
+    cloneCall = "aa",
+    group.by = "sample",
+    motif.length = 3,
+    min.depth = 3,
+    top.motifs = 100,
+    exportTable = TRUE
+)
+
+pca_motifs <- prcomp(
+    kmer_table_tra,
+    scale. = TRUE,
+    center = TRUE
+)
+
+# Create PCA data frame
+pca_df <- as.data.frame(pca_motifs$x[, 1:4]) |>
+    tibble::rownames_to_column("sample") |>
+    dplyr::mutate(
+        tissue = gsub("_.*", "", sample),
+        patient = gsub(".*_", "", sample)
+    ) |>
+    dplyr::left_join(lookup_kmer, by = join_by(patient))
+
+# PCA plot PC1 vs PC2
+pca_plot_12 <- ggplot(
+    pca_df,
+    aes(x = PC1, y = PC2, fill = diagnosis, shape = tissue)
+) +
+    geom_point(size = 5, alpha = 0.8, color = "black") +
+    scale_shape_manual(values = c("CSF" = 24, "PBMC" = 21)) +
+    scale_fill_manual(values = sc_tcr@misc$diagnosis_col) +
+    guides(fill = guide_legend(override.aes = list(shape = 21, color = "black", size = 5))) +
+    labs(
+        title = "PCA of TCR Motif Patterns",
+        x = "PC1",
+        y = "PC2"
+    ) +
+    theme_bw()
+
+ggsave(
+    file.path("results", "tcr", "kmer_pca_plot_pc12.pdf"),
+    pca_plot_12,
+    width = 8,
+    height = 6
+)
+
 # Build the edge list: connect sequences with an edit distance of 3 or less
-library(immApex)
 
 # Extract metadata with TCR sequences as a data frame
 tcr_metadata <- sc_tcr@meta.data |>
@@ -1007,17 +1206,16 @@ edge_list_patients <- data.frame(
         tcr_metadata |>
             dplyr::distinct(CTaa, patient) |>
             dplyr::rename(patient_from = patient),
-        by = c("from" => "CTaa")
+        by = c("from" = "CTaa")
     ) |>
     dplyr::left_join(
         tcr_metadata |>
             dplyr::distinct(CTaa, patient) |>
             dplyr::rename(patient_to = patient),
-        by = c("to" => "CTaa")
+        by = c("to" = "CTaa")
     ) |>
     # Keep only edges between different patients (similar clones shared)
     dplyr::filter(patient_from != patient_to)
-
 
 # Count similar clones shared between each pair of patients
 patient_similarity <- edge_list_patients |>
@@ -1075,7 +1273,6 @@ annotation_colors <- list(
 )
 
 # Plot heatmap (display original similarity values, but cluster by distance)
-library(pheatmap)
 pdf(
     file.path("results", "tcr", "tcr_similar_clones_heatmap.pdf"),
     width = 12,
@@ -1098,48 +1295,3 @@ pheatmap::pheatmap(
     border_color = "grey80"
 )
 dev.off()
-
-# annotating possible epiotopes
-library(Trex)
-
-# only use main groups for epitope annotation
-# because the number of the other groups is too small
-# to compare the number of epitopes
-sc_tcr_main_groups <- Trex::annotateDB(sc_tcr_main_groups, chains = "TRB")
-sc_tcr_main_groups <- Trex::annotateDB(sc_tcr_main_groups, chains = "TRA")
-
-# Helper function to create normalized epitope counts
-create_epitope_counts <- function(data, epitope_col) {
-    data |>
-        dplyr::filter(!is.na(.data[[epitope_col]])) |>
-        dplyr::group_by(across(all_of(c(epitope_col, "diagnosis", "tissue")))) |>
-        dplyr::summarise(n = n(), .groups = "drop") |>
-        dplyr::left_join(
-            data |>
-                dplyr::filter(!is.na(.data[[epitope_col]]), diagnosis == "CTRL") |>
-                dplyr::group_by(across(all_of(c(epitope_col, "tissue")))) |>
-                dplyr::summarise(n_ctrl = n(), .groups = "drop"),
-            by = c(epitope_col, "tissue")
-        ) |>
-        dplyr::mutate(n_normalized = n / n_ctrl) |>
-        dplyr::arrange(desc(n))
-}
-
-# use TRA chain for epitope analysis
-# since it is more frequently detected in our data
-epitope_species_counts <- create_epitope_counts(sc_tcr_main_groups@meta.data, "TRA_Epitope.species")
-epitope_target_counts <- create_epitope_counts(sc_tcr_main_groups@meta.data, "TRA_Epitope.target")
-
-epitope_species_list <- split(epitope_species_counts, epitope_species_counts$tissue)
-epitope_target_list <- split(epitope_target_counts, epitope_target_counts$tissue)
-
-# Write summary to Excel
-writexl::write_xlsx(
-    epitope_species_list,
-    file.path("results", "tcr", "epitope_species_list.xlsx")
-)
-
-writexl::write_xlsx(
-    epitope_target_list,
-    file.path("results", "tcr", "epitope_target_list.xlsx")
-)

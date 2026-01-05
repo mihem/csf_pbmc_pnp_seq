@@ -89,7 +89,7 @@ pcaSeurat1 <- function(
 
       # Transpose: samples as rows, clusters as columns
       cl_size_sample <- t(as.data.frame.matrix(props$TransformedProps))
-      
+
       # Extract patient ID from sample names
       rownames(cl_size_sample) <- gsub(
         pattern = ".*_(P\\d+)$",
@@ -111,7 +111,7 @@ pcaSeurat1 <- function(
       prop_list
     ) |>
       as.data.frame()
-    
+
     rownames(cl_size_df) <- cl_size_df$patient
     cl_size <- cl_size_df |> select(-patient) |> as.matrix()
 

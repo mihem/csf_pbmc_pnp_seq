@@ -221,21 +221,27 @@ flow_batch_plots <- lapply(
   function(var) {
     plot <-
       flow$CSF |>
-      mutate(batch = ifelse(grepl(patient, pattern = "P\\d{2}"), "scRNAseq", "Frontiers")) |>
+      mutate(
+        batch = ifelse(
+          grepl(patient, pattern = "P\\d{2}"),
+          "scRNAseq",
+          "Frontiers"
+        )
+      ) |>
       select(patient, diagnosis, batch, all_of(var)) |>
       dplyr::filter(diagnosis %in% c("CTRL", "CIDP", "GBS")) |>
       ggplot(aes(x = batch, y = .data[[var]])) +
-      geom_boxplot() + 
+      geom_boxplot() +
       facet_wrap(~diagnosis) +
       labs(y = var, x = "Batch")
-    
+
     ggsave(
       file.path("results", "flow", "batch", paste0(var, "_csf.pdf")),
       plot = plot,
       width = 5,
       height = 3
     )
-    
+
     return(plot)
   }
 )

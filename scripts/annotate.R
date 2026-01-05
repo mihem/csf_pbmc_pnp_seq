@@ -195,7 +195,7 @@ sc_merge@meta.data <-
   dplyr::left_join(nk_cells) |>
   dplyr::mutate(cluster = dplyr::coalesce(cluster_manual, cluster)) |>
   dplyr::select(-cluster_manual) |>
-  tibble::column_to_rownames(var = "cell_barcode") 
+  tibble::column_to_rownames(var = "cell_barcode")
 
 # annotate clusters ----
 Idents(sc_merge) <- factor(
@@ -568,5 +568,3 @@ scMisc::fPlot(
   width = 40,
   height = 20
 )
-
-

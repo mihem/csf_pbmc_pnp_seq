@@ -11,90 +11,92 @@ library(grid)
 # Sukenikova supp table 2
 # PNS-myelin-reactivi clones
 sukenikova_reactive_clones <-
-    readr::read_csv(
-        file.path("lookup", "sukenikova_nature_gbs_supp_table_2.csv")
-    ) |>
-    dplyr::rename(CTaa_TRB = cdr3b_aa) |>
-    dplyr::mutate(diagnosis = "GBS") |>
-    dplyr::rename_with(function(x) paste0("sukenikova_", x), .cols = -CTaa_TRB)
+  readr::read_csv(
+    file.path("lookup", "sukenikova_nature_gbs_supp_table_2.csv")
+  ) |>
+  dplyr::rename(CTaa_TRB = cdr3b_aa) |>
+  dplyr::mutate(diagnosis = "GBS") |>
+  dplyr::rename_with(function(x) paste0("sukenikova_", x), .cols = -CTaa_TRB)
 
 # read this dataset
 sc_tcr <- qread(file.path("objects", "sc_tcr.qs"))
 
 # extract CTaa from TRB data from sc_tcr object
 heming_tcr <- sc_tcr@meta.data |>
-    dplyr::select(patient, CTaa, CTgene, CTnt, tissue, diagnosis) |>
-    tidyr::separate_wider_delim(CTaa, names = c("TRA", "TRB"), delim = "_") |>
-    tidyr::drop_na() |>
-    dplyr::distinct() |>
-    dplyr::rename(CTaa_TRB = TRB) |>
-    dplyr::rename(CTaa_TRA = TRA) |>
-    dplyr::rename_with(function(x) paste0("heming_", x), .cols = -CTaa_TRB)
+  dplyr::select(patient, CTaa, CTgene, CTnt, tissue, diagnosis) |>
+  tidyr::separate_wider_delim(CTaa, names = c("TRA", "TRB"), delim = "_") |>
+  tidyr::drop_na() |>
+  dplyr::distinct() |>
+  dplyr::rename(CTaa_TRB = TRB) |>
+  dplyr::rename(CTaa_TRA = TRA) |>
+  dplyr::rename_with(function(x) paste0("heming_", x), .cols = -CTaa_TRB)
 
 # compare with latore supp table 2
 sukenikova_reactive_shared <- heming_tcr |>
-    dplyr::inner_join(
-        sukenikova_reactive_clones,
-        by = c("CTaa_TRB" = "CTaa_TRB")
-    ) |>
-    relocate(CTaa_TRB, .before = everything())
+  dplyr::inner_join(
+    sukenikova_reactive_clones,
+    by = c("CTaa_TRB" = "CTaa_TRB")
+  ) |>
+  relocate(CTaa_TRB, .before = everything())
 
 qsave(
-    sukenikova_reactive_shared,
-    file = file.path("objects", "sukenikova_reactive_shared.qs")
+  sukenikova_reactive_shared,
+  file = file.path("objects", "sukenikova_reactive_shared.qs")
 )
 
 writexl::write_xlsx(
-    sukenikova_reactive_shared,
-    path = file.path("results", "tcr", "sukenikova_reactive_shared.xlsx")
+  sukenikova_reactive_shared,
+  path = file.path("results", "tcr", "sukenikova_reactive_shared.xlsx")
 )
 
 
 # Prepare clean data for the table
 sukenikova_table_clean <- sukenikova_reactive_shared |>
-    dplyr::arrange(heming_tissue, heming_diagnosis, CTaa_TRB) |>
-    dplyr::select(
-        CTaa_TRB,
-        heming_patient,
-        heming_tissue,
-        heming_diagnosis,
-        sukenikova_pt,
-        sukenikova_diagnosis,
-        sukenikova_source,
-        sukenikova_specificity
-    ) |>
-    dplyr::rename(
-        "CDR3 beta" = CTaa_TRB,
-        "Patient" = heming_patient,
-        "Tissue" = heming_tissue,
-        "Diagnosis" = heming_diagnosis,
-        "Sukenikova Patient" = sukenikova_pt,
-        "Sukenikova Diagnosis" = sukenikova_diagnosis,
-        "Sukenikova Tissue" = sukenikova_source,
-        "Sukenikova Specificity" = sukenikova_specificity
-    )
+  dplyr::arrange(heming_tissue, heming_diagnosis, CTaa_TRB) |>
+  dplyr::select(
+    CTaa_TRB,
+    heming_patient,
+    heming_tissue,
+    heming_diagnosis,
+    sukenikova_pt,
+    sukenikova_diagnosis,
+    sukenikova_source,
+    sukenikova_specificity
+  ) |>
+  dplyr::rename(
+    "CDR3 beta" = CTaa_TRB,
+    "Patient" = heming_patient,
+    "Tissue" = heming_tissue,
+    "Diagnosis" = heming_diagnosis,
+    "Sukenikova Patient" = sukenikova_pt,
+    "Sukenikova Diagnosis" = sukenikova_diagnosis,
+    "Sukenikova Tissue" = sukenikova_source,
+    "Sukenikova Specificity" = sukenikova_specificity
+  )
 
 table_plot <- gridExtra::tableGrob(
-    sukenikova_table_clean,
-    rows = NULL,
-    theme = gridExtra::ttheme_default(
-        core = list(
-            fg_params = list(cex = 0.8),
-            bg_params = list(fill = c("white", "lightgray"), alpha = 0.5)
-        ),
-        colhead = list(
-            fg_params = list(cex = 0.9, fontface = "bold"),
-            bg_params = list(fill = "darkgray", alpha = 0.8)
-        )
+  sukenikova_table_clean,
+  rows = NULL,
+  theme = gridExtra::ttheme_default(
+    core = list(
+      fg_params = list(cex = 0.8),
+      bg_params = list(fill = c("white", "lightgray"), alpha = 0.5)
+    ),
+    colhead = list(
+      fg_params = list(cex = 0.9, fontface = "bold"),
+      bg_params = list(fill = "darkgray", alpha = 0.8)
     )
+  )
 )
 
 # Save as PDF using base R graphics (very reliable)
-pdf(file.path("results", "table", "sukenikova_reactive_table_grid.pdf"), 
-    width = 12, height = 8)
+pdf(
+  file.path("results", "table", "sukenikova_reactive_table_grid.pdf"),
+  width = 12,
+  height = 8
+)
 grid::grid.draw(table_plot)
 dev.off()
-
 
 # # Sukenikova public files
 # sukenikova_files <- list.files(

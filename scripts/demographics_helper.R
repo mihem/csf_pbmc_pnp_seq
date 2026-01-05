@@ -4,80 +4,80 @@
 
 # Helper function for creating boxplots with statistics ----
 create_boxplot <- function(
-    data,
-    x_var,
-    y_var,
-    group_var,
-    title,
-    color_palette,
-    geom_type = "point",
-    filter_na = TRUE
+  data,
+  x_var,
+  y_var,
+  group_var,
+  title,
+  color_palette,
+  geom_type = "point",
+  filter_na = TRUE
 ) {
-    # Filter NA values if requested
-    plot_data <- if (filter_na) {
-        data |> dplyr::filter(!is.na(.data[[y_var]]))
-    } else {
-        data
-    }
+  # Filter NA values if requested
+  plot_data <- if (filter_na) {
+    data |> dplyr::filter(!is.na(.data[[y_var]]))
+  } else {
+    data
+  }
 
-    # Calculate statistics
-    stats <- scMisc:::compStat(
-        x_var = y_var,
-        group = group_var,
-        data = plot_data,
-        paired = FALSE
-    )
+  # Calculate statistics
+  stats <- scMisc:::compStat(
+    x_var = y_var,
+    group = group_var,
+    data = plot_data,
+    paired = FALSE
+  )
 
-    # Create base plot
-    p <- plot_data |>
-        ggplot(aes(
-            x = .data[[x_var]],
-            y = .data[[y_var]],
-            fill = .data[[x_var]]
-        )) +
-        geom_boxplot()
+  # Create base plot
+  p <- plot_data |>
+    ggplot(aes(
+      x = .data[[x_var]],
+      y = .data[[y_var]],
+      fill = .data[[x_var]]
+    )) +
+    geom_boxplot()
 
-    # Add points based on geom_type
-    if (geom_type == "point") {
-        p <- p + geom_point()
-    } else if (geom_type == "jitter") {
-        p <- p + geom_jitter(height = 0, width = 0.3)
-    }
+  # Add points based on geom_type
+  if (geom_type == "point") {
+    p <- p + geom_point()
+  } else if (geom_type == "jitter") {
+    p <- p + geom_jitter(height = 0, width = 0.3)
+  }
 
-    # Add significance annotations
-    p <- p +
-        ggsignif::geom_signif(
-            comparisons = stats$comparisons,
-            annotation = stats$annotation,
-            textsize = 5,
-            step_increase = 0.05,
-            vjust = 0.7
-        ) +
-        theme_bw() +
-        scale_fill_manual(values = color_palette) +
-        xlab("") +
-        ylab("") +
-        ggtitle(title) +
-        theme(legend.position = "none")
+  # Add significance annotations
+  p <- p +
+    ggsignif::geom_signif(
+      comparisons = stats$comparisons,
+      annotation = stats$annotation,
+      textsize = 5,
+      step_increase = 0.05,
+      vjust = 0.7
+    ) +
+    theme_bw() +
+    scale_fill_manual(values = color_palette) +
+    xlab("") +
+    ylab("") +
+    ggtitle(title) +
+    theme(legend.position = "none")
 
-    return(p)
+  return(p)
 }
 
 create_barplot <- function(
-    data,
-    x_var,
-    fill_var,
-    title,
-    color_palette
+  data,
+  x_var,
+  fill_var,
+  title,
+  color_palette
 ) {
-    p <- data |>
-        ggplot(aes(x = .data[[x_var]], fill = .data[[fill_var]])) +
-        geom_bar() +
-        theme_bw() +
-        scale_fill_manual(values = color_palette) +
-        xlab("") +
-        ylab("") +
-        ggtitle(title)
+  p <- data |>
+    ggplot(aes(x = .data[[x_var]], fill = .data[[fill_var]])) +
+    geom_bar() +
+    theme_bw() +
+    scale_fill_manual(values = color_palette) +
+    xlab("") +
+    ylab("") +
+    ggtitle(title)
 
-    return(p)
+  return(p)
 }

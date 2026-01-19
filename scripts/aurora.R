@@ -40,8 +40,7 @@ aurora_flow_pre |>
 # Extract flow variables -----
 flow_vars <-
   aurora_flow |>
-    select(cd4_percent_t_cells:n_kmem_tnfa) |>
-#   select(cd4_percent_t_cells:tfh_tnfa) |> # tcell panel only
+  select(cd4_percent_t_cells:n_kmem_tnfa) |>
   names()
 
 # olink data read -----

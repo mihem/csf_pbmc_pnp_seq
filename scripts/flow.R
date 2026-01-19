@@ -1,6 +1,7 @@
-#####################################
+###########################################
 # basic flow analysis
-#####################################
+# requires running flow_pre.R first
+###########################################
 
 # load libraries ------
 library(tidyverse)
@@ -9,6 +10,7 @@ library(patchwork)
 library(broom)
 library(pals)
 library(janitor)
+library(qs)
 
 # source functions ----
 source(file.path("scripts", "flow_helper.R"))
@@ -31,117 +33,18 @@ diagnosis_color <- setNames(
   diagnosis_order
 )
 
-group_order <- c("CTRL", "PNP")
-group_color <- setNames(pals::cols25(length(group_order)), group_order)
-
-# load flow and lookup file ----
-# load flow data, keep only first measurement if multiple are available
-flow_pre <-
-  read_excel(file.path("raw", "flow", "flowbasic_v4.xlsx")) |>
-  mutate(date = as_date(date)) |>
-  group_by(patient, tissue) |>
-  filter(date == min(date)) |>
-  ungroup() |>
-  mutate(cMono = cMono + intMono) # combine cMono and intMono as in Heming et al.
-
-lookup <-
-  read_excel(file.path("lookup", "SEED_lookup_v11.xlsx")) |>
-  janitor::clean_names() |>
-  mutate(age = lubridate::time_length(difftime(date, birth_date), "years")) |>
-  mutate(diagnosis = factor(diagnosis, levels = diagnosis_order)) |>
-  mutate(group = factor(group, levels = group_order))
-
-# sanity checks
-lookup |>
-  anti_join(flow_pre, join_by(patient)) |>
-  select(patient, birth_date, date)
-
-flow_pre |>
-  anti_join(lookup, join_by(patient, date)) |>
-  print(n = Inf)
-
-# join flow and lookup
-flow <-
-  flow_pre |>
-  inner_join(lookup, join_by(patient)) |>
-  (function(df) split(df, df$tissue))()
-
-
-# load flow data from Heming et al . Front Imm Paper ----
+# load preprocessed flow data from this study and  Heming et al . Front Imm Paper ----
 # https://www.frontiersin.org/journals/immunology/articles/10.3389/fimmu.2019.00515/full
-flow_frontiers <-
-  read_excel(file.path("raw", "flow", "cidp_stats_safe.xls")) |>
-  # keep only relevant diagnoses
-  dplyr::filter(dx %in% c("CIDP", "IIH", "GBS")) |>
-  # recode IIH to CTRL
-  dplyr::mutate(dx = ifelse(dx == "IIH", "CTRL", dx)) |>
-  dplyr::select(id, dx, age, sex, protein, disruption:cd4cd8ratio) |>
-  # recode sex to match flow dataset
-  dplyr::mutate(sex = ifelse(sex == "M", "male", "female")) |>
-  # add tissue column
-  mutate(tissue = "CSF") |>
-  # adjust variable names to our naming scheme
-  dplyr::select(
-    -contains(
-      "_abs"
-    ),
-    -cd45cells_pct,
-    -cd4cd8cells_pct,
-    -tcellshladr_pct,
-    -nkcellshladr_pct,
-    -cd4cd8ratio
-  ) |>
-  dplyr::rename(
-    patient = id,
-    diagnosis = dx,
-    Lymph = lymphos_pct,
-    Mono = monos_pct,
-    T = tcells_pct,
-    CD4 = cd4cells_pct,
-    CD8 = cd8cells_pct,
-    B = bcells_pct,
-    NK = nkcells_pct,
-    NKT = nktcells_pct,
-    actCD4 = cd4cellshladr_pct,
-    actCD8 = cd8cellshladr_pct,
-    Plasma = plasmacells_pct,
-    cMono = monosclassical_pct,
-    ncMono = monosatypical_pct,
-    brightNK = nkcellsbright_pct,
-    dimNK = nkcellsdim_pct
-  )
-
-flow$CSF <-
-  bind_rows(flow$CSF, flow_frontiers) |>
-  select(-Gran, -intMono, -dnTc) # remove Gran and intMono to match Heming et al.
-
-# sanity checks
-anyNA(flow$CSF |> dplyr::select(Lymph:ncMono))
-
-flow$CSF |>
-  select(Lymph:ncMono) |>
-  summarize(across(everything(), function(x) sum(is.na(x)))) |>
-  print(width = Inf)
+flow <- qread(file.path("objects", "flow_pre.qs")) 
 
 # Extract flow variables -----
 flow_vars <-
   flow$CSF |>
-  # select(Gran:intMono) |>
-  select(Lymph:ncMono) |>
+  select(Lymph:intMono) |>
   names()
 
 # Create all boxplots -----
 # CSF plots
-createAndSaveBoxplots(
-  data = flow$CSF,
-  flow_vars = flow_vars,
-  group = "group",
-  cols = group_color,
-  output_file = "csf_con_plots_group.pdf",
-  width = 5,
-  height = 15
-)
-
 createAndSaveBoxplots(
   data = flow$CSF,
   flow_vars = flow_vars,
@@ -153,16 +56,6 @@ createAndSaveBoxplots(
 )
 
 # Blood plots
-createAndSaveBoxplots(
-  data = flow$blood,
-  flow_vars = flow_vars,
-  group = "group",
-  cols = group_color,
-  output_file = "blood_con_plots_group.pdf",
-  width = 5,
-  height = 15
-)
-
 createAndSaveBoxplots(
   data = flow$blood,
   flow_vars = flow_vars,
@@ -178,26 +71,9 @@ createAndSaveBoxplots(
 flow_vars_cols <- setNames(pals::cols25(length(flow_vars)), flow_vars)
 
 # Create combinations for different groupings
-combinations_group <- createCombinations(
-  conditions = c("PNP", "CTRL"),
-  group_column_name = "group"
-)
-
-combinations_group2 <- createCombinations(
-  conditions = c("IN", "NIN", "CTRL"),
-  group_column_name = "group2"
-)
-
-combinations_diagnosis <- createCombinations(
-  conditions = c("CIDP", "GBS", "CIAP", "CTRL"),
+volcano_configs <- createCombinations(
+  conditions = c("CIDP", "GBS", "CTRL"),
   group_column_name = "diagnosis"
-)
-
-# Create a configuration table for all volcano plot comparisons
-volcano_configs <- bind_rows(
-  combinations_group,
-  combinations_group2,
-  combinations_diagnosis
 )
 
 # Generate all volcano plots

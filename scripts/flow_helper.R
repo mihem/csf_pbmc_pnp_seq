@@ -26,8 +26,7 @@ statVolcano <- function(
   vars,
   reference,
   data,
-  fdr_threshold = 0.1,
-  n_perm = 100
+  fdr_threshold = 0.1
 ) {
   result <- vector("list")
   for (var in vars) {
@@ -51,55 +50,21 @@ statVolcano <- function(
 
   result <- do.call(rbind, result)
 
-  # Filter to only variables with valid p-values
-  valid_vars_final <- result$var
-
-  # Prepare data for permFDP
-  # Create data frame of quantities (rows = analytes/variables, columns = samples)
-  quant_df <- data |>
-    dplyr::select(all_of(valid_vars_final)) |>
-    t() |>
-    as.data.frame()
-
-  # Remove variables (rows) with any NA values to avoid skewing permutation test
-  complete_rows <- complete.cases(quant_df)
-  quant_df <- quant_df[complete_rows, , drop = FALSE]
-
-  # Also filter the result to match
-  result <- result[complete_rows, ]
-
-  if (nrow(quant_df) == 0) {
-    warning("No complete cases for permFDP")
-    return(NULL)
-  }
-
-  # Create group vector (1s and 2s)
-  group_levels <- unique(data[[reference]])
-  group_vector <- ifelse(data[[reference]] == group_levels[1], 1, 2)
-
-  # Get corrected threshold using permFDP
-  corrected_threshold <- permFDP::permFDP.adjust.threshold(
-    pVals = result$p.value,
-    threshold = fdr_threshold,
-    myDesign = group_vector,
-    intOnly = quant_df,
-    nPerms = n_perm
-  )
-
+  # Calculate adjusted p-values using Benjamini-Hochberg
   result <- result |>
     dplyr::mutate(
-      p.adj.threshold = corrected_threshold,
-      significant = p.value < corrected_threshold
-    ) |>
-    mutate(neg_log10_p = -log10(p.value))
+      p.adj = p.adjust(p.value, method = "BH"),
+      significant = p.adj <= fdr_threshold,
+      neg_log10_p = -log10(p.value)
+    )
 
   return(result)
 }
 
 # volcano plot function for cell abundancies
-VolPlot <- function(data, cols, n) {
-  # Get the corrected threshold for the horizontal line
-  threshold_line <- -log10(data$p.adj.threshold[1])
+VolPlot <- function(data, cols, n, fdr_threshold = 0.1) {
+  # Horizontal line at FDR threshold
+  threshold_line <- -log10(fdr_threshold)
 
   data |>
     ggplot(aes(

@@ -55,9 +55,9 @@ statVolcano <- function(
     dplyr::mutate(
       p.adj = p.adjust(p.value, method = "BH"),
       significant = p.adj <= fdr_threshold,
-      neg_log10_p = -log10(p.value)
+      neg_log10_p = -log10(p.adj)
     )
-
+  # browser()
   return(result)
 }
 

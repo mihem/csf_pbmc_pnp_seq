@@ -157,3 +157,35 @@ ggsave(
   width = 5,
   height = 5
 )
+
+# Olink cohort ----
+olink_quant_file <- file.path(
+  "raw",
+  "olink",
+  "olink_quant_long_filtered.xlsx"
+)
+
+olink_quant <- read_xlsx(olink_quant_file)
+
+olink_metadata_file <- file.path("lookup", "olink_flow_lookup.xlsx")
+olink_metadata <- read_xlsx(olink_metadata_file)
+
+olink_patients <- olink_quant |>
+  left_join(olink_metadata, by = "SampleID") |>
+  dplyr::select(SampleID, orbis_id, age, sex, diagnosis) |>
+  distinct(SampleID, orbis_id, .keep_all = TRUE)
+
+overview_table_olink <-
+  olink_patients |>
+  dplyr::mutate(sex_cat = if_else(sex == "male", 1, 0)) |>
+  dplyr::group_by(diagnosis) |>
+  dplyr::summarize(
+    n = n(),
+    age = mean(age, na.rm = TRUE),
+    female = (1 - mean(sex_cat, na.rm = TRUE)) * 100
+  )
+
+writexl::write_xlsx(
+  overview_table_olink,
+  file.path("results", "table", "overview_table_olink.xlsx")
+)

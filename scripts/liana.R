@@ -60,7 +60,7 @@ liana_plot_all <-
   liana_results_aggregate |>
   liana_dotplot() +
   theme(
-    axis.text.x = element_text(size = 14),
+    axis.text.x = element_text(size = 14, face = "plain"),
     strip.text = element_text(size = 14),
   )
 
@@ -76,7 +76,7 @@ liana_plot_CD8TEM3_target <-
   liana_results_aggregate |>
   liana_dotplot(target_groups = c("CD8TEM_3")) +
   theme(
-    axis.text.x = element_text(size = 14),
+    axis.text.x = element_text(size = 14, face = "plain"),
     strip.text = element_text(size = 14),
   )
 
@@ -91,7 +91,7 @@ liana_plot_CD8TEM3_source <-
   liana_results_aggregate |>
   liana_dotplot(source_groups = c("CD8TEM_3")) +
   theme(
-    axis.text.x = element_text(size = 14),
+    axis.text.x = element_text(size = 14, face = "plain"),
     strip.text = element_text(size = 14),
   )
 
@@ -123,7 +123,13 @@ liana_plot_selected_markers <-
   ) |>
   liana_dotplot() +
   theme(
-    axis.text.x = element_text(size = 10, angle = 90, hjust = 1, vjust = 0.5),
+    axis.text.x = element_text(
+      size = 10,
+      angle = 90,
+      hjust = 1,
+      vjust = 0.5,
+      face = "plain"
+    ),
     strip.text = element_text(size = 10),
   )
 
@@ -134,6 +140,55 @@ ggsave(
   height = 7,
   limitsize = FALSE
 )
+
+# selected ligands and receptors that are validated interactions
+selected_ligands <- c("APOE", "CCL3", "TNFSF14")
+selected_receptors <- c("TREM2", "CCR4", "CCR1", "TNFSFRSF14", "LTB")
+
+liana_dotplot_selected <-
+  liana_results_aggregate |>
+  dplyr::filter(
+    ligand.complex %in%
+      selected_ligands |
+      receptor.complex %in% selected_receptors
+  ) |>
+  liana_dotplot() +
+  coord_flip() +
+  scale_x_discrete(limits = rev) +
+  theme(
+    axis.text.x = element_text(
+      size = 10,
+      angle = 90,
+      hjust = 1,
+      vjust = 0.5,
+      colour = "black",
+      face = "plain"
+    ),
+    axis.text.y = element_text(colour = "black", size = 14),
+    strip.text = element_text(size = 14, angle = 90),
+  )
+
+ggsave(
+  file.path("results", "interaction", "liana_selected_dotplot.pdf"),
+  liana_dotplot_selected,
+  width = 14,
+  height = 10
+)
+
+# Chord diagram filtered for selected interactions
+pdf(
+  file.path("results", "interaction", "liana_chord_freq_selected.pdf"),
+  width = 20,
+  height = 20
+)
+liana_results_aggregate |>
+  dplyr::filter(
+    ligand.complex %in%
+      selected_ligands |
+      receptor.complex %in% selected_receptors
+  ) |>
+  chord_freq()
+dev.off()
 
 # # Visualize CXCR4 expression ----
 # dplot_cxcr4 <-

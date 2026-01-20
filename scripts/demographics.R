@@ -180,7 +180,8 @@ overview_table_olink <-
   dplyr::mutate(sex_cat = if_else(sex == "male", 1, 0)) |>
   dplyr::group_by(diagnosis) |>
   dplyr::summarize(
-    n = n(),
+    samples = n(),
+    patients = n_distinct(orbis_id),
     age = mean(age, na.rm = TRUE),
     female = (1 - mean(sex_cat, na.rm = TRUE)) * 100
   )

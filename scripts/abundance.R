@@ -34,7 +34,19 @@ scMisc::stackedPlot(
   x_order = unique(sc_merge_csf$sample),
   y_order = sc_merge_csf@misc$cluster_order,
   color = sc_merge_csf@misc$cluster_col,
-  width = 7
+  width = 7,
+  dir_output = file.path("results", "abundance")
+)
+
+scMisc::stackedPlot(
+  object = sc_merge_pbmc,
+  x_axis = "sample",
+  y_axis = "cluster",
+  x_order = unique(sc_merge_pbmc$sample),
+  y_order = sc_merge_pbmc@misc$cluster_order,
+  color = sc_merge_pbmc@misc$cluster_col,
+  width = 7,
+  dir_output = file.path("results", "abundance")
 )
 
 scMisc::stackedPlot(
@@ -44,47 +56,19 @@ scMisc::stackedPlot(
   x_order = unique(sc_merge_csf$sample),
   y_order = sc_merge_csf@misc$cluster_order,
   color = sc_merge_csf@misc$cluster_col,
-  width = 7
+  width = 7,
+  dir_output = file.path("results", "abundance")
 )
 
 scMisc::stackedPlot(
-  object = sc_merge_csf,
-  x_axis = "group",
-  y_axis = "cluster",
-  x_order = unique(sc_merge_csf$group),
-  y_order = sc_merge_csf@misc$cluster_order,
-  color = sc_merge_csf@misc$cluster_col,
-  width = 3.8
-)
-
-scMisc::stackedPlot(
-  object = sc_merge_csf,
-  x_axis = "group",
-  y_axis = "cluster",
-  x_order = unique(sc_merge_csf$group),
-  y_order = sc_merge_csf@misc$cluster_order,
-  color = sc_merge_csf@misc$cluster_col,
-  width = 3.8
-)
-
-scMisc::stackedPlot(
-  object = sc_merge_csf,
+  object = sc_merge_pbmc,
   x_axis = "diagnosis",
   y_axis = "cluster",
-  x_order = unique(sc_merge_csf$diagnosis),
-  y_order = sc_merge_csf@misc$cluster_order,
-  color = sc_merge_csf@misc$cluster_col,
-  width = 5
-)
-
-scMisc::stackedPlot(
-  object = sc_merge_csf,
-  x_axis = "diagnosis",
-  y_axis = "cluster",
-  x_order = unique(sc_merge_csf$diagnosis),
-  y_order = sc_merge_csf@misc$cluster_order,
-  color = sc_merge_csf@misc$cluster_col,
-  width = 5
+  x_order = unique(sc_merge_pbmc$diagnosis),
+  y_order = sc_merge_pbmc@misc$cluster_order,
+  color = sc_merge_pbmc@misc$cluster_col,
+  width = 5,
+  dir_output = file.path("results", "abundance")
 )
 
 # create all combinations with defined order

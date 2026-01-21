@@ -552,7 +552,14 @@ ggsave(
 #find clones that are the same between patients and create a table with samples
 shared_clones <- sc_tcr@meta.data |>
     tibble() |>
-    dplyr::select(sample, patient, CTaa, tissue_diagnosis, cloneSize, clonalFrequency) |>
+    dplyr::select(
+        sample,
+        patient,
+        CTaa,
+        tissue_diagnosis,
+        cloneSize,
+        clonalFrequency
+    ) |>
     tidyr::drop_na() |>
     dplyr::distinct() |>
     dplyr::group_by(CTaa) |>
@@ -573,7 +580,13 @@ shared_clones_summary <- shared_clones |>
     tidyr::pivot_wider(
         id_cols = c(CTaa, sample_count, patients_count),
         names_from = sample_num,
-        values_from = c(sample, patient, tissue_diagnosis, cloneSize, clonalFrequency),
+        values_from = c(
+            sample,
+            patient,
+            tissue_diagnosis,
+            cloneSize,
+            clonalFrequency
+        ),
         names_sep = "_"
     ) |>
     dplyr::arrange(
@@ -588,23 +601,33 @@ total_unique_ctaa <- sc_tcr@meta.data |>
     dplyr::pull(CTaa) |>
     n_distinct()
 
-cat("\n=== TCR clonotype summary statistics ===\n")
-cat("Total unique CTaa in dataset:", total_unique_ctaa, "\n")
-cat(
-    "Total shared CTaa (appearing in >1 sample):",
-    nrow(shared_clones_summary),
-    "\n"
+clones_shared_plot <-
+    data.frame(
+        category = c(
+            "unique",
+            "shared_between_patients",
+            "shared_within_patient"
+        ),
+        count = c(
+            total_unique_ctaa - nrow(shared_clones_summary),
+            sum(shared_clones_summary$patients_count > 1),
+            sum(shared_clones_summary$patients_count == 1)
+        )
+    ) |>
+    ggplot(aes(x = "", y = count, fill = category)) +
+    geom_col(width = 1) +
+    geom_text(aes(label = count), position = position_stack(vjust = 0.5)) +
+    coord_polar("y", start = 0) +
+    theme_void()
+
+ggsave(
+    plot = clones_shared_plot,
+    file.path("results", "tcr", "tcr_shared_clones_summary.pdf"),
+    width = 5,
+    height = 5
 )
-cat(
-    "CTaa shared between different patients:",
-    sum(shared_clones_summary$patients_count > 1),
-    "\n"
-)
-cat(
-    "CTaa shared between samples (same patient):",
-    sum(shared_clones_summary$patients_count == 1),
-    "\n\n"
-)
+
+scMisc::stackedPlot
 
 # Save the results to an Excel file
 write_xlsx(

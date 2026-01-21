@@ -320,18 +320,41 @@ sc_tcr_main_groups$tissue_diagnosis <- droplevels(
     sc_tcr_main_groups$tissue_diagnosis,
 )
 
+sc_tcr_main_groups_csf <- subset(
+    sc_tcr_main_groups,
+    subset = tissue == "CSF"
+)
+
+sc_tcr_main_groups_pbmc <- subset(
+    sc_tcr_main_groups,
+    subset = tissue == "PBMC"
+)
+
 # sanity chec
 table(sc_tcr_main_groups$diagnosis)
 
 stackedPlot(
-    object = sc_tcr_main_groups,
+    object = sc_tcr_main_groups_csf,
     x_axis = "tissue_diagnosis",
     y_axis = "cloneSize",
-    x_order = sc_tcr_main_groups@misc$tissue_diagnosis_order,
+    x_order = sc_tcr_main_groups_csf@misc$tissue_diagnosis_order,
     y_order = clone_labels,
     color = clone_cols,
-    width = 5,
-    height = 5
+    width = 4,
+    height = 4,
+    dir_output = file.path("results", "abundance")
+)
+
+stackedPlot(
+    object = sc_tcr_main_groups_pbmc,
+    x_axis = "diagnosis",
+    y_axis = "cloneSize",
+    x_order = sc_tcr_main_groups_pbmc@misc$tissue_diagnosis_order,
+    y_order = clone_labels,
+    color = clone_cols,
+    width = 4,
+    height = 4,
+    dir_output = file.path("results", "abundance")
 )
 
 #clonal overlay
@@ -1161,7 +1184,11 @@ pca_plot_12 <- ggplot(
     geom_point(size = 5, alpha = 0.8, color = "black") +
     scale_shape_manual(values = c("CSF" = 24, "PBMC" = 21)) +
     scale_fill_manual(values = sc_tcr@misc$diagnosis_col) +
-    guides(fill = guide_legend(override.aes = list(shape = 21, color = "black", size = 5))) +
+    guides(
+        fill = guide_legend(
+            override.aes = list(shape = 21, color = "black", size = 5)
+        )
+    ) +
     labs(
         title = "PCA of TCR Motif Patterns",
         x = "PC1",

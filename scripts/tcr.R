@@ -552,7 +552,7 @@ ggsave(
 #find clones that are the same between patients and create a table with samples
 shared_clones <- sc_tcr@meta.data |>
     tibble() |>
-    dplyr::select(sample, CTaa, tissue_diagnosis, cloneSize, clonalFrequency) |>
+    dplyr::select(sample, patient, CTaa, tissue_diagnosis, cloneSize, clonalFrequency) |>
     tidyr::drop_na() |>
     dplyr::distinct() |>
     dplyr::group_by(CTaa) |>
@@ -563,19 +563,35 @@ shared_clones <- sc_tcr@meta.data |>
 # Create a table showing which samples have each clone, sorted by number of occurrences
 shared_clones_summary <- shared_clones |>
     dplyr::group_by(CTaa) |>
-    dplyr::reframe(
+    dplyr::summarise(
         samples = paste(sample, collapse = ", "),
-        tissue_diagnosis = paste(tissue_diagnosis, collapse = ", "),
+        tissue_diagnosis = paste(unique(tissue_diagnosis), collapse = ", "),
         sample_count = n(),
-        clone_size = unique(cloneSize),
-        clonal_frequency = unique(clonalFrequency)
+        patients_count = n_distinct(patient),
+        clone_size = paste(unique(cloneSize), collapse = ", "),
+        clonal_frequency = sum(clonalFrequency),
+        .groups = "drop"
     ) |>
-    dplyr::arrange(desc(sample_count), desc(clonal_frequency), CTaa)
+    dplyr::arrange(desc(patients_count), desc(sample_count), desc(clonal_frequency), CTaa)
+
+sum(duplicated(shared_clones_summary$CTaa)) #sanity check no duplicates
+
+# Calculate summary statistics
+total_unique_ctaa <- sc_tcr@meta.data |> 
+    dplyr::filter(!is.na(CTaa)) |> 
+    dplyr::pull(CTaa) |> 
+    n_distinct()
+
+cat("\n=== TCR clonotype summary statistics ===\n")
+cat("Total unique CTaa in dataset:", total_unique_ctaa, "\n")
+cat("Total shared CTaa (appearing in >1 sample):", nrow(shared_clones_summary), "\n")
+cat("CTaa shared between different patients:", sum(shared_clones_summary$patients_count > 1), "\n")
+cat("CTaa shared between samples (same patient):", sum(shared_clones_summary$patients_count == 1), "\n\n")
 
 # Save the results to an Excel file
 write_xlsx(
     shared_clones_summary,
-    file.path("results", "tcr", "shared_clones_by_sample_summary.xlsx")
+    file.path("results", "tcr", "shared_clones_summary.xlsx")
 )
 
 shared_clones_between_patients <-

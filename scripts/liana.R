@@ -143,7 +143,7 @@ ggsave(
 
 # selected ligands and receptors that are validated interactions
 selected_ligands <- c("APOE", "CCL3", "TNFSF14")
-selected_receptors <- c("TREM2", "CCR4", "CCR1", "TNFSFR14", "LTBR")
+selected_receptors <- c("TREM2", "CCR4", "CCR1", "TNFRSF14", "LTBR")
 
 liana_dotplot_selected <-
   liana_results_aggregate |>
@@ -172,7 +172,7 @@ ggsave(
   file.path("results", "interaction", "liana_selected_dotplot.pdf"),
   liana_dotplot_selected,
   width = 6,
-  height = 7
+  height = 9
 )
 
 # Chord diagram filtered for selected interactions

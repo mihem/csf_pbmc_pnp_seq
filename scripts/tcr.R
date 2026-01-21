@@ -335,9 +335,9 @@ table(sc_tcr_main_groups$diagnosis)
 
 stackedPlot(
     object = sc_tcr_main_groups_csf,
-    x_axis = "tissue_diagnosis",
+    x_axis = "diagnosis",
     y_axis = "cloneSize",
-    x_order = sc_tcr_main_groups_csf@misc$tissue_diagnosis_order,
+    x_order = sc_tcr_main_groups_csf@misc$diagnosis_order,
     y_order = clone_labels,
     color = clone_cols,
     width = 4,
@@ -349,7 +349,7 @@ stackedPlot(
     object = sc_tcr_main_groups_pbmc,
     x_axis = "diagnosis",
     y_axis = "cloneSize",
-    x_order = sc_tcr_main_groups_pbmc@misc$tissue_diagnosis_order,
+    x_order = sc_tcr_main_groups_pbmc@misc$diagnosis_order,
     y_order = clone_labels,
     color = clone_cols,
     width = 4,
@@ -427,10 +427,10 @@ ggsave(
 
 
 # alluvial plots main groups
-tcr_top_clones <- dplyr::count(sc_tcr@meta.data, CTaa) |>
-    slice_max(n, n = 10, with_ties = TRUE) |>
+tcr_top_clones <- dplyr::count(sc_tcr@meta.data, CTaa, tissue, diagnosis) |>
     drop_na() |>
-    arrange(desc(n))
+    arrange(desc(n)) |>
+    slice_max(n, n = 10, with_ties = FALSE)
 
 sc_tcr$CTaa_top <- ifelse(
     sc_tcr$CTaa %in% tcr_top_clones$CTaa,
@@ -442,8 +442,19 @@ sc_tcr$CTaa_top <- ifelse(
 table(sc_tcr_main_groups$CTaa_top)
 
 # Create CTaa_top column - keep only clones in tcr_top_clones, set all others to NA
+tcr_top_clones_main_groups <- dplyr::count(
+    sc_tcr_main_groups@meta.data,
+    CTaa,
+    tissue,
+    diagnosis
+) |>
+    drop_na() |>
+    arrange(desc(n)) |>
+    slice_max(n, n = 10, with_ties = FALSE)
+
+
 sc_tcr_main_groups$CTaa_top <- ifelse(
-    sc_tcr_main_groups$CTaa %in% tcr_top_clones$CTaa,
+    sc_tcr_main_groups$CTaa %in% tcr_top_clones_main_groups$CTaa,
     sc_tcr_main_groups$CTaa,
     NA
 )
@@ -453,10 +464,17 @@ tcr_alluvial_tissue_diagnosis <-
     alluvialClones(
         sc_tcr,
         cloneCall = "aa",
-        y.axes = c("sample", "patient", "diagnosis", "cluster"),
+        y.axes = c("tissue", "patient", "diagnosis", "cluster"),
         color = "CTaa_top"
     ) +
     scale_fill_manual(values = scales::hue_pal()(10))
+
+# # Blank out stratum labels for CTaa_top axis only
+# tcr_alluvial_tissue_diagnosis$data$stratum <- ifelse(
+#     tcr_alluvial_tissue_diagnosis$data$x == "CTaa_top",
+#     "",
+#     as.character(tcr_alluvial_tissue_diagnosis$data$stratum)
+# )
 
 ggsave(
     plot = tcr_alluvial_tissue_diagnosis,
@@ -466,7 +484,27 @@ ggsave(
         "tcr_alluvial_sample_tissue_diagnosis.pdf"
     ),
     width = 15,
-    height = 10
+    height = 12
+)
+
+tcr_alluvial_tissue_diagnosis_main_groups <-
+    alluvialClones(
+        sc_tcr_main_groups,
+        cloneCall = "aa",
+        y.axes = c("tissue", "patient", "diagnosis", "cluster"),
+        color = "CTaa_top"
+    ) +
+    scale_fill_manual(values = scales::hue_pal()(10))
+
+ggsave(
+    plot = tcr_alluvial_tissue_diagnosis_main_groups,
+    file.path(
+        "results",
+        "tcr",
+        "tcr_alluvial_sample_tissue_diagnosis_main_groups.pdf"
+    ),
+    width = 15,
+    height = 12
 )
 
 tcr_overlap_tissue_diagnosis <-

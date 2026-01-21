@@ -561,38 +561,64 @@ shared_clones <- sc_tcr@meta.data |>
     dplyr::ungroup()
 
 # Create a table showing which samples have each clone, sorted by number of occurrences
+# Convert to wide format with separate columns for each sample
 shared_clones_summary <- shared_clones |>
     dplyr::group_by(CTaa) |>
-    dplyr::summarise(
-        samples = paste(sample, collapse = ", "),
-        tissue_diagnosis = paste(unique(tissue_diagnosis), collapse = ", "),
+    dplyr::mutate(
         sample_count = n(),
         patients_count = n_distinct(patient),
-        clone_size = paste(unique(cloneSize), collapse = ", "),
-        clonal_frequency = sum(clonalFrequency),
-        .groups = "drop"
+        sample_num = paste0("sample_", row_number())
     ) |>
-    dplyr::arrange(desc(patients_count), desc(sample_count), desc(clonal_frequency), CTaa)
-
-sum(duplicated(shared_clones_summary$CTaa)) #sanity check no duplicates
+    dplyr::ungroup() |>
+    tidyr::pivot_wider(
+        id_cols = c(CTaa, sample_count, patients_count),
+        names_from = sample_num,
+        values_from = c(sample, patient, tissue_diagnosis, cloneSize, clonalFrequency),
+        names_sep = "_"
+    ) |>
+    dplyr::arrange(
+        desc(patients_count),
+        desc(sample_count),
+        CTaa
+    )
 
 # Calculate summary statistics
-total_unique_ctaa <- sc_tcr@meta.data |> 
-    dplyr::filter(!is.na(CTaa)) |> 
-    dplyr::pull(CTaa) |> 
+total_unique_ctaa <- sc_tcr@meta.data |>
+    dplyr::filter(!is.na(CTaa)) |>
+    dplyr::pull(CTaa) |>
     n_distinct()
 
 cat("\n=== TCR clonotype summary statistics ===\n")
 cat("Total unique CTaa in dataset:", total_unique_ctaa, "\n")
-cat("Total shared CTaa (appearing in >1 sample):", nrow(shared_clones_summary), "\n")
-cat("CTaa shared between different patients:", sum(shared_clones_summary$patients_count > 1), "\n")
-cat("CTaa shared between samples (same patient):", sum(shared_clones_summary$patients_count == 1), "\n\n")
+cat(
+    "Total shared CTaa (appearing in >1 sample):",
+    nrow(shared_clones_summary),
+    "\n"
+)
+cat(
+    "CTaa shared between different patients:",
+    sum(shared_clones_summary$patients_count > 1),
+    "\n"
+)
+cat(
+    "CTaa shared between samples (same patient):",
+    sum(shared_clones_summary$patients_count == 1),
+    "\n\n"
+)
 
 # Save the results to an Excel file
 write_xlsx(
     shared_clones_summary,
     file.path("results", "tcr", "shared_clones_summary.xlsx")
 )
+
+shared_clones_summary |>
+    dplyr::filter(CTaa == "CAVRDSNYQLIW_CASSDSSGGANEQFF") |>
+    data.frame()
+
+sc_tcr@meta.data |>
+    dplyr::filter(CTaa == "CAVRDSNYQLIW_CASSDSSGGANEQFF") |>
+    select(clonalFrequency)
 
 shared_clones_between_patients <-
     sc_tcr@meta.data |>

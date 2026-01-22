@@ -39,6 +39,8 @@ sukenikova_reactive_shared <- heming_tcr |>
   ) |>
   relocate(CTaa_TRB, .before = everything())
 
+data.frame(sukenikova_reactive_shared)
+
 qsave(
   sukenikova_reactive_shared,
   file = file.path("objects", "sukenikova_reactive_shared.qs")
@@ -61,7 +63,8 @@ sukenikova_table_clean <- sukenikova_reactive_shared |>
     sukenikova_pt,
     sukenikova_diagnosis,
     sukenikova_source,
-    sukenikova_specificity
+    sukenikova_specificity,
+    sukenikova_clone_id
   ) |>
   dplyr::rename(
     "CDR3 beta" = CTaa_TRB,

@@ -3,6 +3,20 @@
 # Comprehensive comparison across metadata variables
 ##################################################
 
+# SECTION 1: SETUP (Done)
+# SECTION 2: V/J GENE USAGE ANALYSIS (Done)
+# SECTION 3: CDR3 SEQUENCE FEATURES
+#   3.1 CDR3 length distributions (Done)
+#   3.2 Amino acid composition analysis (Done)
+#   3.3 Positional entropy (Done)
+#   3.4 K-mer motif analysis 
+# SECTION 4: PHYSICOCHEMICAL PROPERTIES
+# SECTION 5: CLONALITY METRICS
+# SECTION 7: PROTEIN EMBEDDINGS 
+# ECTION 8: SUMMARY AND EXPORT
+
+
+
 # ============== SECTION 1: SETUP ==============
 
 # Load libraries ----

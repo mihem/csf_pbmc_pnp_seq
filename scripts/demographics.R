@@ -20,191 +20,104 @@ lookup <-
   qread(file.path("objects", "lookup.qs")) |>
   dplyr::filter(grepl("scRNA", cohort))
 
-# Number of patients per group ----
-disease_plot <- create_barplot(
-  data = lookup,
-  x_var = "diagnosis",
-  fill_var = "diagnosis",
-  title = "diagnosis",
-  color_palette = pals::cols25(9)
+# Define plot configurations ----
+boxplot_configs <- list(
+  age = list(
+    y_var = "age",
+    title = "age",
+    geom_type = "point",
+    width = 3.5,
+    height = 3
+  ),
+  ncv_tibial_motoric = list(
+    y_var = "ncv_tibial_motoric",
+    title = "motoric NCV tibial nerve (m/s)",
+    geom_type = "jitter",
+    width = 3,
+    height = 3
+  ),
+  incat = list(
+    y_var = "incat_at_lumbar_puncture",
+    title = "INCAT score",
+    geom_type = "jitter",
+    width = 3,
+    height = 3
+  ),
+  incat_progress = list(
+    y_var = "incat_progress",
+    title = "INCAT score progress",
+    geom_type = "jitter",
+    width = 5,
+    height = 5
+  ),
+  disease_duration = list(
+    y_var = "disease_duration_in_months",
+    title = "disease duration (months)",
+    geom_type = "jitter",
+    width = 3.5,
+    height = 3
+  ),
+  csf_protein = list(
+    y_var = "csf_protein",
+    title = "CSF protein (mg/L)",
+    geom_type = "jitter",
+    width = 3.8,
+    height = 3
+  )
 )
 
-ggsave(
-  file.path("results", "demographics", "barplot_disease.pdf"),
-  plot = disease_plot,
-  width = 4.5,
-  height = 3
+barplot_configs <- list(
+  disease = list(
+    fill_var = "diagnosis",
+    title = "diagnosis",
+    color_palette = pals::cols25(9),
+    width = 4.5,
+    height = 3
+  ),
+  sex = list(
+    fill_var = "sex",
+    title = "sex",
+    color_palette = rev(pals::cols25(2)),
+    width = 4.5,
+    height = 3
+  ),
+  therapy_status = list(
+    fill_var = "therapy",
+    title = "therapy status",
+    color_palette = pals::cols25(2),
+    width = 4.5,
+    height = 3
+  )
 )
 
-
-# Age Analysis ----
-# Compare age distribution between disease groups using boxplots
-age_plot <- create_boxplot(
+# Generate and save boxplots ----
+create_and_save_boxplots(
   data = lookup,
+  configs = boxplot_configs,
   x_var = "diagnosis",
-  y_var = "age",
   group_var = "diagnosis",
-  title = "age",
-  color_palette = sc_merge@misc$diagnosis_col
-)
-
-ggsave(
-  file.path("results", "demographics", "boxplot_age.pdf"),
-  plot = age_plot,
-  width = 3.5,
-  height = 3
-)
-
-# NCV Analysis ----
-# Compare tibial nerve motor conduction velocity between groups
-ncv_tibial_motoric_plot <- create_boxplot(
-  data = lookup,
-  x_var = "diagnosis",
-  y_var = "ncv_tibial_motoric",
-  group_var = "diagnosis",
-  title = "motoric NCV tibial nerve (m/s)",
   color_palette = sc_merge@misc$diagnosis_col,
-  geom_type = "jitter"
+  output_dir = file.path("results", "demographics")
 )
 
-ggsave(
-  file.path("results", "demographics", "boxplot_ncv_tibial_motoric.pdf"),
-  plot = ncv_tibial_motoric_plot,
-  width = 3,
-  height = 3
-)
-
-# INCAT Score Analysis ----
-incat_plot <- create_boxplot(
+# Generate and save barplots ----
+create_and_save_barplots(
   data = lookup,
+  configs = barplot_configs,
   x_var = "diagnosis",
-  y_var = "incat_at_lumbar_puncture",
-  group_var = "diagnosis",
-  title = "INCAT score",
-  color_palette = sc_merge@misc$diagnosis_col,
-  geom_type = "jitter"
+  output_dir = file.path("results", "demographics")
 )
 
-ggsave(
-  file.path("results", "demographics", "boxplot_incat.pdf"),
-  plot = incat_plot,
-  width = 3,
-  height = 3
-)
-
-# INCAT Progress Analysis ----
-incat_followup_plot <- create_boxplot(
-  data = lookup,
-  x_var = "diagnosis",
-  y_var = "incat_progress",
-  group_var = "diagnosis",
-  title = "INCAT score progress",
-  color_palette = sc_merge@misc$diagnosis_col,
-  geom_type = "jitter"
-)
-
-ggsave(
-  file.path("results", "demographics", "boxplot_incat_progress.pdf"),
-  plot = incat_followup_plot,
-  width = 5,
-  height = 5
-)
-
-# Disease Duration Analysis ----
-disease_duration_plot <- create_boxplot(
-  data = lookup,
-  x_var = "diagnosis",
-  y_var = "disease_duration_in_months",
-  group_var = "diagnosis",
-  title = "disease duration (months)",
-  color_palette = sc_merge@misc$diagnosis_col,
-  geom_type = "jitter"
-)
-
-ggsave(
-  file.path("results", "demographics", "boxplot_disease_duration.pdf"),
-  plot = disease_duration_plot,
-  width = 3.5,
-  height = 3
-)
-
-# CSF Protein Analysis ----
-csf_protein_plot <- create_boxplot(
-  data = lookup,
-  x_var = "diagnosis",
-  y_var = "csf_protein",
-  group_var = "diagnosis",
-  title = "CSF protein (mg/L)",
-  color_palette = sc_merge@misc$diagnosis_col,
-  geom_type = "jitter"
-)
-
-ggsave(
-  file.path("results", "demographics", "boxplot_csf_protein.pdf"),
-  plot = csf_protein_plot,
-  width = 3.8,
-  height = 3
-)
-
-# Sex Distribution ----
-sex_plot <- create_barplot(
-  data = lookup,
-  x_var = "diagnosis",
-  fill_var = "sex",
-  color_palette = rev(pals::cols25(2)),
-  title = "sex"
-)
-
-ggsave(
-  file.path("results", "demographics", "barplot_sex.pdf"),
-  plot = sex_plot,
-  width = 4.5,
-  height = 3
-)
-
-# Therapy Status Distribution ----
-therapy_plot <- create_barplot(
-  data = lookup,
-  x_var = "diagnosis",
-  fill_var = "therapy",
-  title = "therapy status",
-  color_palette = pals::cols25(2)
-)
-
-ggsave(
-  file.path("results", "demographics", "barplot_therapy_status.pdf"),
-  plot = therapy_plot,
-  width = 4.5,
-  height = 3
-)
-
-# Olink cohort ----
-olink_quant_file <- file.path(
-  "raw",
-  "olink",
-  "olink_quant_long_filtered.xlsx"
-)
-
-olink_quant <- read_xlsx(olink_quant_file)
-
-olink_metadata_file <- file.path("lookup", "olink_flow_lookup.xlsx")
-olink_metadata <- read_xlsx(olink_metadata_file)
+# Olink cohort analysis ----
+olink_quant <- read_xlsx(file.path("raw", "olink", "olink_quant_long_filtered.xlsx"))
+olink_metadata <- read_xlsx(file.path("lookup", "olink_flow_lookup.xlsx"))
 
 olink_patients <- olink_quant |>
   left_join(olink_metadata, by = "SampleID") |>
   dplyr::select(SampleID, orbis_id, age, sex, diagnosis) |>
   distinct(SampleID, orbis_id, .keep_all = TRUE)
 
-overview_table_olink <-
-  olink_patients |>
-  dplyr::mutate(sex_cat = if_else(sex == "male", 1, 0)) |>
-  dplyr::group_by(diagnosis) |>
-  dplyr::summarize(
-    samples = n(),
-    patients = n_distinct(orbis_id),
-    age = mean(age, na.rm = TRUE),
-    female = (1 - mean(sex_cat, na.rm = TRUE)) * 100
-  )
+overview_table_olink <- create_overview_table(olink_patients)
 
 writexl::write_xlsx(
   overview_table_olink,

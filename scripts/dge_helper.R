@@ -77,6 +77,8 @@ plotDE <- function(name, title) {
 
   plot <-
     result |>
+    arrange(desc(n)) |>
+    slice_head(n = 10) |>
     mutate(cluster = fct_reorder(cluster, n)) |>
     ggplot(aes(x = cluster, y = n, fill = cluster)) +
     geom_col() +

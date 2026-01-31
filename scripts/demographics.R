@@ -19,6 +19,22 @@ lookup <-
   qread(file.path("objects", "lookup.qs")) |>
   dplyr::filter(grepl("scRNA", cohort))
 
+# Number of patients per group ----
+disease_plot <- create_barplot(
+  data = lookup,
+  x_var = "diagnosis",
+  fill_var = "diagnosis",
+  title = "diagnosis",
+  color_palette = pals::cols25(9)
+)
+
+ggsave(
+  file.path("results", "demographics", "barplot_disease.pdf"),
+  plot = disease_plot,
+  width = 4.5,
+  height = 3
+)
+
 
 # Age Analysis ----
 # Compare age distribution between disease groups using boxplots
@@ -30,11 +46,12 @@ age_plot <- create_boxplot(
   title = "age",
   color_palette = sc_merge@misc$diagnosis_col
 )
+
 ggsave(
   file.path("results", "demographics", "boxplot_age.pdf"),
   plot = age_plot,
-  width = 5,
-  height = 5
+  width = 4,
+  height = 3
 )
 
 # NCV Analysis ----

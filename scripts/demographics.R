@@ -8,6 +8,7 @@
 library(tidyverse)
 library(qs)
 library(pals)
+library(readxl)
 
 # source helper functions
 source(file.path("scripts", "demographics_helper.R"))

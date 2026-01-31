@@ -50,7 +50,7 @@ age_plot <- create_boxplot(
 ggsave(
   file.path("results", "demographics", "boxplot_age.pdf"),
   plot = age_plot,
-  width = 4,
+  width = 3.5,
   height = 3
 )
 
@@ -65,11 +65,12 @@ ncv_tibial_motoric_plot <- create_boxplot(
   color_palette = sc_merge@misc$diagnosis_col,
   geom_type = "jitter"
 )
+
 ggsave(
   file.path("results", "demographics", "boxplot_ncv_tibial_motoric.pdf"),
   plot = ncv_tibial_motoric_plot,
-  width = 5,
-  height = 5
+  width = 3,
+  height = 3
 )
 
 # INCAT Score Analysis ----
@@ -82,11 +83,12 @@ incat_plot <- create_boxplot(
   color_palette = sc_merge@misc$diagnosis_col,
   geom_type = "jitter"
 )
+
 ggsave(
   file.path("results", "demographics", "boxplot_incat.pdf"),
   plot = incat_plot,
-  width = 5,
-  height = 5
+  width = 3,
+  height = 3
 )
 
 # INCAT Progress Analysis ----
@@ -121,8 +123,8 @@ disease_duration_plot <- create_boxplot(
 ggsave(
   file.path("results", "demographics", "boxplot_disease_duration.pdf"),
   plot = disease_duration_plot,
-  width = 5,
-  height = 5
+  width = 3.5,
+  height = 3
 )
 
 # CSF Protein Analysis ----
@@ -139,8 +141,8 @@ csf_protein_plot <- create_boxplot(
 ggsave(
   file.path("results", "demographics", "boxplot_csf_protein.pdf"),
   plot = csf_protein_plot,
-  width = 5,
-  height = 5
+  width = 3.8,
+  height = 3
 )
 
 # Sex Distribution ----
@@ -155,8 +157,8 @@ sex_plot <- create_barplot(
 ggsave(
   file.path("results", "demographics", "barplot_sex.pdf"),
   plot = sex_plot,
-  width = 5,
-  height = 5
+  width = 4.5,
+  height = 3
 )
 
 # Therapy Status Distribution ----
@@ -171,8 +173,8 @@ therapy_plot <- create_barplot(
 ggsave(
   file.path("results", "demographics", "barplot_therapy_status.pdf"),
   plot = therapy_plot,
-  width = 5,
-  height = 5
+  width = 4.5,
+  height = 3
 )
 
 # Olink cohort ----

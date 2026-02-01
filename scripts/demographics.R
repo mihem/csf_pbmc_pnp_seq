@@ -109,17 +109,72 @@ create_and_save_barplots(
 )
 
 # Olink cohort analysis ----
-olink_quant <- read_xlsx(file.path("raw", "olink", "olink_quant_long_filtered.xlsx"))
+olink_quant <- read_xlsx(file.path(
+  "raw",
+  "olink",
+  "olink_quant_long_filtered.xlsx"
+))
 olink_metadata <- read_xlsx(file.path("lookup", "olink_flow_lookup.xlsx"))
 
 olink_patients <- olink_quant |>
   left_join(olink_metadata, by = "SampleID") |>
   dplyr::select(SampleID, orbis_id, age, sex, diagnosis) |>
-  distinct(SampleID, orbis_id, .keep_all = TRUE)
+  dplyr::distinct(SampleID, orbis_id, .keep_all = TRUE) |>
+  dplyr::mutate(
+    diagnosis = factor(
+      diagnosis,
+      levels = c("CTRL", "GBS", "CIDP")
+    )
+  )
 
 overview_table_olink <- create_overview_table(olink_patients)
 
 writexl::write_xlsx(
   overview_table_olink,
   file.path("results", "table", "overview_table_olink.xlsx")
+)
+
+# Define plot configurations ----
+boxplot_configs_olink <- list(
+  age_olink = list(
+    y_var = "age",
+    title = "age",
+    geom_type = "point",
+    width = 2,
+    height = 3
+  )
+)
+
+
+barplot_configs_olink <- list(
+  disease_olink = list(
+    fill_var = "diagnosis",
+    title = "diagnosis",
+    color_palette = pals::cols25(9),
+    width = 3,
+    height = 3
+  ),
+  sex_olink = list(
+    fill_var = "sex",
+    title = "sex",
+    color_palette = rev(pals::cols25(2)),
+    width = 3,
+    height = 3
+  )
+)
+
+create_and_save_boxplots(
+  data = olink_patients,
+  configs = boxplot_configs_olink,
+  x_var = "diagnosis",
+  group_var = "diagnosis",
+  color_palette = sc_merge@misc$diagnosis_col,
+  output_dir = file.path("results", "demographics")
+)
+
+create_and_save_barplots(
+  data = olink_patients,
+  configs = barplot_configs_olink,
+  x_var = "diagnosis",
+  output_dir = file.path("results", "demographics")
 )

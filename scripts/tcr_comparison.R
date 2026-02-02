@@ -1255,7 +1255,8 @@ tryCatch({
   
   # --- Step 3: Loop Through All Modalities (TRA, TRB, JOINT) ---
   analysis_targets <- c("esm_tra", "esm_trb", "esm_joint")
-  
+  esm_permanova_results <- list()
+
   for (red_name in analysis_targets) {
     if (!red_name %in% names(sc_tcr@reductions)) next
     
@@ -1293,40 +1294,114 @@ tryCatch({
       write.csv(dist_res, paste0("results/tcr_comparison/embeddings/dist_to_ctrl_", red_name, ".csv"))
     }
     
-    # B. STATISTICAL: PERMANOVA (Multivariate ANOVA)
+    # B. STATISTICAL: PERMANOVA (Multivariate ANOVA) - sample-level aggregation
     set.seed(42)
-    #idx_sample <- sample(nrow(embeddings), min(2000, nrow(embeddings))) 
+
+    # Aggregate embeddings to sample level (mean embedding per sample)
+    emb_cols <- colnames(embeddings)
+    emb_df <- as.data.frame(embeddings)
+    emb_df$sample <- meta_sub$sample
+    emb_df$patient <- meta_sub$patient
+    emb_df$tissue <- meta_sub$tissue
+    emb_df$diagnosis <- meta_sub$diagnosis
+
+    sample_emb <- emb_df |>
+      dplyr::group_by(sample, patient, tissue, diagnosis) |>
+      dplyr::summarize(
+        dplyr::across(all_of(emb_cols), ~ mean(.x, na.rm = TRUE)),
+        n_cells = n(),
+        .groups = "drop"
+      ) |>
+      dplyr::filter(complete.cases(dplyr::across(all_of(emb_cols))))
+
+    emb_matrix <- sample_emb |> dplyr::select(all_of(emb_cols)) |> as.matrix()
+
+    message(paste("    Sample-level aggregation:", nrow(emb_matrix), "samples,", ncol(emb_matrix), "dimensions"))
+
+    # Run PERMANOVA with patient stratification
+    permanova_result <- run_permanova(emb_matrix, sample_emb, "~ diagnosis * tissue", "patient", n_perm = 999)
+
+    if (permanova_result$success) {
+      permanova <- permanova_result$result
+      diag_r2 <- permanova["diagnosis", "R2"]
+      diag_p <- permanova["diagnosis", "Pr(>F)"]
+      tissue_r2 <- permanova["tissue", "R2"]
+      tissue_p <- permanova["tissue", "Pr(>F)"]
+      message(paste("    diagnosis: R2 =", round(diag_r2, 4), ", p =", round(diag_p, 4)))
+      message(paste("    tissue: R2 =", round(tissue_r2, 4), ", p =", round(tissue_p, 4)))
+      esm_permanova_results[[red_name]] <- permanova
+    } else {
+      message(paste("    PERMANOVA failed:", permanova_result$message))
+      permanova <- NULL
+      diag_r2 <- NA
+    }
+
+    capture.output(permanova, file = paste0("results/tcr_comparison/embeddings/permanova_", red_name, ".txt"))
     
-    dist_mat <- dist(embeddings)
-    permanova <- adonis2(dist_mat ~ diagnosis, 
-                         data = meta_sub, 
-                         permutations = 100)
-    
-    message(paste("    PERMANOVA R2:", round(permanova$R2[1], 4), " P-val:", permanova$`Pr(>F)`[1]))
-    capture.output(permanova, file = paste0("results/tcr_comparison/embeddings/stats_", red_name, ".txt"))
-    
-    # C. VISUALIZATION: UMAP with Density
+    # C. VISUALIZATION: UMAP with Density (cell-level for visualization)
     set.seed(42)
-    umap_res <- uwot::umap(embeddings, n_neighbors = 15, min_dist = 0.1)
-    
+
+    # Subsample for UMAP if too many cells (visualization only)
+    max_cells_umap <- 5000
+    if (nrow(embeddings) > max_cells_umap) {
+      idx_vis <- sample(nrow(embeddings), max_cells_umap)
+      emb_vis <- embeddings[idx_vis, ]
+      meta_vis <- meta_sub[idx_vis, ]
+    } else {
+      emb_vis <- embeddings
+      meta_vis <- meta_sub
+    }
+
+    umap_res <- uwot::umap(emb_vis, n_neighbors = 15, min_dist = 0.1)
+
     plot_df <- data.frame(
       UMAP1 = umap_res[,1],
       UMAP2 = umap_res[,2],
-      diagnosis = meta_sub$diagnosis
+      diagnosis = meta_vis$diagnosis,
+      tissue = meta_vis$tissue
     )
-    
+
+    subtitle_text <- if (!is.na(diag_r2)) paste("PERMANOVA R2 =", round(diag_r2, 3), "(sample-level)") else "PERMANOVA failed"
+
     p <- ggplot(plot_df, aes(x = UMAP1, y = UMAP2, color = diagnosis)) +
       geom_point(alpha = 0.4, size = 0.5) +
-      stat_density_2d(aes(alpha = ..level..), bins = 5, color = "black", size = 0.2) + # Adds contours
+      stat_density_2d(aes(alpha = after_stat(level)), bins = 5, color = "black", linewidth = 0.2) +
       scale_color_manual(values = diagnosis_col) +
+      scale_alpha_continuous(range = c(0.1, 0.3), guide = "none") +
       theme_pub() +
       labs(
         title = paste("ESM2 UMAP:", toupper(gsub("esm_", "", red_name))),
-        subtitle = paste("PERMANOVA R2 =", round(permanova$R2[1], 3))
+        subtitle = subtitle_text
       ) +
-      facet_wrap(~diagnosis) # Split view to see distinct clusters
-    
-    ggsave(paste0("results/tcr_comparison/embeddings/umap_density_", red_name, ".pdf"), p, width = 10, height = 8)
+      facet_wrap(~diagnosis)
+
+    ggsave(paste0("results/tcr_comparison/embeddings/umap_density_", red_name, ".pdf"), p, width = 12, height = 8)
+
+    # Also create sample-level PCA for direct comparison with PERMANOVA
+    pca_emb <- prcomp(emb_matrix, scale. = TRUE, center = TRUE)
+    var_exp <- summary(pca_emb)$importance[2, 1:2] * 100
+
+    pca_df <- data.frame(
+      PC1 = pca_emb$x[,1],
+      PC2 = pca_emb$x[,2],
+      diagnosis = sample_emb$diagnosis,
+      tissue = sample_emb$tissue,
+      patient = sample_emb$patient
+    )
+
+    p_pca <- ggplot(pca_df, aes(x = PC1, y = PC2, color = diagnosis, shape = tissue)) +
+      geom_point(size = 3, alpha = 0.8) +
+      stat_ellipse(aes(group = diagnosis), level = 0.95, linetype = "dashed") +
+      scale_color_manual(values = diagnosis_col) +
+      theme_pub() +
+      labs(
+        title = paste("ESM2 PCA (sample-level):", toupper(gsub("esm_", "", red_name))),
+        subtitle = subtitle_text,
+        x = paste0("PC1 (", round(var_exp[1], 1), "%)"),
+        y = paste0("PC2 (", round(var_exp[2], 1), "%)")
+      )
+
+    ggsave(paste0("results/tcr_comparison/embeddings/pca_sample_", red_name, ".pdf"), p_pca, width = 9, height = 7)
   }
   
   message("  Embeddings analysis complete")
@@ -1352,10 +1427,11 @@ if (exists("diversity_stats_dx_combined")) all_stats$diversity_by_diagnosis <- d
 if (exists("diversity_stats_tissue")) all_stats$diversity_by_tissue <- diversity_stats_tissue
 if (exists("diversity_interaction")) all_stats$diversity_interaction <- diversity_interaction
 
-# Add PERMANOVA results
+# Add AA composition PERMANOVA results
 permanova_summary <- lapply(names(permanova_results), function(ch) {
   res <- permanova_results[[ch]]
   data.frame(
+    analysis = "aa_composition",
     chain = ch,
     term = rownames(res),
     Df = res$Df,
@@ -1365,6 +1441,24 @@ permanova_summary <- lapply(names(permanova_results), function(ch) {
     p.value = res[, "Pr(>F)"]
   )
 }) |> dplyr::bind_rows()
+
+# Add ESM embedding PERMANOVA results
+if (exists("esm_permanova_results") && length(esm_permanova_results) > 0) {
+  esm_summary <- lapply(names(esm_permanova_results), function(red) {
+    res <- esm_permanova_results[[red]]
+    data.frame(
+      analysis = "esm_embeddings",
+      chain = gsub("esm_", "", red),
+      term = rownames(res),
+      Df = res$Df,
+      SumOfSqs = res$SumOfSqs,
+      R2 = res$R2,
+      F = res$F,
+      p.value = res[, "Pr(>F)"]
+    )
+  }) |> dplyr::bind_rows()
+  permanova_summary <- dplyr::bind_rows(permanova_summary, esm_summary)
+}
 
 if (nrow(permanova_summary) > 0) {
   all_stats$permanova <- permanova_summary

@@ -1,6 +1,12 @@
 # TCR repertoire comparison across neuropathy diagnoses
 # Compares TRA, TRB, TRAB chains with mixed models (patient random effect, tissue fixed effect)
 
+# Deactivate renv to use system/CRAN packages
+if (nzchar(Sys.getenv("RENV_PROJECT"))) {
+  Sys.setenv(RENV_PROJECT = "")
+  message("Note: renv deactivated, using system packages")
+}
+
 set.seed(42)
 
 # Libraries
@@ -46,6 +52,8 @@ output_dirs <- c(
   "results/tcr_comparison/similarity",
   "results/tcr_comparison/embeddings",
   "results/tcr_comparison/motifs",
+  "results/tcr_comparison/tcrdist",
+  "results/tcr_comparison/gliph",
   "results/tcr_comparison/tables"
 )
 invisible(lapply(output_dirs, dir.create, recursive = TRUE, showWarnings = FALSE))
@@ -1221,8 +1229,9 @@ tryCatch({
     reduction_name <- paste0("esm_", tolower(chain_type))
     
     # Check if already computed to save time
+    # Use function without namespace prefix to ensure devtools::load_all version is used
     if (!reduction_name %in% names(sc_tcr@reductions)) {
-      sc_tcr <- immLynx::runEmbeddings(
+      sc_tcr <- runEmbeddings(
         sc_tcr,
         chains = chain_type,
         model_name = "facebook/esm2_t12_35M_UR50D",
@@ -1411,9 +1420,1474 @@ tryCatch({
 })
 
 # ============================================================================
-# Section 9: Summary export
+# Section 9: TCRdist analysis
 # ============================================================================
-message("Section 9: Exporting summary")
+message("Section 9: TCRdist analysis")
+
+dir.create("results/tcr_comparison/tcrdist", showWarnings = FALSE, recursive = TRUE)
+
+tcrdist_results <- tryCatch({
+  message("  Computing TCRdist distances")
+
+  # Run TCRdist for beta chain (most informative for antigen specificity)
+  # Subsample to max 5000 sequences to avoid memory issues with large distance matrices
+  # Use runTCRdist without namespace prefix to ensure devtools::load_all version is used
+  dist_trb <- runTCRdist(
+    sc_tcr,
+    chains = "beta",
+    organism = "human",
+    compute_distances = TRUE,
+    max_sequences = 5000,
+    add_to_object = FALSE
+  )
+  message("    TRB distances computed: ", nrow(dist_trb$tcr_data), " sequences")
+
+  # Run TCRdist for alpha chain
+  dist_tra <- runTCRdist(
+    sc_tcr,
+    chains = "alpha",
+    organism = "human",
+    compute_distances = TRUE,
+    max_sequences = 5000,
+    add_to_object = FALSE
+  )
+  message("    TRA distances computed: ", nrow(dist_tra$tcr_data), " sequences")
+
+  # Get metadata for the cells in the distance matrix
+  trb_cells <- dist_trb$barcodes
+  tra_cells <- dist_tra$barcodes
+
+  # Sample-level aggregation of TCRdist: mean distance to other samples
+  message("  Aggregating TCRdist to sample level")
+
+  aggregate_tcrdist <- function(dist_mat, barcodes, metadata) {
+    # Match barcodes to metadata - try multiple strategies
+    # Strategy 1: Direct match to rownames
+    matched_idx <- match(barcodes, rownames(metadata))
+
+    # Strategy 2: If no matches, barcodes might be in a cell_id column
+    if (all(is.na(matched_idx)) && "cell_id" %in% colnames(metadata)) {
+      matched_idx <- match(barcodes, metadata$cell_id)
+    }
+
+    # Strategy 3: Try matching partial barcodes (strip sample prefix)
+    if (all(is.na(matched_idx))) {
+      # Extract core barcode (last part after underscore or dash)
+      core_barcodes <- sub(".*[_-]", "", barcodes)
+      core_rownames <- sub(".*[_-]", "", rownames(metadata))
+      matched_idx <- match(core_barcodes, core_rownames)
+    }
+
+    # Strategy 4: Try matching barcodes to rownames allowing partial matches
+    if (all(is.na(matched_idx))) {
+      # Try substring matching
+      matched_idx <- sapply(barcodes, function(bc) {
+        idx <- grep(bc, rownames(metadata), fixed = TRUE)
+        if (length(idx) == 1) idx else NA
+      })
+    }
+
+    # Report match rate
+    match_rate <- sum(!is.na(matched_idx)) / length(barcodes)
+    message(paste("    Barcode match rate:", round(match_rate * 100, 1), "%"))
+
+    if (match_rate < 0.1) {
+      warning("Very low barcode match rate. Check barcode formats.")
+      # Debug: show examples
+      message("    Example barcodes from TCRdist: ", paste(head(barcodes, 3), collapse = ", "))
+      message("    Example rownames from metadata: ", paste(head(rownames(metadata), 3), collapse = ", "))
+    }
+
+    # Filter to matched cells only
+    valid_idx <- which(!is.na(matched_idx))
+    if (length(valid_idx) < 10) {
+      stop("Too few barcodes matched to metadata (n=", length(valid_idx), ")")
+    }
+
+    # Subset distance matrix to valid cells
+    dist_mat <- dist_mat[valid_idx, valid_idx]
+    matched_idx <- matched_idx[valid_idx]
+
+    # Get sample assignment for each barcode (now indexed 1:length(valid_idx))
+    cell_samples <- metadata$sample[matched_idx]
+
+    # Remove NA samples
+    valid_samples <- !is.na(cell_samples)
+    if (sum(valid_samples) < 10) {
+      stop("Too few cells with valid sample assignment")
+    }
+    dist_mat <- dist_mat[valid_samples, valid_samples]
+    cell_samples <- cell_samples[valid_samples]
+
+    # Calculate mean within-sample and between-sample distances
+    samples <- unique(cell_samples)
+    n_samples <- length(samples)
+    message(paste("    Aggregating", sum(valid_samples), "cells into", n_samples, "samples"))
+
+    sample_dist <- matrix(0, n_samples, n_samples, dimnames = list(samples, samples))
+
+    for (i in seq_along(samples)) {
+      for (j in seq_along(samples)) {
+        # Now idx_i and idx_j are relative to the current dist_mat
+        idx_i <- which(cell_samples == samples[i])
+        idx_j <- which(cell_samples == samples[j])
+        if (length(idx_i) > 0 && length(idx_j) > 0) {
+          sample_dist[i, j] <- mean(dist_mat[idx_i, idx_j], na.rm = TRUE)
+        }
+      }
+    }
+    sample_dist
+  }
+
+  # Aggregate TRB distances
+  trb_sample_dist <- NULL
+  if (!is.null(dist_trb$distances$pw_beta)) {
+    message("  Aggregating TRB distances...")
+    dist_mat_trb <- as.matrix(dist_trb$distances$pw_beta)
+    # Sync barcodes with matrix dims (tcrdist3 may filter some sequences)
+    n_dist <- nrow(dist_mat_trb)
+    barcodes_trb <- if (length(dist_trb$barcodes) > n_dist) {
+      dist_trb$barcodes[1:n_dist]
+    } else {
+      dist_trb$barcodes
+    }
+    message("    Matrix: ", n_dist, " x ", ncol(dist_mat_trb), ", Barcodes: ", length(barcodes_trb))
+    trb_sample_dist <- aggregate_tcrdist(dist_mat_trb, barcodes_trb, sc_tcr@meta.data)
+  } else {
+    message("  Warning: No TRB distance matrix available")
+  }
+
+  # Aggregate TRA distances
+  tra_sample_dist <- NULL
+  if (!is.null(dist_tra$distances$pw_alpha)) {
+    message("  Aggregating TRA distances...")
+    dist_mat_tra <- as.matrix(dist_tra$distances$pw_alpha)
+    # Sync barcodes with matrix dims
+    n_dist <- nrow(dist_mat_tra)
+    barcodes_tra <- if (length(dist_tra$barcodes) > n_dist) {
+      dist_tra$barcodes[1:n_dist]
+    } else {
+      dist_tra$barcodes
+    }
+    message("    Matrix: ", n_dist, " x ", ncol(dist_mat_tra), ", Barcodes: ", length(barcodes_tra))
+    tra_sample_dist <- aggregate_tcrdist(dist_mat_tra, barcodes_tra, sc_tcr@meta.data
+    )
+  } else {
+    message("  Warning: No TRA distance matrix available")
+  }
+
+  # PERMANOVA on sample-level TCRdist
+  message("  Running PERMANOVA on TCRdist")
+
+  tcrdist_permanova <- list()
+
+  for (chain_name in c("TRB", "TRA")) {
+    dist_mat <- if (chain_name == "TRB") trb_sample_dist else tra_sample_dist
+
+    # Skip if distance matrix not available
+    if (is.null(dist_mat)) {
+      message(paste("    Skipping", chain_name, "- no distance matrix"))
+      next
+    }
+
+    # Get metadata for samples
+    sample_meta <- sample_summary |>
+      dplyr::filter(sample %in% rownames(dist_mat)) |>
+      dplyr::arrange(match(sample, rownames(dist_mat)))
+
+    if (nrow(sample_meta) < 3) {
+      message(paste("    Skipping", chain_name, "- too few samples (n=", nrow(sample_meta), ")"))
+      next
+    }
+
+    # Ensure order matches
+    dist_mat <- dist_mat[sample_meta$sample, sample_meta$sample]
+
+    # Convert to dist object
+    dist_obj <- as.dist(dist_mat)
+
+    perm_result <- tryCatch({
+      vegan::adonis2(
+        dist_obj ~ diagnosis * tissue,
+        data = sample_meta,
+        permutations = 999,
+        strata = sample_meta$patient
+      )
+    }, error = function(e) {
+      message(paste("    PERMANOVA failed for", chain_name, ":", e$message))
+      NULL
+    })
+
+    if (!is.null(perm_result)) {
+      tcrdist_permanova[[chain_name]] <- perm_result
+      message(paste("   ", chain_name, "- diagnosis R2:",
+                    round(perm_result["diagnosis", "R2"], 4),
+                    "p:", round(perm_result["diagnosis", "Pr(>F)"], 4)))
+    }
+  }
+
+  # Visualize sample-level TCRdist as heatmap
+  message("  Creating TCRdist heatmaps")
+
+  for (chain_name in c("TRB", "TRA")) {
+    dist_mat <- if (chain_name == "TRB") trb_sample_dist else tra_sample_dist
+
+    # Skip if distance matrix not available
+    if (is.null(dist_mat)) next
+
+    # Get sample annotations
+    sample_anno <- sample_summary |>
+      dplyr::filter(sample %in% rownames(dist_mat)) |>
+      dplyr::select(sample, diagnosis, tissue) |>
+      tibble::column_to_rownames("sample")
+
+    if (nrow(sample_anno) < 2) next
+
+    # Reorder to match
+    dist_mat <- dist_mat[rownames(sample_anno), rownames(sample_anno)]
+
+    pdf(paste0("results/tcr_comparison/tcrdist/sample_distance_", chain_name, ".pdf"),
+        width = 10, height = 8)
+    pheatmap::pheatmap(
+      dist_mat,
+      color = colorRampPalette(c("darkblue", "white", "darkred"))(100),
+      main = paste(chain_name, "TCRdist (sample-level mean)"),
+      annotation_row = sample_anno,
+      annotation_col = sample_anno,
+      annotation_colors = list(diagnosis = diagnosis_col, tissue = tissue_col),
+      show_rownames = TRUE,
+      show_colnames = TRUE,
+      fontsize = 8
+    )
+    dev.off()
+  }
+
+  # PCoA visualization
+  message("  Creating PCoA plots")
+
+  pcoa_results <- list()
+  for (chain_name in c("TRB", "TRA")) {
+    dist_mat <- if (chain_name == "TRB") trb_sample_dist else tra_sample_dist
+
+    # Skip if distance matrix not available
+    if (is.null(dist_mat)) next
+
+    # Get sample metadata
+    sample_meta <- sample_summary |>
+      dplyr::filter(sample %in% rownames(dist_mat))
+
+    if (nrow(sample_meta) < 3) next
+
+    dist_mat <- dist_mat[sample_meta$sample, sample_meta$sample]
+
+    # PCoA
+    pcoa_result <- tryCatch({
+      cmdscale(as.dist(dist_mat), k = min(5, nrow(dist_mat) - 1), eig = TRUE)
+    }, error = function(e) NULL)
+
+    if (is.null(pcoa_result)) next
+
+    pos_eig <- pcoa_result$eig[pcoa_result$eig > 0]
+    var_exp <- pcoa_result$eig[1:min(5, length(pos_eig))] / sum(pos_eig) * 100
+
+    pcoa_df <- data.frame(
+      sample = sample_meta$sample,
+      PCo1 = pcoa_result$points[,1],
+      PCo2 = pcoa_result$points[,2],
+      diagnosis = sample_meta$diagnosis,
+      tissue = sample_meta$tissue,
+      patient = sample_meta$patient
+    )
+    pcoa_results[[chain_name]] <- pcoa_df
+
+    # Basic PCoA plot by diagnosis and tissue
+    p <- ggplot(pcoa_df, aes(x = PCo1, y = PCo2, color = diagnosis, shape = tissue)) +
+      geom_point(size = 3, alpha = 0.8) +
+      stat_ellipse(aes(group = diagnosis), level = 0.95, linetype = "dashed") +
+      scale_color_manual(values = diagnosis_col) +
+      theme_pub() +
+      labs(
+        title = paste(chain_name, "TCRdist PCoA (sample-level)"),
+        x = paste0("PCo1 (", round(var_exp[1], 1), "%)"),
+        y = paste0("PCo2 (", round(var_exp[2], 1), "%)")
+      )
+
+    ggsave(paste0("results/tcr_comparison/tcrdist/pcoa_", chain_name, ".pdf"), p, width = 9, height = 7)
+  }
+
+  # =====================================================
+  # DIAGNOSIS-FOCUSED VISUALIZATIONS
+  # =====================================================
+  message("  Creating diagnosis-focused visualizations")
+
+  # 1. Distance to controls analysis
+  # For each sample, calculate mean TCRdist to control samples
+  message("    Calculating distance to controls")
+
+  dist_to_ctrl_results <- list()
+  for (chain_name in c("TRB", "TRA")) {
+    dist_mat <- if (chain_name == "TRB") trb_sample_dist else tra_sample_dist
+    if (is.null(dist_mat)) next
+
+    sample_meta <- sample_summary |>
+      dplyr::filter(sample %in% rownames(dist_mat))
+
+    ctrl_samples <- sample_meta$sample[sample_meta$diagnosis == "CTRL"]
+    disease_samples <- sample_meta$sample[sample_meta$diagnosis != "CTRL"]
+
+    if (length(ctrl_samples) < 2 || length(disease_samples) < 2) next
+
+    # Calculate mean distance to controls for each sample
+    dist_to_ctrl <- sapply(rownames(dist_mat), function(s) {
+      if (s %in% ctrl_samples) {
+        # For controls, calculate distance to other controls
+        other_ctrl <- setdiff(ctrl_samples, s)
+        mean(dist_mat[s, other_ctrl], na.rm = TRUE)
+      } else {
+        # For disease, calculate distance to all controls
+        mean(dist_mat[s, ctrl_samples], na.rm = TRUE)
+      }
+    })
+
+    dist_ctrl_df <- data.frame(
+      sample = names(dist_to_ctrl),
+      dist_to_ctrl = dist_to_ctrl
+    ) |>
+      dplyr::left_join(sample_meta, by = "sample") |>
+      dplyr::mutate(
+        is_ctrl = diagnosis == "CTRL",
+        diagnosis_group = ifelse(diagnosis == "CTRL", "CTRL", "Disease")
+      )
+
+    dist_to_ctrl_results[[chain_name]] <- dist_ctrl_df
+
+    # Statistical test: Wilcoxon test for each diagnosis vs CTRL
+    ctrl_dists <- dist_ctrl_df$dist_to_ctrl[dist_ctrl_df$diagnosis == "CTRL"]
+    stat_results <- lapply(setdiff(unique(dist_ctrl_df$diagnosis), "CTRL"), function(dx) {
+      dx_dists <- dist_ctrl_df$dist_to_ctrl[dist_ctrl_df$diagnosis == dx]
+      if (length(dx_dists) < 2) return(NULL)
+      test <- wilcox.test(dx_dists, ctrl_dists, alternative = "greater")
+      data.frame(
+        chain = chain_name,
+        diagnosis = dx,
+        n_samples = length(dx_dists),
+        median_dist = median(dx_dists),
+        ctrl_median = median(ctrl_dists),
+        fold_change = median(dx_dists) / median(ctrl_dists),
+        p.value = test$p.value
+      )
+    }) |> dplyr::bind_rows()
+
+    if (nrow(stat_results) > 0) {
+      stat_results$p.adj <- p.adjust(stat_results$p.value, method = "BH")
+      dist_to_ctrl_results[[paste0(chain_name, "_stats")]] <- stat_results
+
+      # Report significant findings
+      sig <- stat_results |> dplyr::filter(p.adj < 0.1)
+      if (nrow(sig) > 0) {
+        message("      Significantly divergent from CTRL (FDR < 0.1):")
+        for (i in seq_len(nrow(sig))) {
+          message(sprintf("        %s: FC=%.2f, p.adj=%.4f",
+                          sig$diagnosis[i], sig$fold_change[i], sig$p.adj[i]))
+        }
+      }
+    }
+
+    # Use consistent diagnosis ordering (CTRL first)
+    dx_levels <- c("CTRL", intersect(neuropathy_dx, unique(dist_ctrl_df$diagnosis)))
+    dist_ctrl_df$diagnosis <- factor(dist_ctrl_df$diagnosis, levels = dx_levels)
+
+    # Plot: Distance to controls by diagnosis with significance annotations
+    p_dist <- ggplot(dist_ctrl_df, aes(x = diagnosis, y = dist_to_ctrl, fill = diagnosis)) +
+      geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+      geom_jitter(aes(shape = tissue), width = 0.2, size = 2, alpha = 0.8) +
+      scale_fill_manual(values = diagnosis_col) +
+      theme_pub() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+    # Add significance brackets from Wilcoxon tests
+    if (nrow(stat_results) > 0) {
+      sig_stats <- stat_results |> dplyr::filter(p.adj < 0.05)
+      if (nrow(sig_stats) > 0) {
+        comparisons <- lapply(sig_stats$diagnosis, function(dx) c("CTRL", dx))
+        annotations <- sapply(sig_stats$p.adj, format_pval)
+        p_dist <- p_dist + ggsignif::geom_signif(
+          comparisons = comparisons, annotations = annotations,
+          step_increase = 0.08, textsize = 3, vjust = 0.5
+        )
+      }
+    }
+
+    p_dist <- p_dist +
+      labs(
+        title = paste(chain_name, "- TCR distance to healthy controls"),
+        x = "Diagnosis",
+        y = "Mean TCRdist to CTRL samples"
+      )
+    ggsave(paste0("results/tcr_comparison/tcrdist/dist_to_ctrl_", chain_name, ".pdf"),
+           p_dist, width = 10, height = 7)
+
+    # Plot: Faceted by tissue with per-tissue statistics
+    tissue_stats <- lapply(c("CSF", "PBMC"), function(tis) {
+      tis_df <- dist_ctrl_df |> dplyr::filter(tissue == tis)
+      ctrl_d <- tis_df$dist_to_ctrl[tis_df$diagnosis == "CTRL"]
+      if (length(ctrl_d) < 2) return(NULL)
+      lapply(setdiff(levels(tis_df$diagnosis), "CTRL"), function(dx) {
+        dx_d <- tis_df$dist_to_ctrl[tis_df$diagnosis == dx]
+        if (length(dx_d) < 2) return(NULL)
+        test <- tryCatch(wilcox.test(dx_d, ctrl_d, alternative = "greater"), error = function(e) list(p.value = NA))
+        data.frame(tissue = tis, diagnosis = dx, p.value = test$p.value)
+      }) |> dplyr::bind_rows()
+    }) |> dplyr::bind_rows()
+
+    if (nrow(tissue_stats) > 0) {
+      tissue_stats$p.adj <- p.adjust(tissue_stats$p.value, method = "BH")
+    }
+
+    p_dist_tissue <- ggplot(dist_ctrl_df, aes(x = diagnosis, y = dist_to_ctrl, fill = diagnosis)) +
+      geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+      geom_jitter(width = 0.2, size = 2, alpha = 0.8) +
+      facet_wrap(~tissue, scales = "free_y") +
+      scale_fill_manual(values = diagnosis_col) +
+      theme_pub() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
+      labs(
+        title = paste(chain_name, "- TCR distance to controls by tissue"),
+        x = "Diagnosis",
+        y = "Mean TCRdist to CTRL"
+      )
+
+    # Add per-tissue significance brackets
+    if (nrow(tissue_stats) > 0) {
+      for (tis in unique(tissue_stats$tissue)) {
+        tis_sig <- tissue_stats |> dplyr::filter(tissue == tis, p.adj < 0.05)
+        if (nrow(tis_sig) > 0) {
+          comparisons <- lapply(tis_sig$diagnosis, function(dx) c("CTRL", dx))
+          annotations <- sapply(tis_sig$p.adj, format_pval)
+          p_dist_tissue <- p_dist_tissue + ggsignif::geom_signif(
+            comparisons = comparisons, annotations = annotations,
+            step_increase = 0.08, textsize = 3, vjust = 0.5,
+            data = dist_ctrl_df |> dplyr::filter(tissue == tis)
+          )
+        }
+      }
+    }
+
+    ggsave(paste0("results/tcr_comparison/tcrdist/dist_to_ctrl_by_tissue_", chain_name, ".pdf"),
+           p_dist_tissue, width = 12, height = 6)
+  }
+
+  # 2. Within-diagnosis vs between-diagnosis distances
+  message("    Calculating within vs between diagnosis distances")
+
+  within_between_results <- list()
+  for (chain_name in c("TRB", "TRA")) {
+    dist_mat <- if (chain_name == "TRB") trb_sample_dist else tra_sample_dist
+    if (is.null(dist_mat)) next
+
+    sample_meta <- sample_summary |>
+      dplyr::filter(sample %in% rownames(dist_mat))
+
+    # Calculate pairwise comparisons
+    comparisons <- expand.grid(s1 = rownames(dist_mat), s2 = rownames(dist_mat),
+                               stringsAsFactors = FALSE) |>
+      dplyr::filter(s1 < s2) |>
+      dplyr::mutate(
+        distance = mapply(function(a, b) dist_mat[a, b], s1, s2),
+        dx1 = sample_meta$diagnosis[match(s1, sample_meta$sample)],
+        dx2 = sample_meta$diagnosis[match(s2, sample_meta$sample)],
+        tissue1 = sample_meta$tissue[match(s1, sample_meta$sample)],
+        tissue2 = sample_meta$tissue[match(s2, sample_meta$sample)],
+        patient1 = sample_meta$patient[match(s1, sample_meta$sample)],
+        patient2 = sample_meta$patient[match(s2, sample_meta$sample)],
+        same_diagnosis = dx1 == dx2,
+        same_tissue = tissue1 == tissue2,
+        same_patient = patient1 == patient2,
+        comparison_type = case_when(
+          same_diagnosis & same_patient ~ "Within patient",
+          same_diagnosis ~ "Within diagnosis",
+          TRUE ~ "Between diagnoses"
+        )
+      )
+
+    within_between_results[[chain_name]] <- comparisons
+
+    # Wilcoxon test: within vs between diagnosis (excluding same-patient)
+    comp_no_self <- comparisons |> dplyr::filter(!same_patient)
+
+    wb_stats <- lapply(c(TRUE, FALSE), function(st) {
+      sub <- comp_no_self |> dplyr::filter(same_tissue == st)
+      within_d <- sub$distance[sub$comparison_type == "Within diagnosis"]
+      between_d <- sub$distance[sub$comparison_type == "Between diagnoses"]
+      if (length(within_d) < 3 || length(between_d) < 3) return(NULL)
+      test <- wilcox.test(within_d, between_d)
+      data.frame(same_tissue = st, p.value = test$p.value,
+                 median_within = median(within_d), median_between = median(between_d))
+    }) |> dplyr::bind_rows()
+
+    within_between_results[[paste0(chain_name, "_stats")]] <- wb_stats
+
+    # Use consistent colors matching script theme
+    wb_fill <- c("Within diagnosis" = "#66C2A5", "Between diagnoses" = "#FC8D62")
+
+    # Plot: Within vs between diagnosis distances with stats
+    p_wb <- ggplot(comp_no_self,
+                   aes(x = comparison_type, y = distance, fill = comparison_type)) +
+      geom_violin(alpha = 0.7) +
+      geom_boxplot(width = 0.2, alpha = 0.9, outlier.shape = NA) +
+      facet_wrap(~same_tissue, labeller = labeller(same_tissue = c("FALSE" = "Different tissues",
+                                                                    "TRUE" = "Same tissue"))) +
+      scale_fill_manual(values = wb_fill) +
+      theme_pub() +
+      theme(legend.position = "none")
+
+    # Add Wilcoxon p-values per facet
+    if (nrow(wb_stats) > 0) {
+      for (i in seq_len(nrow(wb_stats))) {
+        row <- wb_stats[i, ]
+        p_wb <- p_wb + ggsignif::geom_signif(
+          comparisons = list(c("Within diagnosis", "Between diagnoses")),
+          annotations = format_pval(row$p.value),
+          textsize = 3.5, vjust = 0.5,
+          data = comp_no_self |> dplyr::filter(same_tissue == row$same_tissue)
+        )
+      }
+    }
+
+    p_wb <- p_wb +
+      labs(
+        title = paste(chain_name, "- Within vs between diagnosis TCR distances"),
+        x = "",
+        y = "TCRdist"
+      )
+    ggsave(paste0("results/tcr_comparison/tcrdist/within_between_dx_", chain_name, ".pdf"),
+           p_wb, width = 10, height = 6)
+  }
+
+  # 3. Diagnosis-specific clustering in PCoA space
+  message("    Creating diagnosis-specific PCoA panels")
+
+  for (chain_name in c("TRB", "TRA")) {
+    if (!chain_name %in% names(pcoa_results)) next
+    pcoa_df <- pcoa_results[[chain_name]]
+
+    # Highlight each diagnosis vs controls
+    diagnoses <- setdiff(unique(pcoa_df$diagnosis), "CTRL")
+
+    plots <- lapply(diagnoses, function(dx) {
+      df <- pcoa_df |>
+        dplyr::mutate(
+          highlight = case_when(
+            diagnosis == dx ~ dx,
+            diagnosis == "CTRL" ~ "CTRL",
+            TRUE ~ "Other"
+          ),
+          highlight = factor(highlight, levels = c(dx, "CTRL", "Other"))
+        )
+
+      ggplot(df, aes(x = PCo1, y = PCo2)) +
+        geom_point(data = df |> dplyr::filter(highlight == "Other"),
+                   color = "gray80", size = 2, alpha = 0.5) +
+        geom_point(data = df |> dplyr::filter(highlight == "CTRL"),
+                   aes(shape = tissue), color = "gray40", size = 3, alpha = 0.8) +
+        geom_point(data = df |> dplyr::filter(highlight == dx),
+                   aes(shape = tissue), color = diagnosis_col[dx], size = 3, alpha = 0.9) +
+        stat_ellipse(data = df |> dplyr::filter(diagnosis == "CTRL"),
+                     color = "gray40", linetype = "dashed") +
+        stat_ellipse(data = df |> dplyr::filter(diagnosis == dx),
+                     color = diagnosis_col[dx], linetype = "solid") +
+        theme_pub() +
+        labs(title = paste(dx, "vs CTRL"), x = "PCo1", y = "PCo2") +
+        theme(legend.position = "bottom")
+    })
+
+    # Combine into multi-panel figure
+    p_combined <- patchwork::wrap_plots(plots, ncol = 3) +
+      patchwork::plot_annotation(
+        title = paste(chain_name, "- Diagnosis-specific TCR profiles vs controls"),
+      )
+    ggsave(paste0("results/tcr_comparison/tcrdist/pcoa_dx_vs_ctrl_", chain_name, ".pdf"),
+           p_combined, width = 14, height = ceiling(length(diagnoses)/3) * 5)
+  }
+
+  # 4. Centroid distances between diagnoses
+  message("    Calculating diagnosis centroid distances")
+
+  centroid_results <- list()
+  for (chain_name in c("TRB", "TRA")) {
+    dist_mat <- if (chain_name == "TRB") trb_sample_dist else tra_sample_dist
+    if (is.null(dist_mat)) next
+
+    sample_meta <- sample_summary |>
+      dplyr::filter(sample %in% rownames(dist_mat))
+
+    diagnoses <- unique(sample_meta$diagnosis)
+    n_dx <- length(diagnoses)
+
+    # Calculate mean distance between diagnosis groups
+    dx_dist_mat <- matrix(0, n_dx, n_dx, dimnames = list(diagnoses, diagnoses))
+    for (i in seq_along(diagnoses)) {
+      for (j in seq_along(diagnoses)) {
+        samples_i <- sample_meta$sample[sample_meta$diagnosis == diagnoses[i]]
+        samples_j <- sample_meta$sample[sample_meta$diagnosis == diagnoses[j]]
+        dx_dist_mat[i, j] <- mean(dist_mat[samples_i, samples_j], na.rm = TRUE)
+      }
+    }
+
+    centroid_results[[chain_name]] <- dx_dist_mat
+
+    # Heatmap of diagnosis-level distances
+    pdf(paste0("results/tcr_comparison/tcrdist/diagnosis_centroid_dist_", chain_name, ".pdf"),
+        width = 8, height = 7)
+    pheatmap::pheatmap(
+      dx_dist_mat,
+      color = colorRampPalette(c("navy", "white", "firebrick"))(100),
+      main = paste(chain_name, "- Mean TCRdist between diagnosis groups"),
+      display_numbers = TRUE,
+      number_format = "%.1f",
+      fontsize_number = 8,
+      cluster_rows = TRUE,
+      cluster_cols = TRUE
+    )
+    dev.off()
+  }
+
+  # Export results
+  message("  Exporting TCRdist results")
+
+  export_list <- list()
+  if (!is.null(trb_sample_dist)) {
+    export_list$TRB_sample_dist <- as.data.frame(trb_sample_dist) |> tibble::rownames_to_column("sample")
+  }
+  if (!is.null(tra_sample_dist)) {
+    export_list$TRA_sample_dist <- as.data.frame(tra_sample_dist) |> tibble::rownames_to_column("sample")
+  }
+  if ("TRB" %in% names(dist_to_ctrl_results)) {
+    export_list$TRB_dist_to_ctrl <- dist_to_ctrl_results$TRB
+  }
+  if ("TRA" %in% names(dist_to_ctrl_results)) {
+    export_list$TRA_dist_to_ctrl <- dist_to_ctrl_results$TRA
+  }
+  if ("TRB_stats" %in% names(dist_to_ctrl_results)) {
+    export_list$TRB_vs_ctrl_stats <- dist_to_ctrl_results$TRB_stats
+  }
+  if ("TRA_stats" %in% names(dist_to_ctrl_results)) {
+    export_list$TRA_vs_ctrl_stats <- dist_to_ctrl_results$TRA_stats
+  }
+  if ("TRB" %in% names(centroid_results)) {
+    export_list$TRB_dx_centroids <- as.data.frame(centroid_results$TRB) |> tibble::rownames_to_column("diagnosis")
+  }
+  if ("TRA" %in% names(centroid_results)) {
+    export_list$TRA_dx_centroids <- as.data.frame(centroid_results$TRA) |> tibble::rownames_to_column("diagnosis")
+  }
+
+  if (length(export_list) > 0) {
+    writexl::write_xlsx(export_list, "results/tcr_comparison/tcrdist/tcrdist_analysis_results.xlsx")
+  }
+
+  list(
+    trb_dist = trb_sample_dist,
+    tra_dist = tra_sample_dist,
+    permanova = tcrdist_permanova,
+    dist_to_ctrl = dist_to_ctrl_results,
+    centroid_dist = centroid_results
+  )
+
+}, error = function(e) {
+
+  message("  TCRdist analysis failed: ", e$message)
+  NULL
+})
+
+# ============================================================================
+# Section 10: GLIPH2 specificity group analysis
+# ============================================================================
+message("Section 10: GLIPH2 specificity group analysis")
+
+dir.create("results/tcr_comparison/gliph", showWarnings = FALSE, recursive = TRUE)
+
+gliph_results <- tryCatch({
+  message("  Running GLIPH2 clustering")
+
+  # Run GLIPH2 on TRB chains
+  gliph_out <- runGLIPH(
+    sc_tcr,
+    chains = "TRB",
+    local_similarities = TRUE,
+    global_similarities = TRUE,
+    local_method = "fisher",
+    motif_length = 3,
+    vgene_match = FALSE,
+    n_cores = 1,
+    return_seurat = FALSE
+  )
+
+  # turboGliph returns cluster info in $clusters with members column (space-separated CDR3s)
+  # Parse the members column to create proper membership mapping
+  n_clusters <- if (!is.null(gliph_out$clusters)) nrow(gliph_out$clusters) else 0
+  message("    GLIPH2 identified ", n_clusters, " specificity groups")
+
+  if (n_clusters == 0) {
+    stop("No GLIPH clusters found")
+  }
+
+  # Extract enriched motifs
+  gliph_motifs <- tryCatch({
+    extractGLIPHmotifs(gliph_out, fdr_threshold = 0.1)
+  }, error = function(e) NULL)
+  n_motifs <- if (!is.null(gliph_motifs)) nrow(gliph_motifs) else 0
+  message("    Found ", n_motifs, " enriched motifs (FDR < 0.1)")
+
+  # Parse cluster membership from gliph_out$clusters$members column
+  # Each row has space-separated CDR3 sequences in the 'members' column
+  message("  Parsing cluster membership from turboGliph output")
+
+  cluster_membership <- lapply(seq_len(nrow(gliph_out$clusters)), function(i) {
+    row <- gliph_out$clusters[i, ]
+    members_str <- row$members
+    if (is.null(members_str) || is.na(members_str) || members_str == "") {
+      return(NULL)
+    }
+    cdr3_seqs <- strsplit(as.character(members_str), "\\s+")[[1]]
+    cdr3_seqs <- cdr3_seqs[cdr3_seqs != ""]
+    if (length(cdr3_seqs) == 0) return(NULL)
+
+    data.frame(
+      cluster = i,
+      CDR3b = cdr3_seqs,
+      cluster_tag = row$tag,
+      cluster_size = row$cluster_size,
+      stringsAsFactors = FALSE
+    )
+  }) |> dplyr::bind_rows()
+
+  if (is.null(cluster_membership) || nrow(cluster_membership) == 0) {
+    stop("No cluster membership data could be parsed")
+  }
+  message("    Parsed ", nrow(cluster_membership), " CDR3-to-cluster mappings")
+
+  # Extract TRB CDR3 sequences from Seurat metadata for matching
+  tcr_data <- immApex::getIR(sc_tcr, chains = "TRB")
+  tcr_data <- tcr_data |>
+    dplyr::left_join(
+      sc_tcr@meta.data |>
+        tibble::rownames_to_column("barcode") |>
+        dplyr::select(barcode, sample, patient, tissue, diagnosis),
+      by = "barcode"
+    )
+
+  # Match GLIPH clusters to cells via CDR3 sequence
+  message("  Mapping GLIPH clusters to cell metadata")
+  cluster_meta <- cluster_membership |>
+    dplyr::left_join(
+      tcr_data |> dplyr::select(barcode, cdr3_aa, sample, patient, tissue, diagnosis) |> dplyr::distinct(),
+      by = c("CDR3b" = "cdr3_aa")
+    )
+
+  n_matched <- sum(!is.na(cluster_meta$diagnosis))
+  message("    Matched ", n_matched, " / ", nrow(cluster_meta), " sequences to metadata")
+
+  # =====================================================
+  # DIAGNOSIS-FOCUSED GLIPH ANALYSIS
+  # =====================================================
+  message("  Analyzing diagnosis enrichment in GLIPH clusters")
+
+  # Calculate diagnosis distribution per cluster
+  cluster_diagnosis <- cluster_meta |>
+    dplyr::filter(!is.na(cluster), !is.na(diagnosis)) |>
+    dplyr::group_by(cluster, diagnosis) |>
+    dplyr::summarize(n_cells = n(), .groups = "drop") |>
+    tidyr::pivot_wider(names_from = diagnosis, values_from = n_cells, values_fill = 0)
+
+  # Total cells per diagnosis (for expected proportions)
+  total_by_diagnosis <- cluster_meta |>
+    dplyr::filter(!is.na(diagnosis)) |>
+    dplyr::count(diagnosis, name = "total")
+
+  # Test for diagnosis enrichment using Fisher's exact test
+  # Focus on Disease vs CTRL enrichment
+  diagnosis_enrichment <- lapply(unique(cluster_meta$cluster[!is.na(cluster_meta$cluster)]), function(cl) {
+    cl_data <- cluster_meta |> dplyr::filter(cluster == cl, !is.na(diagnosis))
+    if (nrow(cl_data) < 3) return(NULL)
+
+    # Test each diagnosis vs CTRL specifically
+    results <- lapply(setdiff(unique(cl_data$diagnosis), "CTRL"), function(dx) {
+      # Cells in cluster: diagnosis of interest vs CTRL
+      in_cluster_dx <- sum(cl_data$diagnosis == dx)
+      in_cluster_ctrl <- sum(cl_data$diagnosis == "CTRL")
+
+      # Total cells in dataset
+      total_dx <- total_by_diagnosis$total[total_by_diagnosis$diagnosis == dx]
+      total_ctrl <- total_by_diagnosis$total[total_by_diagnosis$diagnosis == "CTRL"]
+
+      if (is.na(total_dx) || is.na(total_ctrl) || total_dx == 0 || total_ctrl == 0) return(NULL)
+
+      out_cluster_dx <- total_dx - in_cluster_dx
+      out_cluster_ctrl <- total_ctrl - in_cluster_ctrl
+
+      if (any(c(in_cluster_dx, in_cluster_ctrl, out_cluster_dx, out_cluster_ctrl) < 0)) return(NULL)
+
+      mat <- matrix(c(in_cluster_dx, in_cluster_ctrl, out_cluster_dx, out_cluster_ctrl), nrow = 2)
+
+      tryCatch({
+        test <- fisher.test(mat)
+        data.frame(
+          cluster = cl,
+          diagnosis = dx,
+          n_dx_in_cluster = in_cluster_dx,
+          n_ctrl_in_cluster = in_cluster_ctrl,
+          cluster_size = nrow(cl_data),
+          odds_ratio = test$estimate,
+          p.value = test$p.value
+        )
+      }, error = function(e) NULL)
+    }) |> dplyr::bind_rows()
+
+    results
+  }) |> dplyr::bind_rows()
+
+  if (nrow(diagnosis_enrichment) > 0) {
+    diagnosis_enrichment <- diagnosis_enrichment |>
+      dplyr::mutate(
+        p.adj = p.adjust(p.value, method = "BH"),
+        enrichment_direction = ifelse(odds_ratio > 1, "Disease-enriched", "CTRL-enriched"),
+        log2_OR = log2(odds_ratio + 0.01)
+      ) |>
+      dplyr::arrange(p.adj)
+
+    # Report significant enrichments
+    sig_enrichments <- diagnosis_enrichment |> dplyr::filter(p.adj < 0.1, odds_ratio > 1)
+    if (nrow(sig_enrichments) > 0) {
+      message("    Disease-enriched clusters (vs CTRL, FDR < 0.1):")
+      for (i in seq_len(min(10, nrow(sig_enrichments)))) {
+        row <- sig_enrichments[i, ]
+        message(sprintf("      Cluster %s - %s: OR=%.2f, FDR=%.4f (n=%d vs %d CTRL)",
+                        row$cluster, row$diagnosis, row$odds_ratio, row$p.adj,
+                        row$n_dx_in_cluster, row$n_ctrl_in_cluster))
+      }
+    }
+  }
+
+  # =====================================================
+  # GLIPH VISUALIZATIONS
+  # =====================================================
+  message("  Creating GLIPH visualizations")
+
+  # 1. Summary of disease-enriched vs control-enriched clusters
+  if (nrow(diagnosis_enrichment) > 0) {
+    # Volcano plot: log2(OR) vs -log10(p.adj) for each diagnosis
+    p_volcano <- ggplot(diagnosis_enrichment, aes(x = log2_OR, y = -log10(p.adj + 1e-10))) +
+      geom_point(aes(color = diagnosis, size = cluster_size), alpha = 0.6) +
+      geom_hline(yintercept = -log10(0.1), linetype = "dashed", color = "gray50") +
+      geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+      scale_color_manual(values = diagnosis_col) +
+      scale_size_continuous(range = c(1, 6), name = "Cluster size") +
+      facet_wrap(~diagnosis, scales = "free") +
+      theme_pub() +
+      labs(
+        title = "GLIPH cluster enrichment: Disease vs CTRL",
+        x = "log2(Odds Ratio vs CTRL)",
+        y = "-log10(FDR)"
+      )
+    ggsave("results/tcr_comparison/gliph/cluster_enrichment_volcano.pdf", p_volcano, width = 14, height = 10)
+
+    # Count significant clusters per diagnosis
+    sig_summary <- diagnosis_enrichment |>
+      dplyr::filter(p.adj < 0.1) |>
+      dplyr::group_by(diagnosis, enrichment_direction) |>
+      dplyr::summarize(n_clusters = n(), .groups = "drop")
+
+    if (nrow(sig_summary) > 0) {
+      # Consistent diagnosis ordering
+      dx_levels_gliph <- intersect(neuropathy_dx, unique(sig_summary$diagnosis))
+      sig_summary$diagnosis <- factor(sig_summary$diagnosis, levels = dx_levels_gliph)
+
+      # Chi-squared test: is the distribution of enriched clusters non-random across diagnoses?
+      enrichment_table <- sig_summary |>
+        dplyr::filter(enrichment_direction == "Disease-enriched")
+      chisq_pval <- NA
+      if (nrow(enrichment_table) > 1 && sum(enrichment_table$n_clusters) > 0) {
+        chisq_test <- tryCatch(chisq.test(enrichment_table$n_clusters), error = function(e) NULL)
+        if (!is.null(chisq_test)) chisq_pval <- chisq_test$p.value
+      }
+
+      subtitle_text <- "FDR < 0.1"
+      if (!is.na(chisq_pval)) {
+        subtitle_text <- paste0(subtitle_text, " | Chi-squared test across diagnoses: p = ",
+                                 signif(chisq_pval, 3))
+      }
+
+      p_sig_count <- ggplot(sig_summary, aes(x = diagnosis, y = n_clusters, fill = enrichment_direction)) +
+        geom_bar(stat = "identity", position = "dodge") +
+        scale_fill_manual(values = c("Disease-enriched" = "firebrick", "CTRL-enriched" = "steelblue")) +
+        theme_pub() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        labs(
+          title = "Number of significantly enriched GLIPH clusters per diagnosis",
+          x = "Diagnosis",
+          y = "Number of clusters",
+          fill = ""
+        )
+      ggsave("results/tcr_comparison/gliph/significant_cluster_counts.pdf", p_sig_count, width = 10, height = 6)
+    }
+  }
+
+  # 2. Top clusters by size - composition by diagnosis
+  top_clusters <- cluster_meta |>
+    dplyr::filter(!is.na(cluster)) |>
+    dplyr::count(cluster, sort = TRUE) |>
+    dplyr::slice(1:30) |>
+    dplyr::pull(cluster)
+
+  if (length(top_clusters) > 0) {
+    cluster_comp <- cluster_meta |>
+      dplyr::filter(cluster %in% top_clusters, !is.na(diagnosis)) |>
+      dplyr::count(cluster, diagnosis) |>
+      dplyr::group_by(cluster) |>
+      dplyr::mutate(prop = n / sum(n), total = sum(n)) |>
+      dplyr::ungroup() |>
+      dplyr::arrange(desc(total))
+
+    # Reorder clusters by size
+    cluster_order <- cluster_comp |> dplyr::distinct(cluster, total) |>
+      dplyr::arrange(desc(total)) |> dplyr::pull(cluster)
+    cluster_comp$cluster <- factor(cluster_comp$cluster, levels = cluster_order)
+
+    p_comp <- ggplot(cluster_comp, aes(x = cluster, y = prop, fill = diagnosis)) +
+      geom_bar(stat = "identity") +
+      scale_fill_manual(values = diagnosis_col) +
+      theme_pub() +
+      labs(
+        title = "GLIPH cluster composition by diagnosis",
+        x = "Cluster (ordered by size)", y = "Proportion"
+      ) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7))
+    ggsave("results/tcr_comparison/gliph/cluster_composition.pdf", p_comp, width = 14, height = 6)
+
+    # Same but faceted by tissue
+    cluster_comp_tissue <- cluster_meta |>
+      dplyr::filter(cluster %in% top_clusters[1:15], !is.na(diagnosis), !is.na(tissue)) |>
+      dplyr::count(cluster, diagnosis, tissue) |>
+      dplyr::group_by(cluster, tissue) |>
+      dplyr::mutate(prop = n / sum(n)) |>
+      dplyr::ungroup()
+
+    if (nrow(cluster_comp_tissue) > 0) {
+      p_comp_tissue <- ggplot(cluster_comp_tissue,
+                              aes(x = factor(cluster), y = prop, fill = diagnosis)) +
+        geom_bar(stat = "identity") +
+        facet_wrap(~tissue) +
+        scale_fill_manual(values = diagnosis_col) +
+        theme_pub() +
+        labs(
+          title = "GLIPH cluster composition by diagnosis and tissue",
+          x = "Cluster", y = "Proportion"
+        ) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7))
+      ggsave("results/tcr_comparison/gliph/cluster_composition_by_tissue.pdf",
+             p_comp_tissue, width = 14, height = 8)
+    }
+  }
+
+  # 3. Disease-specific clusters: show CDR3 motifs
+  if (nrow(diagnosis_enrichment) > 0) {
+    # Get top disease-enriched clusters for each diagnosis
+    top_enriched <- diagnosis_enrichment |>
+      dplyr::filter(p.adj < 0.2, odds_ratio > 2) |>
+      dplyr::group_by(diagnosis) |>
+      dplyr::slice_max(order_by = odds_ratio, n = 5) |>
+      dplyr::ungroup()
+
+    if (nrow(top_enriched) > 0) {
+      # Get CDR3 sequences from these clusters
+      enriched_cdr3 <- cluster_meta |>
+        dplyr::filter(cluster %in% top_enriched$cluster) |>
+        dplyr::left_join(top_enriched |> dplyr::select(cluster, diagnosis, odds_ratio, p.adj),
+                         by = "cluster", suffix = c("", "_enriched")) |>
+        dplyr::filter(!is.na(diagnosis_enriched)) |>
+        dplyr::group_by(cluster, diagnosis_enriched) |>
+        dplyr::summarize(
+          n_sequences = n(),
+          example_CDR3s = paste(head(unique(CDR3b), 5), collapse = ", "),
+          odds_ratio = first(odds_ratio),
+          p.adj = first(p.adj),
+          .groups = "drop"
+        )
+
+      # Export disease-specific CDR3 motifs
+      if (nrow(enriched_cdr3) > 0) {
+        writexl::write_xlsx(
+          enriched_cdr3,
+          "results/tcr_comparison/gliph/disease_enriched_cdr3_motifs.xlsx"
+        )
+        message("    Exported disease-enriched CDR3 motifs")
+      }
+    }
+  }
+
+  # 3b. Motif-level analysis: what CDR3 motifs drive diagnosis differences?
+  message("    Extracting driving motifs from GLIPH clusters")
+
+  # Extract motifs (k-mers of length 3-4) from CDR3 sequences in enriched clusters
+  extract_cdr3_motifs <- function(cdr3_seqs, k = 3) {
+    motifs <- unlist(lapply(cdr3_seqs, function(seq) {
+      if (is.na(seq) || nchar(seq) < k) return(character(0))
+      sapply(1:(nchar(seq) - k + 1), function(i) substr(seq, i, i + k - 1))
+    }))
+    table(motifs)
+  }
+
+  if (nrow(diagnosis_enrichment) > 0) {
+    # For each diagnosis, compare motifs in disease-enriched vs CTRL-enriched clusters
+    dx_with_enrichment <- unique(diagnosis_enrichment$diagnosis)
+
+    motif_driving <- lapply(dx_with_enrichment, function(dx) {
+      # Disease-enriched clusters for this diagnosis
+      dx_enriched_cl <- diagnosis_enrichment |>
+        dplyr::filter(diagnosis == dx, odds_ratio > 1, p.adj < 0.2) |>
+        dplyr::pull(cluster)
+      # CTRL-enriched clusters
+      ctrl_enriched_cl <- diagnosis_enrichment |>
+        dplyr::filter(diagnosis == dx, odds_ratio < 1, p.adj < 0.2) |>
+        dplyr::pull(cluster)
+
+      # Get CDR3 sequences from each set
+      dx_cdr3 <- cluster_meta |>
+        dplyr::filter(cluster %in% dx_enriched_cl, !is.na(CDR3b)) |>
+        dplyr::pull(CDR3b) |> unique()
+      ctrl_cdr3 <- cluster_meta |>
+        dplyr::filter(cluster %in% ctrl_enriched_cl, !is.na(CDR3b)) |>
+        dplyr::pull(CDR3b) |> unique()
+
+      if (length(dx_cdr3) < 3) return(NULL)
+
+      # Extract 3-mer and 4-mer motifs
+      lapply(c(3, 4), function(k) {
+        dx_motifs <- extract_cdr3_motifs(dx_cdr3, k)
+        # Background: all CDR3 sequences
+        all_cdr3 <- cluster_meta |> dplyr::filter(!is.na(CDR3b)) |> dplyr::pull(CDR3b) |> unique()
+        bg_motifs <- extract_cdr3_motifs(all_cdr3, k)
+
+        # Compute enrichment for each motif (Fisher's exact)
+        shared_motifs <- intersect(names(dx_motifs), names(bg_motifs))
+        if (length(shared_motifs) == 0) return(NULL)
+
+        motif_stats <- lapply(shared_motifs, function(m) {
+          a <- as.integer(dx_motifs[m])        # motif in disease-enriched
+          b <- sum(dx_motifs) - a               # other motifs in disease-enriched
+          c_val <- as.integer(bg_motifs[m])     # motif in background
+          d <- sum(bg_motifs) - c_val           # other in background
+          mat <- matrix(c(a, c_val, b, d), nrow = 2)
+          ft <- tryCatch(fisher.test(mat), error = function(e) NULL)
+          if (is.null(ft)) return(NULL)
+          data.frame(
+            diagnosis = dx, motif = m, k = k,
+            count_enriched = a, count_background = c_val,
+            freq_enriched = a / sum(dx_motifs),
+            freq_background = c_val / sum(bg_motifs),
+            odds_ratio = ft$estimate, p.value = ft$p.value
+          )
+        }) |> dplyr::bind_rows()
+
+        if (nrow(motif_stats) > 0) {
+          motif_stats$p.adj <- p.adjust(motif_stats$p.value, method = "BH")
+          motif_stats$log2_fc <- log2((motif_stats$freq_enriched + 1e-6) /
+                                       (motif_stats$freq_background + 1e-6))
+        }
+        motif_stats
+      }) |> dplyr::bind_rows()
+    }) |> dplyr::bind_rows()
+
+    if (!is.null(motif_driving) && nrow(motif_driving) > 0) {
+      # Export full motif table
+      writexl::write_xlsx(
+        motif_driving |> dplyr::arrange(p.adj),
+        "results/tcr_comparison/gliph/motif_enrichment_by_diagnosis.xlsx"
+      )
+
+      # Visualize top driving motifs per diagnosis
+      top_motifs <- motif_driving |>
+        dplyr::filter(p.adj < 0.1, odds_ratio > 1, k == 3) |>
+        dplyr::group_by(diagnosis) |>
+        dplyr::slice_max(order_by = log2_fc, n = 10) |>
+        dplyr::ungroup()
+
+      if (nrow(top_motifs) > 0) {
+        # Consistent diagnosis ordering
+        top_motifs$diagnosis <- factor(top_motifs$diagnosis,
+                                       levels = intersect(neuropathy_dx, unique(top_motifs$diagnosis)))
+
+        p_motifs <- ggplot(top_motifs, aes(x = reorder(motif, log2_fc), y = log2_fc, fill = diagnosis)) +
+          geom_bar(stat = "identity") +
+          geom_text(aes(label = sapply(p.adj, function(p) {
+            if (p < 0.001) "***" else if (p < 0.01) "**" else if (p < 0.05) "*" else ""
+          })), hjust = -0.2, size = 3) +
+          coord_flip() +
+          facet_wrap(~diagnosis, scales = "free_y") +
+          scale_fill_manual(values = diagnosis_col) +
+          theme_pub() +
+          theme(legend.position = "none") +
+          labs(
+            title = "Top CDR3 3-mer motifs enriched in disease-associated GLIPH clusters",
+            x = "CDR3 motif",
+            y = "log2(fold change vs background)"
+          )
+        ggsave("results/tcr_comparison/gliph/driving_motifs_by_diagnosis.pdf",
+               p_motifs, width = 14, height = max(6, length(unique(top_motifs$diagnosis)) * 3))
+      }
+
+      message("    Exported driving motif analysis")
+    }
+  }
+
+  # 3c. Tissue-specific motif and cluster analysis
+  message("    Analyzing tissue-specificity of GLIPH clusters")
+
+  # Test each cluster for tissue enrichment (CSF vs PBMC) using Fisher's exact
+  tissue_enrichment <- lapply(unique(cluster_meta$cluster[!is.na(cluster_meta$cluster)]), function(cl) {
+    cl_data <- cluster_meta |> dplyr::filter(cluster == cl, !is.na(tissue))
+    if (nrow(cl_data) < 3) return(NULL)
+
+    n_csf <- sum(cl_data$tissue == "CSF")
+    n_pbmc <- sum(cl_data$tissue == "PBMC")
+
+    # Background tissue proportions
+    total_csf <- sum(cluster_meta$tissue == "CSF", na.rm = TRUE)
+    total_pbmc <- sum(cluster_meta$tissue == "PBMC", na.rm = TRUE)
+
+    mat <- matrix(c(n_csf, total_csf - n_csf, n_pbmc, total_pbmc - n_pbmc), nrow = 2)
+    ft <- tryCatch(fisher.test(mat), error = function(e) NULL)
+    if (is.null(ft)) return(NULL)
+
+    data.frame(
+      cluster = cl, n_csf = n_csf, n_pbmc = n_pbmc,
+      csf_fraction = n_csf / (n_csf + n_pbmc),
+      tissue_OR = ft$estimate, tissue_p = ft$p.value
+    )
+  }) |> dplyr::bind_rows()
+
+  if (nrow(tissue_enrichment) > 0) {
+    tissue_enrichment$tissue_padj <- p.adjust(tissue_enrichment$tissue_p, method = "BH")
+    tissue_enrichment <- tissue_enrichment |>
+      dplyr::mutate(tissue_bias = case_when(
+        tissue_padj < 0.1 & tissue_OR > 1 ~ "CSF-enriched",
+        tissue_padj < 0.1 & tissue_OR < 1 ~ "PBMC-enriched",
+        TRUE ~ "No bias"
+      ))
+
+    # Combine tissue and diagnosis enrichment
+    if (nrow(diagnosis_enrichment) > 0) {
+      cluster_tissue_dx <- diagnosis_enrichment |>
+        dplyr::filter(p.adj < 0.2, odds_ratio > 1) |>
+        dplyr::left_join(tissue_enrichment |> dplyr::select(cluster, csf_fraction, tissue_OR,
+                                                              tissue_padj, tissue_bias),
+                         by = "cluster")
+
+      if (nrow(cluster_tissue_dx) > 0) {
+        # Consistent diagnosis ordering
+        cluster_tissue_dx$diagnosis <- factor(cluster_tissue_dx$diagnosis,
+                                              levels = intersect(neuropathy_dx, unique(cluster_tissue_dx$diagnosis)))
+
+        # Visualize: scatter of disease enrichment OR vs CSF fraction, colored by tissue bias
+        p_tissue_dx <- ggplot(cluster_tissue_dx,
+                               aes(x = csf_fraction, y = log2(odds_ratio + 0.01),
+                                   color = diagnosis, shape = tissue_bias)) +
+          geom_point(aes(size = cluster_size), alpha = 0.7) +
+          geom_vline(xintercept = 0.5, linetype = "dashed", color = "gray50") +
+          geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+          scale_color_manual(values = diagnosis_col) +
+          scale_shape_manual(values = c("CSF-enriched" = 17, "PBMC-enriched" = 15, "No bias" = 16)) +
+          scale_size_continuous(range = c(2, 7), name = "Cluster size") +
+          theme_pub() +
+          labs(
+            title = "Disease-enriched GLIPH clusters: tissue specificity",
+            x = "CSF fraction of cluster",
+            y = "log2(OR vs CTRL)",
+            shape = "Tissue bias"
+          )
+        ggsave("results/tcr_comparison/gliph/cluster_tissue_vs_diagnosis.pdf",
+               p_tissue_dx, width = 11, height = 8)
+
+        # Summary: how many disease-enriched clusters are tissue-biased?
+        tissue_bias_summary <- cluster_tissue_dx |>
+          dplyr::count(diagnosis, tissue_bias) |>
+          tidyr::pivot_wider(names_from = tissue_bias, values_from = n, values_fill = 0)
+
+        # Bar chart of tissue bias per diagnosis
+        tissue_bias_long <- cluster_tissue_dx |>
+          dplyr::count(diagnosis, tissue_bias)
+
+        tissue_bias_long$tissue_bias <- factor(tissue_bias_long$tissue_bias,
+                                                levels = c("CSF-enriched", "No bias", "PBMC-enriched"))
+
+        p_tissue_bias <- ggplot(tissue_bias_long,
+                                 aes(x = diagnosis, y = n, fill = tissue_bias)) +
+          geom_bar(stat = "identity", position = "stack") +
+          scale_fill_manual(values = c("CSF-enriched" = tissue_col["CSF"],
+                                        "PBMC-enriched" = tissue_col["PBMC"],
+                                        "No bias" = "gray70")) +
+          theme_pub() +
+          theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+          labs(
+            title = "Tissue bias of disease-enriched GLIPH clusters",
+            x = "Diagnosis",
+            y = "Number of clusters",
+            fill = "Tissue bias"
+          )
+        ggsave("results/tcr_comparison/gliph/tissue_bias_per_diagnosis.pdf",
+               p_tissue_bias, width = 10, height = 6)
+
+        # Fisher's exact: is tissue bias associated with diagnosis?
+        if (nrow(tissue_bias_summary) > 1) {
+          tissue_dx_table <- cluster_tissue_dx |>
+            dplyr::mutate(is_csf_biased = tissue_bias == "CSF-enriched") |>
+            dplyr::count(diagnosis, is_csf_biased) |>
+            tidyr::pivot_wider(names_from = is_csf_biased, values_from = n, values_fill = 0)
+          if (ncol(tissue_dx_table) == 3 && nrow(tissue_dx_table) > 1) {
+            fisher_tissue <- tryCatch(
+              fisher.test(as.matrix(tissue_dx_table[, -1])),
+              error = function(e) NULL
+            )
+            if (!is.null(fisher_tissue)) {
+              message(sprintf("      Fisher's test for tissue bias ~ diagnosis: p = %.4f",
+                              fisher_tissue$p.value))
+            }
+          }
+        }
+
+        # Export tissue-specificity results
+        writexl::write_xlsx(
+          list(
+            cluster_tissue_dx = cluster_tissue_dx,
+            tissue_enrichment = tissue_enrichment,
+            tissue_bias_summary = tissue_bias_summary
+          ),
+          "results/tcr_comparison/gliph/tissue_specificity_analysis.xlsx"
+        )
+        message("    Exported tissue-specificity analysis")
+      }
+    }
+  }
+
+  # 3d. Tissue-specific motifs: which motifs are enriched in CSF vs PBMC within disease clusters?
+  message("    Analyzing tissue-specific motifs")
+
+  if (nrow(tissue_enrichment) > 0) {
+    # Get CDR3 sequences from CSF-enriched vs PBMC-enriched disease clusters
+    csf_clusters <- tissue_enrichment$cluster[tissue_enrichment$tissue_bias == "CSF-enriched"]
+    pbmc_clusters <- tissue_enrichment$cluster[tissue_enrichment$tissue_bias == "PBMC-enriched"]
+
+    csf_cdr3 <- cluster_meta |>
+      dplyr::filter(cluster %in% csf_clusters, !is.na(CDR3b)) |>
+      dplyr::pull(CDR3b) |> unique()
+    pbmc_cdr3 <- cluster_meta |>
+      dplyr::filter(cluster %in% pbmc_clusters, !is.na(CDR3b)) |>
+      dplyr::pull(CDR3b) |> unique()
+
+    if (length(csf_cdr3) >= 5 && length(pbmc_cdr3) >= 5) {
+      tissue_motif_comparison <- lapply(c(3, 4), function(k) {
+        csf_m <- extract_cdr3_motifs(csf_cdr3, k)
+        pbmc_m <- extract_cdr3_motifs(pbmc_cdr3, k)
+        shared <- intersect(names(csf_m), names(pbmc_m))
+        if (length(shared) == 0) return(NULL)
+
+        lapply(shared, function(m) {
+          a <- as.integer(csf_m[m]); b <- sum(csf_m) - a
+          c_val <- as.integer(pbmc_m[m]); d <- sum(pbmc_m) - c_val
+          ft <- tryCatch(fisher.test(matrix(c(a, c_val, b, d), nrow = 2)), error = function(e) NULL)
+          if (is.null(ft)) return(NULL)
+          data.frame(
+            motif = m, k = k,
+            count_csf = a, count_pbmc = c_val,
+            freq_csf = a / sum(csf_m), freq_pbmc = c_val / sum(pbmc_m),
+            odds_ratio = ft$estimate, p.value = ft$p.value
+          )
+        }) |> dplyr::bind_rows()
+      }) |> dplyr::bind_rows()
+
+      if (nrow(tissue_motif_comparison) > 0) {
+        tissue_motif_comparison$p.adj <- p.adjust(tissue_motif_comparison$p.value, method = "BH")
+        tissue_motif_comparison$log2_fc <- log2((tissue_motif_comparison$freq_csf + 1e-6) /
+                                                  (tissue_motif_comparison$freq_pbmc + 1e-6))
+
+        # Top tissue-biased motifs
+        top_tissue_motifs <- tissue_motif_comparison |>
+          dplyr::filter(p.adj < 0.1, k == 3) |>
+          dplyr::arrange(desc(abs(log2_fc))) |>
+          dplyr::slice(1:min(30, n()))
+
+        if (nrow(top_tissue_motifs) > 0) {
+          top_tissue_motifs$tissue_direction <- ifelse(top_tissue_motifs$log2_fc > 0,
+                                                        "CSF-enriched", "PBMC-enriched")
+
+          p_tissue_motifs <- ggplot(top_tissue_motifs,
+                                     aes(x = reorder(motif, log2_fc), y = log2_fc,
+                                         fill = tissue_direction)) +
+            geom_bar(stat = "identity") +
+            geom_text(aes(label = sapply(p.adj, function(p) {
+              if (p < 0.001) "***" else if (p < 0.01) "**" else if (p < 0.05) "*" else ""
+            })), hjust = ifelse(top_tissue_motifs$log2_fc > 0, -0.2, 1.2), size = 3) +
+            coord_flip() +
+            scale_fill_manual(values = c("CSF-enriched" = tissue_col["CSF"],
+                                          "PBMC-enriched" = tissue_col["PBMC"])) +
+            theme_pub() +
+            labs(
+              title = "CDR3 motifs differentially enriched in CSF vs PBMC GLIPH clusters",
+              subtitle = "3-mer motifs (FDR < 0.1)",
+              x = "CDR3 motif",
+              y = "log2(CSF freq / PBMC freq)",
+              fill = ""
+            )
+          ggsave("results/tcr_comparison/gliph/tissue_specific_motifs.pdf",
+                 p_tissue_motifs, width = 10, height = max(6, nrow(top_tissue_motifs) * 0.3))
+        }
+
+        writexl::write_xlsx(
+          tissue_motif_comparison |> dplyr::arrange(p.adj),
+          "results/tcr_comparison/gliph/tissue_specific_motif_comparison.xlsx"
+        )
+        message("    Exported tissue-specific motif comparison")
+      }
+    } else {
+      message("    Insufficient tissue-biased clusters for motif comparison (CSF: ",
+              length(csf_cdr3), ", PBMC: ", length(pbmc_cdr3), " unique CDR3s)")
+    }
+  }
+
+ 
+  # 4. Per-diagnosis private cluster analysis
+  disease_specific <- cluster_sharing |>
+    dplyr::filter(cluster_type == "Disease-specific") |>
+    dplyr::separate_rows(diagnoses, sep = ",") |>
+    dplyr::count(diagnoses, name = "n_private_clusters")
+
+  if (nrow(disease_specific) > 0) {
+    # Consistent diagnosis ordering
+    ds_levels <- intersect(c("CTRL", neuropathy_dx), unique(disease_specific$diagnoses))
+    disease_specific$diagnoses <- factor(disease_specific$diagnoses, levels = ds_levels)
+
+    # Binomial test: does any diagnosis have more private clusters than expected by chance?
+    # Expected proportion based on number of cells per diagnosis
+    total_private <- sum(disease_specific$n_private_clusters)
+    if (total_private > 0 && nrow(total_by_diagnosis) > 0) {
+      disease_specific <- disease_specific |>
+        dplyr::left_join(total_by_diagnosis, by = c("diagnoses" = "diagnosis")) |>
+        dplyr::mutate(
+          expected_prop = total / sum(total_by_diagnosis$total),
+          binom_p = mapply(function(k, p) {
+            tryCatch(binom.test(k, total_private, p, alternative = "greater")$p.value,
+                     error = function(e) NA)
+          }, n_private_clusters, expected_prop)
+        )
+      disease_specific$binom_padj <- p.adjust(disease_specific$binom_p, method = "BH")
+    }
+
+    p_private <- ggplot(disease_specific, aes(x = diagnoses, y = n_private_clusters, fill = diagnoses)) +
+      geom_bar(stat = "identity") +
+      scale_fill_manual(values = diagnosis_col) +
+      theme_pub() +
+      theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
+
+    # Annotate bars that are significantly enriched
+    if ("binom_padj" %in% colnames(disease_specific)) {
+      sig_private <- disease_specific |> dplyr::filter(binom_padj < 0.05)
+      if (nrow(sig_private) > 0) {
+        p_private <- p_private +
+          geom_text(data = sig_private,
+                    aes(label = sapply(binom_padj, format_pval)),
+                    vjust = -0.5, size = 4)
+      }
+    }
+
+    p_private <- p_private +
+      labs(
+        title = "Disease-specific GLIPH clusters",
+        subtitle = "Clusters found only in one diagnosis group (binomial test vs expected proportion)",
+        x = "Diagnosis",
+        y = "Number of private clusters"
+      )
+    ggsave("results/tcr_comparison/gliph/disease_specific_clusters.pdf", p_private, width = 8, height = 6)
+  }
+
+  # 6. Heatmap of cluster presence across patient-tissue combinations
+  # This helps visualize patient effects
+  patient_cluster_mat <- cluster_meta |>
+    dplyr::filter(!is.na(cluster), !is.na(patient), !is.na(tissue)) |>
+    dplyr::mutate(patient_tissue = paste(patient, tissue, sep = "_")) |>
+    dplyr::count(cluster, patient_tissue) |>
+    tidyr::pivot_wider(names_from = patient_tissue, values_from = n, values_fill = 0) |>
+    tibble::column_to_rownames("cluster") |>
+    as.matrix()
+
+  if (nrow(patient_cluster_mat) > 5 && ncol(patient_cluster_mat) > 2) {
+    # Select top clusters by variance
+    cluster_var <- apply(patient_cluster_mat, 1, var)
+    top_var_clusters <- names(sort(cluster_var, decreasing = TRUE))[1:min(50, nrow(patient_cluster_mat))]
+    mat_subset <- patient_cluster_mat[top_var_clusters, ]
+
+    # Create annotation for columns
+    col_anno <- data.frame(
+      patient_tissue = colnames(mat_subset)
+    ) |>
+      tidyr::separate(patient_tissue, into = c("patient", "tissue"), sep = "_", remove = FALSE) |>
+      dplyr::left_join(sample_summary |> dplyr::distinct(patient, diagnosis), by = "patient") |>
+      tibble::column_to_rownames("patient_tissue")
+
+    pdf("results/tcr_comparison/gliph/cluster_patient_tissue_heatmap.pdf", width = 14, height = 12)
+    pheatmap::pheatmap(
+      log10(mat_subset + 1),
+      color = colorRampPalette(c("white", "navy"))(50),
+      annotation_col = col_anno |> dplyr::select(diagnosis, tissue),
+      annotation_colors = list(diagnosis = diagnosis_col, tissue = tissue_col),
+      main = "GLIPH cluster presence across patients/tissues",
+      fontsize_row = 6,
+      fontsize_col = 8,
+      cluster_cols = TRUE,
+      cluster_rows = TRUE
+    )
+    dev.off()
+  }
+
+  # Export comprehensive results
+  message("  Exporting GLIPH results")
+
+  export_list <- list()
+  if (!is.null(gliph_out$clusters)) export_list$cluster_properties <- gliph_out$clusters
+  if (!is.null(cluster_meta)) export_list$cluster_membership <- cluster_meta
+  if (nrow(diagnosis_enrichment) > 0) export_list$diagnosis_enrichment <- diagnosis_enrichment
+  if (!is.null(gliph_motifs) && nrow(gliph_motifs) > 0) export_list$motifs <- gliph_motifs
+  export_list$cluster_sharing <- cluster_sharing
+  if (exists("tissue_enrichment") && nrow(tissue_enrichment) > 0) {
+    export_list$tissue_enrichment <- tissue_enrichment
+  }
+  if (exists("motif_driving") && !is.null(motif_driving) && nrow(motif_driving) > 0) {
+    export_list$motif_driving <- motif_driving
+  }
+
+  writexl::write_xlsx(export_list, "results/tcr_comparison/gliph/gliph_analysis_results.xlsx")
+
+  message("  GLIPH analysis COMPLETE!")
+
+  list(
+    gliph = gliph_out,
+    cluster_meta = cluster_meta,
+    diagnosis_enrichment = diagnosis_enrichment,
+    cluster_sharing = cluster_sharing,
+    motifs = gliph_motifs,
+    tissue_enrichment = if (exists("tissue_enrichment")) tissue_enrichment else NULL,
+    motif_driving = if (exists("motif_driving")) motif_driving else NULL
+  )
+
+}, error = function(e) {
+  message("  GLIPH2 analysis failed: ", e$message)
+  NULL
+})
+
+
+# ============================================================================
+# Section 11: Summary export
+# ============================================================================
+message("Section 11: Exporting summary")
 
 all_stats <- list(
   aa_composition = aa_stats_combined,
@@ -1460,8 +2934,37 @@ if (exists("esm_permanova_results") && length(esm_permanova_results) > 0) {
   permanova_summary <- dplyr::bind_rows(permanova_summary, esm_summary)
 }
 
+# Add TCRdist PERMANOVA results
+if (!is.null(tcrdist_results) && length(tcrdist_results$permanova) > 0) {
+  tcrdist_summary <- lapply(names(tcrdist_results$permanova), function(ch) {
+    res <- tcrdist_results$permanova[[ch]]
+    data.frame(
+      analysis = "tcrdist",
+      chain = ch,
+      term = rownames(res),
+      Df = res$Df,
+      SumOfSqs = res$SumOfSqs,
+      R2 = res$R2,
+      F = res$F,
+      p.value = res[, "Pr(>F)"]
+    )
+  }) |> dplyr::bind_rows()
+  permanova_summary <- dplyr::bind_rows(permanova_summary, tcrdist_summary)
+}
+
 if (nrow(permanova_summary) > 0) {
   all_stats$permanova <- permanova_summary
+}
+
+# Add GLIPH diagnosis enrichment results
+if (!is.null(gliph_results) && !is.null(gliph_results$enrichment) && nrow(gliph_results$enrichment) > 0) {
+  all_stats$gliph_diagnosis_enrichment <- gliph_results$enrichment
+}
+if (!is.null(gliph_results) && !is.null(gliph_results$tissue_enrichment) && nrow(gliph_results$tissue_enrichment) > 0) {
+  all_stats$gliph_tissue_enrichment <- gliph_results$tissue_enrichment
+}
+if (!is.null(gliph_results) && !is.null(gliph_results$motif_driving) && nrow(gliph_results$motif_driving) > 0) {
+  all_stats$gliph_driving_motifs <- gliph_results$motif_driving
 }
 
 writexl::write_xlsx(all_stats, "results/tcr_comparison/tables/tcr_statistics_comprehensive.xlsx")

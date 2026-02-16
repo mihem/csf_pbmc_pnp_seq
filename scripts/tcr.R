@@ -635,6 +635,63 @@ write_xlsx(
     file.path("results", "tcr", "shared_clones_summary.xlsx")
 )
 
+# Compare abundance of shared clones between CSF and PBMC
+shared_clones_csf_pbmc <- sc_tcr@meta.data |>
+    tibble() |>
+    dplyr::select(CTaa, tissue, diagnosis, clonalFrequency, patient) |>
+    tidyr::drop_na() |>
+    dplyr::distinct() |>
+    dplyr::group_by(CTaa) |>
+    dplyr::filter(n() > 1) |>
+    dplyr::ungroup() |>
+    tidyr::pivot_wider(
+        names_from = tissue,
+        values_from = clonalFrequency,
+        names_prefix = "freq_"
+    ) |>
+    tidyr::drop_na(freq_CSF, freq_PBMC) |>
+    dplyr::filter(freq_CSF > 1 | freq_PBMC > 1) |>
+    dplyr::mutate(
+        log2_ratio = log2(freq_CSF / freq_PBMC),
+        enriched_in = case_when(
+            log2_ratio > 1 ~ "CSF",
+            log2_ratio < -1 ~ "PBMC",
+            TRUE ~ "Similar"
+        )
+    )
+
+# Create violin plot showing distribution of log2 ratio
+shared_clones_ratio_plot <- ggplot(
+    shared_clones_csf_pbmc,
+    aes(x = diagnosis, y = log2_ratio, fill = diagnosis)
+) +
+    geom_violin(alpha = .5, width = 1.5) +
+    geom_boxplot(alpha = .5, width = .2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey30") +
+    scale_fill_manual(values = sc_tcr@misc$diagnosis_col) +
+    scale_y_continuous(breaks = seq(-10, 10, by = 1)) +
+    labs(
+        x = "",
+        y = "log2(CSF / blood frequency)",
+        title = "Shared Clone Enrichment",
+        subtitle = "Positive = enriched in CSF, Negative = enriched in blood"
+    ) +
+    theme_classic() +
+    theme(legend.position = "none") 
+
+ggsave(
+    plot = shared_clones_ratio_plot,
+    file.path("results", "tcr", "shared_clones_enrichment_ratio_expanded.pdf"),
+    width = 5,
+    height = 3
+)
+
+# Save the data
+write_xlsx(
+    shared_clones_csf_pbmc,
+    file.path("results", "tcr", "shared_clones_csf_pbmc_abundance.xlsx")
+)
+
 shared_clones_summary |>
     dplyr::filter(CTaa == "CAVRDSNYQLIW_CASSDSSGGANEQFF") |>
     data.frame()

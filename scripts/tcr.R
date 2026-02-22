@@ -351,8 +351,8 @@ stackedPlot(
     x_order = sc_tcr_csf@misc$diagnosis_order,
     y_order = clone_labels,
     color = clone_cols,
-    width = 4,
-    height = 4,
+    width = 5,
+    height = 3,
     dir_output = file.path("results", "abundance")
 )
 
@@ -363,8 +363,8 @@ stackedPlot(
     x_order = sc_tcr_pbmc@misc$diagnosis_order,
     y_order = clone_labels,
     color = clone_cols,
-    width = 4,
-    height = 4,
+    width = 5,
+    height = 3,
     dir_output = file.path("results", "abundance")
 )
 

@@ -311,6 +311,17 @@ stackedPlot(
     height = 5
 )
 
+sc_tcr_csf <- subset(
+    sc_tcr,
+    subset = tissue == "CSF"
+)
+
+sc_tcr_pbmc <- subset(
+    sc_tcr,
+    subset = tissue == "PBMC"
+)
+
+
 sc_tcr_main_groups <- subset(
     sc_tcr,
     subset = diagnosis %in% c("CTRL", "CIAP", "CIDP", "GBS")
@@ -332,6 +343,30 @@ sc_tcr_main_groups_pbmc <- subset(
 
 # sanity chec
 table(sc_tcr_main_groups$diagnosis)
+
+stackedPlot(
+    object = sc_tcr_csf,
+    x_axis = "diagnosis",
+    y_axis = "cloneSize",
+    x_order = sc_tcr_csf@misc$diagnosis_order,
+    y_order = clone_labels,
+    color = clone_cols,
+    width = 4,
+    height = 4,
+    dir_output = file.path("results", "abundance")
+)
+
+stackedPlot(
+    object = sc_tcr_pbmc,
+    x_axis = "diagnosis",
+    y_axis = "cloneSize",
+    x_order = sc_tcr_pbmc@misc$diagnosis_order,
+    y_order = clone_labels,
+    color = clone_cols,
+    width = 4,
+    height = 4,
+    dir_output = file.path("results", "abundance")
+)
 
 stackedPlot(
     object = sc_tcr_main_groups_csf,

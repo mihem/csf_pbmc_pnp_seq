@@ -17,8 +17,7 @@
 #     - tissue_compartmentalization_scatter, cross_cohort_cluster_sharing_alluvial,
 #       sukenikova_acute_vs_recovery, cross_cohort_top_cluster_composition
 #   Myelin reactivity:
-#     - myelin_antigen_reactivity_dotplot, myelin_cluster_network,
-#       myelin_exact_hamming_match_table
+#     - myelin_cluster_network
 #   Supplementary:
 #     - enriched_clusters_overview_bubble, diagnosis_cluster_sharing_heatmap,
 #       tissue_bias_fraction_by_diagnosis, csf_vs_pbmc_motif_enrichment,
@@ -91,14 +90,10 @@ message("Generating manuscript figures")
 message("============================================================\n")
 
 
-# ==============================================================================
-# STORY A: GLIPH Enrichment, Composition, CDR3 Features
-# ==============================================================================
-
 # ------------------------------------------------------------------------------
 # A1: Enrichment Volcano (faceted by diagnosis)
 # ------------------------------------------------------------------------------
-message("--- Figure A1: Enrichment volcano ---")
+message("--- Enrichment volcano ---")
 
 if (exists("diagnosis_enrichment") && nrow(diagnosis_enrichment) > 0 &&
     exists("tissue_enrichment") && nrow(tissue_enrichment) > 0) {
@@ -159,7 +154,7 @@ if (exists("diagnosis_enrichment") && nrow(diagnosis_enrichment) > 0 &&
 # ------------------------------------------------------------------------------
 # A2: Cluster Composition Heatmap (ComplexHeatmap)
 # ------------------------------------------------------------------------------
-message("--- Figure A2: Cluster composition heatmap ---")
+message("--- Cluster composition heatmap ---")
 
 if (requireNamespace("ComplexHeatmap", quietly = TRUE) &&
     exists("cluster_composition") && nrow(cluster_composition) > 0 &&
@@ -221,7 +216,7 @@ if (requireNamespace("ComplexHeatmap", quietly = TRUE) &&
 # ------------------------------------------------------------------------------
 # A3: Private vs Shared Clusters (stacked bar)
 # ------------------------------------------------------------------------------
-message("--- Figure A3: Private vs shared clusters ---")
+message("--- Private vs shared clusters ---")
 
 if (exists("specificity_summary") && nrow(specificity_summary) > 0) {
 
@@ -260,7 +255,7 @@ if (exists("specificity_summary") && nrow(specificity_summary) > 0) {
 # ------------------------------------------------------------------------------
 # A4: CDR3 Length Constraint (density, faceted by diagnosis)
 # ------------------------------------------------------------------------------
-message("--- Figure A4: CDR3 length constraint ---")
+message("--- CDR3 length constraint ---")
 
 if (exists("enriched_cdr3_lengths") && nrow(enriched_cdr3_lengths) > 0 &&
     exists("bg_cdr3_lengths") && nrow(bg_cdr3_lengths) > 0) {
@@ -327,7 +322,7 @@ if (exists("enriched_cdr3_lengths") && nrow(enriched_cdr3_lengths) > 0 &&
 # ------------------------------------------------------------------------------
 # A5: V-Gene Within Clusters Dot Plot
 # ------------------------------------------------------------------------------
-message("--- Figure A5: V-gene within clusters dot plot ---")
+message("--- V-gene within clusters dot plot ---")
 
 if (exists("vgene_enrichment_tests") && nrow(vgene_enrichment_tests) > 0) {
 
@@ -384,7 +379,7 @@ if (exists("vgene_enrichment_tests") && nrow(vgene_enrichment_tests) > 0) {
 # ------------------------------------------------------------------------------
 # A6: Public Clone Rates
 # ------------------------------------------------------------------------------
-message("--- Figure A6: Public clone rates ---")
+message("--- Public clone rates ---")
 
 if (exists("public_clone_rates") && nrow(public_clone_rates) > 0) {
 
@@ -419,7 +414,7 @@ if (exists("public_clone_rates") && nrow(public_clone_rates) > 0) {
 # ------------------------------------------------------------------------------
 # A7: Motif Enrichment (faceted horizontal bar, top 5 per dx)
 # ------------------------------------------------------------------------------
-message("--- Figure A7: Motif enrichment faceted ---")
+message("--- Motif enrichment faceted ---")
 
 if (exists("motif_driving") && !is.null(motif_driving) && nrow(motif_driving) > 0) {
 
@@ -463,15 +458,10 @@ if (exists("motif_driving") && !is.null(motif_driving) && nrow(motif_driving) > 
   message("  SKIP: no motif data")
 }
 
-
-# ==============================================================================
-# STORY B: Tissue Compartmentalization & Cross-Cohort
-# ==============================================================================
-
 # ------------------------------------------------------------------------------
 # B1: CSF Fraction vs Enrichment Scatter
 # ------------------------------------------------------------------------------
-message("--- Figure B1: CSF vs enrichment scatter ---")
+message("--- CSF vs enrichment scatter ---")
 
 if (exists("cluster_tissue_dx") && nrow(cluster_tissue_dx) > 0) {
 
@@ -520,7 +510,7 @@ if (exists("cluster_tissue_dx") && nrow(cluster_tissue_dx) > 0) {
 # ------------------------------------------------------------------------------
 # B2: Cross-Cohort Alluvial (ggalluvial)
 # ------------------------------------------------------------------------------
-message("--- Figure B2: Cross-cohort alluvial ---")
+message("--- Cross-cohort alluvial ---")
 
 if (exists("cross_cohort") && nrow(cross_cohort) > 0 &&
     sum(cross_cohort$cross_cohort) > 0) {
@@ -576,7 +566,7 @@ if (exists("cross_cohort") && nrow(cross_cohort) > 0 &&
 # ------------------------------------------------------------------------------
 # B3: Sukenikova Timepoint Comparison (grouped bar)
 # ------------------------------------------------------------------------------
-message("--- Figure B3: Sukenikova timepoint comparison ---")
+message("--- Sukenikova timepoint comparison ---")
 
 if (exists("timepoint_summary") && nrow(timepoint_summary) > 0) {
 
@@ -626,7 +616,7 @@ if (exists("timepoint_summary") && nrow(timepoint_summary) > 0) {
 # ------------------------------------------------------------------------------
 # B4: Cross-Cohort Cluster Profiles (top 10 stacked bar)
 # ------------------------------------------------------------------------------
-message("--- Figure B4: Cross-cohort cluster profiles ---")
+message("--- Cross-cohort cluster profiles ---")
 
 if (exists("cross_cohort") && nrow(cross_cohort) > 0 &&
     exists("cluster_composition") && nrow(cluster_composition) > 0) {
@@ -674,60 +664,11 @@ if (exists("cross_cohort") && nrow(cross_cohort) > 0 &&
 # STORY C: Myelin Reactivity
 # ==============================================================================
 
-# ------------------------------------------------------------------------------
-# C1: Myelin Reactivity Dot Plot (diagnosis x antigen)
-# ------------------------------------------------------------------------------
-message("--- Figure C1: Myelin reactivity dot plot ---")
-
-if (exists("antigen_cluster_enrichment") && nrow(antigen_cluster_enrichment) > 0) {
-
-  # Aggregate: per diagnosis, per antigen
-  myelin_dot_data <- antigen_cluster_enrichment |>
-    dplyr::filter(!is.na(dx_enriched), !is.na(antigen)) |>
-    dplyr::group_by(dx_enriched, antigen) |>
-    dplyr::summarize(
-      n_reactive = sum(n_antigen_in_cluster, na.rm = TRUE),
-      mean_OR = mean(dx_OR, na.rm = TRUE),
-      min_padj = min(dx_padj, na.rm = TRUE),
-      n_clusters = dplyr::n(),
-      .groups = "drop"
-    ) |>
-    dplyr::mutate(
-      log2_OR = log2(pmax(mean_OR, 1e-4)),
-      sig_label = sapply(min_padj, format_pval)
-    )
-
-  if (nrow(myelin_dot_data) > 0) {
-    p_c1 <- ggplot(myelin_dot_data,
-                   aes(x = antigen, y = dx_enriched,
-                       size = n_reactive, color = log2_OR)) +
-      geom_point() +
-      geom_text(aes(label = sig_label), size = 3, vjust = -1, color = "black") +
-      scale_color_gradient2(low = "#2166AC", mid = "white", high = "#B2182B",
-                            midpoint = 0, name = expression(log[2](OR))) +
-      scale_size_continuous(range = c(2, 10), name = "n reactive TCRs") +
-      theme_pub() +
-      theme(
-        axis.text.x = element_text(angle = 45, hjust = 1),
-        panel.grid.major = element_line(color = "grey92", linewidth = 0.3)
-      ) +
-      labs(
-        title = "Myelin antigen reactivity in disease-enriched GLIPH2 clusters",
-        x = "Myelin antigen",
-        y = "Enriched diagnosis"
-      )
-
-    safe_save("fig_gliph_myelin_antigen_reactivity_dotplot.pdf", p_c1, 8, 6)
-  }
-} else {
-  message("  SKIP: no antigen cluster enrichment data")
-}
-
 
 # ------------------------------------------------------------------------------
-# C2: Myelin Cluster Network (ggraph)
+# C1: Myelin Cluster Network (ggraph)
 # ------------------------------------------------------------------------------
-message("--- Figure C2: Myelin cluster network ---")
+message("--- Myelin cluster network ---")
 
 if (exists("myelin_clusters") && length(myelin_clusters) > 0 &&
     exists("cluster_meta") && nrow(cluster_meta) > 0) {
@@ -806,9 +747,9 @@ if (exists("myelin_clusters") && length(myelin_clusters) > 0 &&
 
 
 # ------------------------------------------------------------------------------
-# C3: Exact and Near Match Table
+# C2: Exact and Near Match Table
 # ------------------------------------------------------------------------------
-message("--- Figure C3: Exact/near match table ---")
+message("--- Exact/near match table ---")
 
 has_exact <- exists("exact_matches") && nrow(exact_matches) > 0
 has_near  <- exists("near_matches_annotated") && nrow(near_matches_annotated) > 0
@@ -881,7 +822,7 @@ if (has_exact || has_near) {
 # ------------------------------------------------------------------------------
 # S1: GLIPH Overview Bubble (enriched clusters jitter)
 # ------------------------------------------------------------------------------
-message("--- Figure S1: GLIPH overview bubble ---")
+message("--- GLIPH overview bubble ---")
 
 if (exists("diagnosis_enrichment") && nrow(diagnosis_enrichment) > 0) {
 
@@ -945,7 +886,7 @@ if (exists("diagnosis_enrichment") && nrow(diagnosis_enrichment) > 0) {
 # ------------------------------------------------------------------------------
 # S2: Diagnosis Sharing Heatmap (ComplexHeatmap)
 # ------------------------------------------------------------------------------
-message("--- Figure S2: Diagnosis sharing heatmap ---")
+message("--- Diagnosis sharing heatmap ---")
 
 if (requireNamespace("ComplexHeatmap", quietly = TRUE) &&
     exists("cluster_meta") && nrow(cluster_meta) > 0) {
@@ -1002,7 +943,7 @@ if (requireNamespace("ComplexHeatmap", quietly = TRUE) &&
 # ------------------------------------------------------------------------------
 # S3: Tissue Bias Fractions (fraction-based stacked bar)
 # ------------------------------------------------------------------------------
-message("--- Figure S3: Tissue bias fractions ---")
+message("--- Tissue bias fractions ---")
 
 if (exists("tissue_bias_summary") && nrow(tissue_bias_summary) > 0) {
 
@@ -1044,7 +985,7 @@ if (exists("tissue_bias_summary") && nrow(tissue_bias_summary) > 0) {
 # ------------------------------------------------------------------------------
 # S4: Tissue Motifs Mirrored Bar (CSF vs PBMC)
 # ------------------------------------------------------------------------------
-message("--- Figure S4: Tissue motifs mirrored ---")
+message("--- Tissue motifs mirrored ---")
 
 if (exists("tissue_motif_comparison") && !is.null(tissue_motif_comparison) &&
     nrow(tissue_motif_comparison) > 0) {
@@ -1094,7 +1035,7 @@ if (exists("tissue_motif_comparison") && !is.null(tissue_motif_comparison) &&
 # ------------------------------------------------------------------------------
 # S5: Myelin Enrichment Bar (per diagnosis)
 # ------------------------------------------------------------------------------
-message("--- Figure S5: Myelin enrichment bar ---")
+message("--- Myelin enrichment bar ---")
 
 if (exists("myelin_enrichment") && nrow(myelin_enrichment) > 0) {
 
@@ -1132,7 +1073,7 @@ if (exists("myelin_enrichment") && nrow(myelin_enrichment) > 0) {
 # ------------------------------------------------------------------------------
 # S6: Cross-Cohort Overlap Bar (shared clusters per Heming dx)
 # ------------------------------------------------------------------------------
-message("--- Figure S6: Cross-cohort overlap ---")
+message("--- Cross-cohort overlap ---")
 
 if (exists("cross_dx") && nrow(cross_dx) > 0) {
 

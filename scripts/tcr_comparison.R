@@ -2,28 +2,41 @@
 # TCR Repertoire Comparison with Sukenikova Integration
 # ==============================================================================
 #
-# Consolidated analysis script for CSF/PBMC neuropathy TCR sequencing.
-# Compares TCR repertoires across neuropathy diagnoses (GBS, CIDP, CIAP, MAG,
-# MFS, PNC, CAN, PPN) vs healthy controls (CTRL).
+# Analysis script for CSF/PBMC neuropathy single-cell TCR sequencing data
+# (our cohort), integrated with bulk TCR-beta sequencing from the
+# Sukenikova et al. Nature study of Guillain-Barre syndrome (GBS).
+#
+# Goal: Identify disease-specific TCR convergence patterns across neuropathies
+# (GBS, CIDP, CIAP, MAG, MFS, PNC, CAN, PPN) vs healthy controls (CTRL),
+# assess CSF vs blood compartmentalization, and cross-validate against the
+# published GBS myelin-reactive clonotype catalog.
+#
+# Approach:
+#   - GLIPH2 clusters CDR3-beta sequences predicted to bind similar antigens
+#   - Fisher's exact tests identify disease- and tissue-enriched clusters
+#   - Cross-referencing with Sukenikova supp table maps myelin reactivity
 #
 # Sections:
 #   0. Setup & Data Loading
 #   1. Sukenikova Data Import (Adaptive immunoseq bulk TCRB)
-#   2. V/J Gene Usage Analysis
+#   2. V/J Gene Usage Analysis (mixed models, emmeans contrasts vs CTRL)
 #   3. GLIPH2 Combined Analysis (single-cell + Sukenikova)
 #   4. Sukenikova Cross-Reference (myelin reactivity, cluster mirroring)
 #   5. Save Cache for Figure Script
+#
+# Outputs:
+#   - Excel tables in results/tcr_comparison/
+#   - Analysis cache in data/cache/gliph_results.qs (read by tcr_gliph_figures.R)
 #
 # ==============================================================================
 
 # ==============================================================================
 # Section 0: Setup & Data Loading
 # ==============================================================================
-
-if (nzchar(Sys.getenv("RENV_PROJECT"))) {
-  Sys.setenv(RENV_PROJECT = "")
-  message("Note: renv deactivated, using system packages")
-}
+# Load the Seurat object containing single-cell TCR metadata (CTaa, CTgene
+# columns from scRepertoire), extract paired TRA/TRB CDR3 sequences, and
+# define diagnosis-level constants used throughout the script.
+# ==============================================================================
 
 set.seed(42)
 
@@ -48,6 +61,7 @@ library(ggrepel)
 library(gridExtra)
 library(grid)
 library(turboGliph)
+library(janitor)
 
 # Constants
 neuropathy_dx <- c("CIAP", "CIDP", "GBS", "MAG", "MFS", "PNC", "CAN", "PPN")
@@ -116,7 +130,10 @@ message(sprintf("  Loaded %d cells with TCR, %d unique clonotypes, %d patients",
 # Helper functions
 # ==============================================================================
 
-# Mixed model: diagnosis vs CTRL with patient random effect
+# run_diagnosis_stats: Tests each neuropathy diagnosis against CTRL for a given
+# numeric outcome. Fits a linear mixed model with patient as random intercept
+# (and optionally tissue as fixed effect), then extracts Dunnett-style contrasts
+# via emmeans. Falls back to pairwise Wilcoxon tests if the mixed model fails.
 run_diagnosis_stats <- function(data, value_col, include_tissue = TRUE) {
   data_clean <- data |>
     dplyr::filter(!is.na(.data[[value_col]]), !is.na(diagnosis), !is.na(patient)) |>
@@ -212,7 +229,9 @@ format_pval <- function(p) {
   return("")
 }
 
-# Extract k-mer motifs from CDR3 sequences
+# extract_cdr3_motifs: Slides a k-length window across CDR3 amino acid sequences
+# and counts occurrences of each k-mer. Used to compare motif frequencies between
+# disease-enriched GLIPH clusters and the full repertoire background.
 extract_cdr3_motifs <- function(cdr3_seqs, k = 3) {
   motifs <- unlist(lapply(cdr3_seqs, function(seq) {
     if (is.na(seq) || nchar(seq) < k) return(character(0))
@@ -224,6 +243,12 @@ extract_cdr3_motifs <- function(cdr3_seqs, k = 3) {
 
 # ==============================================================================
 # Section 1: Sukenikova Data Import
+# ==============================================================================
+# Imports bulk TCR-beta sequencing data from the Sukenikova et al. Nature GBS
+# study (Adaptive immunoSEQ platform). These are 22 TSV files from 6 GBS
+# patients sampled at acute (AC) and recovery (REC) timepoints in blood, CSF,
+# and nerve biopsy. We also load their supplementary table 2, which annotates
+# myelin-reactive clonotypes (P0, P2, PMP22 antigens) for cross-referencing.
 # ==============================================================================
 message("\n", paste(rep("=", 60), collapse = ""))
 message("Section 1: Sukenikova Data Import")
@@ -337,6 +362,10 @@ myelin_lookup <- sukenikova_reactive |>
 # --------------------------------------------------------------------------
 # 1c. Size normalization
 # --------------------------------------------------------------------------
+# Sukenikova bulk data has ~100x more unique CDR3b than our single-cell data.
+# To avoid GLIPH2 being dominated by the larger dataset, we (1) deduplicate
+# per patient and (2) cap at top 1000 clonotypes/patient by template count.
+# --------------------------------------------------------------------------
 message("  [1c] Size normalization analysis...")
 
 # Report size comparison
@@ -406,6 +435,12 @@ message("    Saved import summary to sukenikova/sukenikova_import_summary.xlsx")
 
 # ==============================================================================
 # Section 2: V/J Gene Usage Analysis
+# ==============================================================================
+# Compares V-gene and J-gene usage across diagnoses using linear mixed models.
+# For each of the top 25 genes in each chain (TRA/TRB) and segment (V/J),
+# we test whether the gene's proportion in any neuropathy differs from CTRL.
+# Generates per-diagnosis volcano plots and a summary heatmap of significant
+# shifts.
 # ==============================================================================
 message("\n", paste(rep("=", 60), collapse = ""))
 message("Section 2: V/J Gene Usage Analysis")
@@ -540,6 +575,21 @@ message("  Saved gene usage statistics")
 # ==============================================================================
 # Section 3: GLIPH2 Combined Analysis
 # ==============================================================================
+# GLIPH2 (Grouping of Lymphocyte Interactions by Paratope Hotspots) clusters
+# CDR3-beta sequences into "specificity groups" predicted to recognize similar
+# peptide-MHC complexes. We run turboGliph on the combined Heming single-cell
+# + Sukenikova bulk repertoires, then analyze the resulting clusters for:
+#   3a. Input preparation (combine both datasets)
+#   3b. turboGliph execution
+#   3c. Disease enrichment (Fisher's exact: each diagnosis vs CTRL per cluster)
+#   3d. Tissue compartmentalization (CSF vs PBMC bias per cluster)
+#   3e. CDR3 motif extraction (k-mer enrichment in disease clusters)
+#   3f. Cross-cohort cluster analysis (which clusters span both datasets?)
+#   3g. Cluster composition profiling (private vs shared)
+#   3h. CDR3 length distributions in enriched clusters
+#   3i. V-gene usage within GLIPH clusters
+#   3j. Public clone analysis (CDR3b shared by 2+ patients)
+# ==============================================================================
 message("\n", paste(rep("=", 60), collapse = ""))
 message("Section 3: GLIPH2 Combined Analysis (Heming + Sukenikova)")
 message(paste(rep("=", 60), collapse = ""))
@@ -648,6 +698,12 @@ message(sprintf("    Matched %d / %d sequences to metadata", n_matched,
 # --------------------------------------------------------------------------
 # 3c. Disease enrichment analysis
 # --------------------------------------------------------------------------
+# For each GLIPH cluster, test whether any neuropathy diagnosis is
+# over-represented compared to CTRL using Fisher's exact test. A cluster
+# enriched for GBS (OR > 1, FDR < 0.1) suggests GBS-specific antigen
+# recognition. These "enriched_cluster_ids" are the basis for downstream
+# analyses (tissue bias, motifs, public clones, myelin cross-referencing).
+# --------------------------------------------------------------------------
 message("  [3c] Analyzing diagnosis enrichment in GLIPH clusters...")
 
 # Total cells per diagnosis
@@ -725,9 +781,14 @@ if (nrow(diagnosis_enrichment) > 0) {
 # --------------------------------------------------------------------------
 # 3d. Tissue compartmentalization
 # --------------------------------------------------------------------------
+# Tests whether GLIPH clusters show preferential representation in CSF or
+# blood (PBMC). CSF-enriched disease clusters may indicate intrathecal
+# antigen-driven expansion, relevant to inflammatory neuropathies where
+# autoreactive T cells traffic across the blood-nerve barrier.
+# --------------------------------------------------------------------------
 message("  [3d] Analyzing tissue-specificity of GLIPH clusters...")
 
-# Standardize Sukenikova tissue labels to match Heming
+# Standardize Sukenikova tissue labels to match Heming (our data)
 cluster_meta <- cluster_meta |>
   dplyr::mutate(
     tissue_standard = case_when(
@@ -803,6 +864,11 @@ if (nrow(tissue_enrichment) > 0) {
 
 # --------------------------------------------------------------------------
 # 3e. CDR3 motif extraction from disease-enriched clusters
+# --------------------------------------------------------------------------
+# Compares k-mer (3- and 4-mer) amino acid motif frequencies between CDR3
+# sequences in disease-enriched clusters vs the full repertoire background.
+# Enriched motifs suggest conserved binding determinants within specificity
+# groups. Also compares motifs between CSF-enriched and PBMC-enriched clusters.
 # --------------------------------------------------------------------------
 message("  [3e] Extracting driving motifs from GLIPH clusters...")
 
@@ -919,6 +985,12 @@ if (nrow(tissue_enrichment) > 0) {
 # --------------------------------------------------------------------------
 # 3f. Cross-cohort cluster analysis
 # --------------------------------------------------------------------------
+# Identifies GLIPH clusters that contain TCR sequences from BOTH the our
+# single-cell cohort and Sukenikova bulk GBS cohort. Cross-cohort clusters
+# represent convergent antigen recognition across independent patient
+# populations, strengthening the case for shared autoimmune targets.
+# Normalized by total clusters per diagnosis to account for unequal group sizes.
+# --------------------------------------------------------------------------
 message("  [3f] Cross-cohort cluster analysis...")
 
 # Identify clusters containing TCRs from both datasets
@@ -949,10 +1021,26 @@ if (n_cross > 0) {
     dplyr::count(heming_diagnoses, name = "n_shared_clusters") |>
     dplyr::arrange(desc(n_shared_clusters))
 
+  # Normalize by total clusters per diagnosis
+  total_clusters_per_dx <- cluster_meta |>
+    dplyr::filter(!is.na(diagnosis), !is.na(cluster)) |>
+    dplyr::distinct(cluster, diagnosis) |>
+    dplyr::count(diagnosis, name = "total_clusters_with_dx")
+
+  cross_dx <- cross_dx |>
+    dplyr::left_join(total_clusters_per_dx,
+                     by = c("heming_diagnoses" = "diagnosis")) |>
+    dplyr::mutate(
+      shared_fraction = n_shared_clusters / total_clusters_with_dx
+    )
+
   message("    Heming diagnoses sharing clusters with Sukenikova GBS:")
   for (i in seq_len(nrow(cross_dx))) {
-    message(sprintf("      %s: %d clusters", cross_dx$heming_diagnoses[i],
-                    cross_dx$n_shared_clusters[i]))
+    message(sprintf("      %s: %d / %d clusters (%.1f%%)",
+                    cross_dx$heming_diagnoses[i],
+                    cross_dx$n_shared_clusters[i],
+                    cross_dx$total_clusters_with_dx[i],
+                    cross_dx$shared_fraction[i] * 100))
   }
 }
 
@@ -997,6 +1085,12 @@ message("    Saved cross-cohort cluster analysis")
 
 # --------------------------------------------------------------------------
 # 3g. Cluster composition profiling
+# --------------------------------------------------------------------------
+# Classifies each GLIPH cluster by its diagnosis composition:
+#   - Private (>=90% from one diagnosis): likely disease-specific epitope
+#   - Semi-private (>=60%): predominantly one disease with some sharing
+#   - Promiscuous (<60%): shared across multiple diagnoses
+# Shannon entropy quantifies the diagnostic diversity of each cluster.
 # --------------------------------------------------------------------------
 message("  [3g] Cluster composition profiling...")
 
@@ -1065,6 +1159,11 @@ message("    Saved cluster composition profiling")
 # --------------------------------------------------------------------------
 # 3h. CDR3 length distribution in enriched clusters
 # --------------------------------------------------------------------------
+# CDR3 length is constrained by peptide-MHC binding geometry. If disease-
+# enriched clusters show a narrower length distribution than background,
+# it suggests structural convergence toward a specific antigen. Tested
+# with Kolmogorov-Smirnov (KS) comparing enriched vs all CDR3 lengths.
+# --------------------------------------------------------------------------
 message("  [3h] CDR3 length distributions in enriched clusters...")
 
 bg_cdr3_lengths <- cluster_meta |>
@@ -1122,6 +1221,10 @@ message("    Saved CDR3 length analysis")
 
 # --------------------------------------------------------------------------
 # 3i. V-gene usage within GLIPH clusters
+# --------------------------------------------------------------------------
+# Compares TRBV gene frequencies inside disease-enriched clusters vs the
+# overall repertoire. V-gene bias in a specificity group can indicate
+# germline-encoded binding contributions to the antigen-specific response.
 # --------------------------------------------------------------------------
 message("  [3i] V-gene usage within GLIPH clusters...")
 
@@ -1199,6 +1302,14 @@ message("    Saved V-gene within clusters analysis")
 # --------------------------------------------------------------------------
 # 3j. Public clone analysis
 # --------------------------------------------------------------------------
+# "Public" clones are identical CDR3b sequences found in 2+ patients within
+# the same diagnosis. The overall public rate (~0.5%) largely reflects
+# convergent recombination (common CDR3 sequences generated independently).
+# A more biologically meaningful metric is the public rate *within*
+# disease-enriched GLIPH clusters, which captures shared autoreactive
+# clonotypes — analogous to Sukenikova's definition of "public clonotypes"
+# among GBS patients.
+# --------------------------------------------------------------------------
 message("  [3j] Public clone analysis...")
 
 public_clones <- combined_trb |>
@@ -1237,6 +1348,67 @@ public_in_gliph <- public_clones |>
 message(sprintf("    %d public clones found in disease-enriched GLIPH clusters",
                 dplyr::n_distinct(public_in_gliph$CDR3b)))
 
+# Public clone rate within disease-enriched GLIPH clusters per diagnosis:
+# This is the key metric for comparison with Sukenikova's "public clonotype"
+# finding. Higher in-cluster publicity in GBS/CIDP would support shared
+# autoreactive responses across patients.
+cdr3_in_enriched <- cluster_meta |>
+  dplyr::filter(cluster %in% enriched_cluster_ids, !is.na(CDR3b), !is.na(diagnosis)) |>
+  dplyr::distinct(CDR3b, patient, diagnosis)
+
+public_in_enriched_by_dx <- cdr3_in_enriched |>
+  dplyr::group_by(CDR3b, diagnosis) |>
+  dplyr::summarize(n_patients = dplyr::n_distinct(patient), .groups = "drop") |>
+  dplyr::filter(n_patients >= 2)
+
+total_unique_in_enriched <- cdr3_in_enriched |>
+  dplyr::distinct(CDR3b, diagnosis) |>
+  dplyr::count(diagnosis, name = "total_unique_in_clusters")
+
+public_rate_in_clusters <- public_in_enriched_by_dx |>
+  dplyr::count(diagnosis, name = "n_public_in_clusters") |>
+  dplyr::left_join(total_unique_in_enriched, by = "diagnosis") |>
+  dplyr::mutate(public_rate_in_clusters = n_public_in_clusters / total_unique_in_clusters)
+
+message("    Public clone rates within disease-enriched GLIPH clusters:")
+print(public_rate_in_clusters)
+
+# Fisher's exact: is the public rate higher inside disease-enriched clusters
+# than in the overall repertoire? This tests whether GLIPH clusters concentrate
+# shared clonotypes beyond what convergent recombination alone would predict.
+public_cluster_vs_overall <- lapply(
+  intersect(public_rate_in_clusters$diagnosis, public_clone_rates$diagnosis),
+  function(dx) {
+    in_cl <- public_rate_in_clusters |> dplyr::filter(diagnosis == dx)
+    overall <- public_clone_rates |> dplyr::filter(diagnosis == dx)
+    if (nrow(in_cl) == 0 || nrow(overall) == 0) return(NULL)
+    a <- in_cl$n_public_in_clusters
+    b <- in_cl$total_unique_in_clusters - a
+    c_val <- overall$n_public - a  # public outside clusters
+    d <- (overall$total_unique - overall$n_public) - b  # non-public outside clusters
+    if (any(c(a, b, c_val, d) < 0, na.rm = TRUE)) return(NULL)
+    ft <- tryCatch(fisher.test(matrix(c(a, c_val, b, d), nrow = 2)),
+                   error = function(e) list(estimate = NA, p.value = NA))
+    data.frame(
+      diagnosis = dx,
+      public_in_clusters = a,
+      public_outside = max(c_val, 0),
+      rate_in_clusters = in_cl$public_rate_in_clusters,
+      rate_overall = overall$public_rate,
+      fold_enrichment = in_cl$public_rate_in_clusters / (overall$public_rate + 1e-10),
+      odds_ratio = ft$estimate,
+      p.value = ft$p.value
+    )
+  }
+) |> dplyr::bind_rows()
+
+if (nrow(public_cluster_vs_overall) > 0) {
+  public_cluster_vs_overall$p.adj <- p.adjust(public_cluster_vs_overall$p.value, method = "BH")
+  message("    In-cluster vs overall public clone enrichment:")
+  print(public_cluster_vs_overall |>
+          dplyr::select(diagnosis, fold_enrichment, odds_ratio, p.adj))
+}
+
 suk_public <- myelin_lookup |>
   dplyr::filter(public_clonotype == "yes") |>
   dplyr::pull(CDR3b) |> unique()
@@ -1251,6 +1423,10 @@ writexl::write_xlsx(
   list(
     public_clones = public_clones,
     public_clone_rates = public_clone_rates,
+    public_rate_in_clusters = public_rate_in_clusters,
+    public_cluster_vs_overall = if (exists("public_cluster_vs_overall") &&
+                                     nrow(public_cluster_vs_overall) > 0)
+                                   public_cluster_vs_overall else tibble::tibble(),
     public_in_gliph = public_in_gliph,
     public_suk_overlap = public_suk_overlap
   ),
@@ -1261,12 +1437,26 @@ message("    Saved public clone analysis")
 # ==============================================================================
 # Section 4: Sukenikova Cross-Reference Analysis
 # ==============================================================================
+# Cross-references our neuropathy TCR data against Sukenikova's published
+# myelin-reactive clonotype catalog (supp table 2). Two matching tiers:
+#   Tier 1 (exact): Identical CDR3b sequences between Heming and supp table 2
+#   Tier 2 (cluster): Heming CDR3b in the same GLIPH cluster as a known
+#          myelin-reactive clone (indirect evidence of shared specificity)
+# Also checks for near-matches (Hamming distance = 1), mirrors their published
+# GLIPH cluster assignments, and tests per-antigen enrichment across diagnoses.
+# ==============================================================================
 message("\n", paste(rep("=", 60), collapse = ""))
 message("Section 4: Sukenikova Cross-Reference Analysis")
 message(paste(rep("=", 60), collapse = ""))
 
 # --------------------------------------------------------------------------
 # 4a. Myelin-reactive clone mapping
+# --------------------------------------------------------------------------
+# Tier 1: Exact CDR3b match between Heming data and Sukenikova supp table 2.
+# Tier 2: Heming CDR3b in the same de novo GLIPH2 cluster as any myelin-
+#   reactive clone (suggests shared antigen recognition without identical CDR3).
+# Then quantifies myelin-reactive fraction by diagnosis (both tiers combined),
+# and breaks down by tissue (CSF vs PBMC) to test compartment enrichment.
 # --------------------------------------------------------------------------
 message("  [4a] Myelin-reactive clone mapping...")
 
@@ -1368,12 +1558,71 @@ myelin_enrichment$p.adj <- p.adjust(myelin_enrichment$p.value, method = "BH")
 message("    Myelin reactivity enrichment by diagnosis:")
 print(myelin_enrichment |> dplyr::select(diagnosis, n_myelin_reactive, fraction, odds_ratio, p.adj))
 
+# Tissue breakdown: Are myelin-reactive clones concentrated in CSF?
+# If GBS myelin-reactive TCRs are preferentially found in CSF, this
+# supports intrathecal immune activation against peripheral nerve antigens.
+myelin_by_dx_tissue <- dplyr::bind_rows(
+  exact_matches |>
+    dplyr::mutate(match_type = "exact") |>
+    dplyr::select(diagnosis, tissue, match_type),
+  cluster_matches |>
+    dplyr::mutate(match_type = "cluster") |>
+    dplyr::select(diagnosis, tissue, match_type)
+) |>
+  dplyr::filter(tissue %in% c("CSF", "PBMC")) |>
+  dplyr::count(diagnosis, tissue) |>
+  dplyr::left_join(
+    tcr_metadata |>
+      dplyr::filter(tissue %in% c("CSF", "PBMC")) |>
+      dplyr::count(diagnosis, tissue, name = "total_cells"),
+    by = c("diagnosis", "tissue")
+  ) |>
+  dplyr::mutate(fraction = n / total_cells)
+
+# Fisher's exact: CSF vs PBMC enrichment of myelin-reactive clones per diagnosis
+myelin_tissue_enrichment <- lapply(
+  unique(myelin_by_dx_tissue$diagnosis),
+  function(dx) {
+    dx_data <- myelin_by_dx_tissue |> dplyr::filter(diagnosis == dx)
+    n_csf <- dx_data$n[dx_data$tissue == "CSF"]
+    n_pbmc <- dx_data$n[dx_data$tissue == "PBMC"]
+    total_csf <- dx_data$total_cells[dx_data$tissue == "CSF"]
+    total_pbmc <- dx_data$total_cells[dx_data$tissue == "PBMC"]
+    if (length(n_csf) == 0) n_csf <- 0
+    if (length(n_pbmc) == 0) n_pbmc <- 0
+    if (length(total_csf) == 0 || length(total_pbmc) == 0) return(NULL)
+    mat <- matrix(c(n_csf, n_pbmc,
+                     total_csf - n_csf, total_pbmc - n_pbmc), nrow = 2)
+    ft <- tryCatch(fisher.test(mat), error = function(e) list(estimate = NA, p.value = NA))
+    data.frame(
+      diagnosis = dx,
+      n_csf = n_csf, n_pbmc = n_pbmc,
+      total_csf = total_csf, total_pbmc = total_pbmc,
+      csf_fraction = n_csf / total_csf,
+      pbmc_fraction = n_pbmc / total_pbmc,
+      odds_ratio = ft$estimate,
+      p.value = ft$p.value
+    )
+  }
+) |> dplyr::bind_rows()
+
+if (nrow(myelin_tissue_enrichment) > 0) {
+  myelin_tissue_enrichment$p.adj <- p.adjust(myelin_tissue_enrichment$p.value, method = "BH")
+  message("    Myelin reactivity by tissue:")
+  print(myelin_tissue_enrichment |>
+          dplyr::select(diagnosis, n_csf, n_pbmc, csf_fraction, pbmc_fraction, p.adj))
+}
+
 # --------------------------------------------------------------------------
 # 4b. Mirror Sukenikova GLIPH analysis
 # --------------------------------------------------------------------------
+# Checks whether Sukenikova's published GLIPH cluster assignments recapitulate 
+# in our de novo clustering. If the same CDR3b sequences co-cluster in both 
+# analyses, it validates the clustering.
+# --------------------------------------------------------------------------
 message("  [4b] Mirroring Sukenikova GLIPH cluster assignments...")
 
-# Check if Heming CDR3b sequences fall into their published GLIPH clusters
+# Check if our CDR3b sequences fall into their published GLIPH clusters
 # Their clusters are identified by gliph_cluster_id in supp table 2
 suk_cluster_members <- myelin_lookup |>
   dplyr::filter(!is.na(gliph_cluster_id)) |>
@@ -1463,6 +1712,11 @@ if (nrow(antigen_by_dx) > 0) {
 # --------------------------------------------------------------------------
 # 4d. Hamming distance near-matches
 # --------------------------------------------------------------------------
+# CDR3 sequences differing by a single amino acid (Hamming distance = 1)
+# may recognize the same peptide-MHC complex. This identifies our CDR3b
+# that are near-identical to known myelin-reactive clones but not exact
+# matches, broadening the potential autoreactive repertoire.
+# --------------------------------------------------------------------------
 message("  [4d] Hamming distance near-matches to myelin-reactive CDR3b...")
 
 hamming_distance <- function(s1, s2) {
@@ -1548,6 +1802,10 @@ if (n_near > 0) {
 # --------------------------------------------------------------------------
 # 4e. Per-antigen cluster enrichment
 # --------------------------------------------------------------------------
+# Maps each myelin antigen (P0, P2, PMP22) to GLIPH clusters via their
+# CDR3b sequences, then cross-references with disease enrichment to see
+# which antigens dominate in which neuropathy-enriched clusters.
+# --------------------------------------------------------------------------
 message("  [4e] Per-antigen cluster enrichment...")
 
 antigens <- unique(na.omit(myelin_lookup$specificity))
@@ -1600,6 +1858,11 @@ message("    Saved antigen cluster enrichment")
 
 # --------------------------------------------------------------------------
 # 4f. Sukenikova timepoint analysis
+# --------------------------------------------------------------------------
+# Examines whether Sukenikova GBS TCRs in disease-enriched clusters come
+# preferentially from the acute phase (AC) or recovery phase (REC). An
+# acute bias would support active immune-mediated pathology, while
+# persistent clones at recovery may indicate ongoing or memory responses.
 # --------------------------------------------------------------------------
 message("  [4f] Sukenikova timepoint analysis...")
 
@@ -1704,6 +1967,11 @@ if (n_exact > 0) {
 # ==============================================================================
 # Section 5: Save Cache for Figure Script
 # ==============================================================================
+# Bundles ~60 analysis objects into a single .qs file for the companion
+# figure script (tcr_gliph_figures.R). This cache architecture separates
+# computation from visualization: re-running figures doesn't require
+# re-running the full analysis pipeline.
+# ==============================================================================
 message("\n", paste(rep("=", 60), collapse = ""))
 message("Section 5: Saving analysis cache")
 message(paste(rep("=", 60), collapse = ""))
@@ -1765,6 +2033,8 @@ gliph_cache <- list(
   # Section 3j: Public clones
   public_clones = public_clones,
   public_clone_rates = public_clone_rates,
+  public_rate_in_clusters = public_rate_in_clusters,
+  public_cluster_vs_overall = if (exists("public_cluster_vs_overall")) public_cluster_vs_overall else tibble::tibble(),
   public_in_gliph = public_in_gliph,
   public_suk_overlap = public_suk_overlap,
 
@@ -1773,6 +2043,8 @@ gliph_cache <- list(
   cluster_matches = cluster_matches,
   myelin_enrichment = myelin_enrichment,
   myelin_by_dx = myelin_by_dx,
+  myelin_by_dx_tissue = myelin_by_dx_tissue,
+  myelin_tissue_enrichment = if (exists("myelin_tissue_enrichment")) myelin_tissue_enrichment else tibble::tibble(),
   myelin_lookup = myelin_lookup,
   myelin_cdr3_set = myelin_cdr3_set,
   myelin_clusters = myelin_clusters,

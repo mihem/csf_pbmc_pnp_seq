@@ -2,26 +2,41 @@
 # TCR GLIPH2 Manuscript Figures
 # ==============================================================================
 #
-# Reads cached analysis results from data/cache/gliph_results.qs and generates
-# ~20 individual standalone PDF figures for the manuscript.
+# Reads cached analysis results from data/cache/gliph_results.qs (produced by
+# tcr_comparison.R) and generates ~20 standalone PDF figures for the manuscript.
+# Each figure is self-contained: this script does no analysis — only plotting.
 #
-# Depends on: scripts/tcr_comparison.R (produces the cache)
+# Depends on: scripts/tcr_comparison.R (run first to produce the cache)
 #
-# Figures (all individual standalone PDFs):
-#   Disease-specific TCR convergence:
-#     - disease_enrichment_volcano, cluster_composition_heatmap,
-#       cluster_specificity_private_shared, cdr3_length_enriched_vs_background,
-#       vgene_usage_enriched_clusters, public_clone_rate_by_diagnosis,
-#       cdr3_motif_enrichment_by_diagnosis
-#   GBS CSF tropism + Sukenikova cross-validation:
-#     - tissue_compartmentalization_scatter, cross_cohort_cluster_sharing_alluvial,
-#       sukenikova_acute_vs_recovery, cross_cohort_top_cluster_composition
-#   Myelin reactivity:
-#     - myelin_cluster_network
-#   Supplementary:
-#     - enriched_clusters_overview_bubble, diagnosis_cluster_sharing_heatmap,
-#       tissue_bias_fraction_by_diagnosis, csf_vs_pbmc_motif_enrichment,
-#       myelin_reactive_fraction_by_diagnosis, sukenikova_shared_clusters_by_diagnosis
+# Figure organization by manuscript story:
+#
+#   STORY A — Disease-specific TCR convergence (main figures):
+#     A1. Enrichment volcano: which GLIPH clusters are enriched per diagnosis?
+#     A2. Cluster composition heatmap: diagnosis makeup of enriched clusters
+#     A3. Private vs shared clusters: specificity class stacked bar
+#     A4. CDR3 length constraint: density plots, enriched vs background
+#     A5. V-gene usage: dot plot of TRBV enrichment within GLIPH clusters
+#     A6. Public clone rates: overall vs in-cluster (comparison with Sukenikova)
+#     A7. Motif enrichment: top CDR3 k-mers per diagnosis
+#
+#   STORY B — GBS CSF tropism + Sukenikova cross-validation:
+#     B1. Tissue compartmentalization: CSF fraction vs enrichment scatter
+#     B2. Cross-cohort alluvial: Heming diagnoses <-> Sukenikova patients
+#     B3. Sukenikova timepoint: acute vs recovery in enriched clusters
+#     B4. Cross-cohort cluster profiles: top 10 shared cluster compositions
+#
+#   STORY C — Myelin reactivity:
+#     C1. Myelin cluster network: graph of clusters containing myelin TCRs
+#     C2. Exact/near match table: individual CDR3b matches to supp table 2
+#
+#   SUPPLEMENTARY:
+#     S1. Enriched clusters overview bubble
+#     S2. Diagnosis cluster sharing heatmap (Jaccard-normalized)
+#     S3. Tissue bias fraction by diagnosis
+#     S4. CSF vs PBMC motif enrichment mirrored bar
+#     S5. Myelin-reactive fraction by diagnosis (overall)
+#     S5b. Myelin-reactive fraction by tissue (CSF vs PBMC)
+#     S6. Sukenikova shared clusters by diagnosis (fraction-normalized)
 #
 # ==============================================================================
 
@@ -69,7 +84,8 @@ theme_pub <- function(base_size = 11) {
     )
 }
 
-# -- Helper: format p-values for annotation -----------------------------------
+# -- Helpers -------------------------------------------------------------------
+# format_pval: Converts numeric p-values to significance stars for plot labels
 format_pval <- function(p) {
   if (is.na(p)) return("")
   if (p < 0.001) return("***")
@@ -78,7 +94,7 @@ format_pval <- function(p) {
   return("")
 }
 
-# -- Helper: safe ggsave with message -----------------------------------------
+# safe_save: Wrapper around ggsave that prints the filename and dimensions
 safe_save <- function(filename, plot, width, height) {
   out <- file.path(fig_dir, filename)
   ggsave(out, plot = plot, width = width, height = height, device = "pdf")
@@ -92,6 +108,9 @@ message("============================================================\n")
 
 # ------------------------------------------------------------------------------
 # A1: Enrichment Volcano (faceted by diagnosis)
+# Shows which GLIPH2 specificity groups are statistically enriched in each
+# neuropathy vs CTRL. Points colored by tissue bias (CSF/PBMC/neutral) and
+# sized by cluster membership. Top 3 significant clusters labeled per facet.
 # ------------------------------------------------------------------------------
 message("--- Enrichment volcano ---")
 
@@ -153,6 +172,10 @@ if (exists("diagnosis_enrichment") && nrow(diagnosis_enrichment) > 0 &&
 
 # ------------------------------------------------------------------------------
 # A2: Cluster Composition Heatmap (ComplexHeatmap)
+# Rows = disease-enriched GLIPH clusters, columns = diagnoses.
+# Cell color = fraction of cluster from that diagnosis. Right annotation shows
+# cluster size (barplot) and specificity class (Private/Semi-private/Promiscuous).
+# Reveals whether enriched clusters are dominated by one diagnosis or shared.
 # ------------------------------------------------------------------------------
 message("--- Cluster composition heatmap ---")
 
@@ -215,6 +238,9 @@ if (requireNamespace("ComplexHeatmap", quietly = TRUE) &&
 
 # ------------------------------------------------------------------------------
 # A3: Private vs Shared Clusters (stacked bar)
+# Stacked bar per diagnosis showing how many enriched clusters are Private
+# (>=90% from one dx), Semi-private (>=60%), or Promiscuous (<60%).
+# High "Private" fraction suggests disease-specific antigen recognition.
 # ------------------------------------------------------------------------------
 message("--- Private vs shared clusters ---")
 
@@ -254,6 +280,10 @@ if (exists("specificity_summary") && nrow(specificity_summary) > 0) {
 
 # ------------------------------------------------------------------------------
 # A4: CDR3 Length Constraint (density, faceted by diagnosis)
+# Overlays CDR3 length density for disease-enriched clusters (red) vs the
+# full repertoire background (grey). KS test p-values annotated per facet.
+# A narrower distribution in enriched clusters suggests structural convergence
+# toward a specific peptide-MHC binding geometry.
 # ------------------------------------------------------------------------------
 message("--- CDR3 length constraint ---")
 
@@ -321,6 +351,9 @@ if (exists("enriched_cdr3_lengths") && nrow(enriched_cdr3_lengths) > 0 &&
 
 # ------------------------------------------------------------------------------
 # A5: V-Gene Within Clusters Dot Plot
+# Bubble plot of TRBV gene usage within disease-enriched clusters vs background.
+# Color = log2 fold enrichment, size = count in clusters. V-gene bias indicates
+# germline-encoded contributions to antigen-specific binding.
 # ------------------------------------------------------------------------------
 message("--- V-gene within clusters dot plot ---")
 
@@ -377,35 +410,74 @@ if (exists("vgene_enrichment_tests") && nrow(vgene_enrichment_tests) > 0) {
 
 
 # ------------------------------------------------------------------------------
-# A6: Public Clone Rates
+# A6: Public Clone Rates (overall vs in-cluster)
+# Grouped bar chart comparing two definitions of "public" clones per diagnosis:
+#   Grey: All CDR3b shared by 2+ patients (~0.5%, mostly convergent recombination)
+#   Red:  CDR3b shared by 2+ patients *within* disease-enriched GLIPH clusters
+# The in-cluster rate is more comparable to Sukenikova's "public clonotype"
+# definition among AIDP patients, which specifically refers to shared
+# autoreactive clonotypes, not all convergent CDR3 sequences.
 # ------------------------------------------------------------------------------
 message("--- Public clone rates ---")
 
 if (exists("public_clone_rates") && nrow(public_clone_rates) > 0) {
 
-  pcr_plot <- public_clone_rates |>
+  # Combine two measures of "public" clones into a single long-format data frame:
+  # 1. "All CDR3" = public rate across the entire repertoire (convergent recombination)
+  # 2. "In GLIPH clusters" = public rate within disease-enriched clusters (autoreactive)
+  pcr_overall <- public_clone_rates |>
     dplyr::mutate(
       public_pct = public_rate * 100,
-      diagnosis = factor(diagnosis, levels = intersect(c(dx_order, "GBS_Sukenikova"),
-                                                        diagnosis))
-    )
+      context = "All CDR3"
+    ) |>
+    dplyr::select(diagnosis, public_pct, context)
 
-  p_a6 <- ggplot(pcr_plot, aes(x = diagnosis, y = public_pct, fill = diagnosis)) +
-    geom_col(width = 0.7, show.legend = FALSE) +
+  has_cluster_rates <- exists("public_rate_in_clusters") &&
+    nrow(public_rate_in_clusters) > 0
+
+  if (has_cluster_rates) {
+    pcr_cluster <- public_rate_in_clusters |>
+      dplyr::mutate(
+        public_pct = public_rate_in_clusters * 100,
+        context = "In GLIPH clusters"
+      ) |>
+      dplyr::select(diagnosis, public_pct, context)
+
+    pcr_combined <- dplyr::bind_rows(pcr_overall, pcr_cluster) |>
+      dplyr::mutate(
+        diagnosis = factor(diagnosis, levels = intersect(c(dx_order, "GBS_Sukenikova"),
+                                                          diagnosis)),
+        context = factor(context, levels = c("All CDR3", "In GLIPH clusters"))
+      )
+  } else {
+    pcr_combined <- pcr_overall |>
+      dplyr::mutate(
+        diagnosis = factor(diagnosis, levels = intersect(c(dx_order, "GBS_Sukenikova"),
+                                                          diagnosis)),
+        context = factor(context, levels = c("All CDR3"))
+      )
+  }
+
+  context_colors <- c("All CDR3" = "grey60", "In GLIPH clusters" = "#E41A1C")
+
+  p_a6 <- ggplot(pcr_combined, aes(x = diagnosis, y = public_pct, fill = context)) +
+    geom_col(position = position_dodge(width = 0.7), width = 0.6) +
     geom_text(aes(label = sprintf("%.1f%%", public_pct)),
-              vjust = -0.5, size = 3) +
-    scale_fill_manual(values = diagnosis_col) +
+              position = position_dodge(width = 0.7),
+              vjust = -0.5, size = 2.8) +
+    scale_fill_manual(values = context_colors, name = "") +
     theme_pub() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "top") +
     labs(
       title = "Public clone rate by diagnosis",
       x = "",
       y = "Public clone rate (%)",
-      subtitle = "Fraction of unique CDR3b shared by 2+ patients"
+      subtitle = "CDR3b shared by 2+ patients: overall vs within disease-enriched GLIPH2 clusters"
     ) +
-    expand_limits(y = max(pcr_plot$public_pct, na.rm = TRUE) * 1.15)
+    expand_limits(y = max(pcr_combined$public_pct, na.rm = TRUE) * 1.2)
 
-  safe_save("fig_gliph_public_clone_rate_by_diagnosis.pdf", p_a6, 8, 5.5)
+  safe_save("fig_gliph_public_clone_rate_by_diagnosis.pdf", p_a6, 9, 5.5)
 } else {
   message("  SKIP: no public clone rate data")
 }
@@ -413,6 +485,9 @@ if (exists("public_clone_rates") && nrow(public_clone_rates) > 0) {
 
 # ------------------------------------------------------------------------------
 # A7: Motif Enrichment (faceted horizontal bar, top 5 per dx)
+# Top 5 enriched/depleted CDR3 k-mers per diagnosis (vs background).
+# Positive log2FC = motif over-represented in disease clusters.
+# These conserved sequence motifs may reflect shared binding determinants.
 # ------------------------------------------------------------------------------
 message("--- Motif enrichment faceted ---")
 
@@ -460,6 +535,10 @@ if (exists("motif_driving") && !is.null(motif_driving) && nrow(motif_driving) > 
 
 # ------------------------------------------------------------------------------
 # B1: CSF Fraction vs Enrichment Scatter
+# Each point = one disease-enriched cluster. X-axis = fraction of cluster
+# members from CSF, Y-axis = log2(OR) enrichment vs CTRL. Clusters in the
+# upper-right are both disease-enriched AND CSF-biased, consistent with
+# intrathecal antigen-driven expansion in inflammatory neuropathies.
 # ------------------------------------------------------------------------------
 message("--- CSF vs enrichment scatter ---")
 
@@ -509,6 +588,10 @@ if (exists("cluster_tissue_dx") && nrow(cluster_tissue_dx) > 0) {
 
 # ------------------------------------------------------------------------------
 # B2: Cross-Cohort Alluvial (ggalluvial)
+# Visualizes GLIPH clusters that span both Heming (single-cell) and Sukenikova
+# (bulk GBS) datasets. Left axis = Heming diagnosis, right axis = Sukenikova
+# patient. Flows show shared TCR sequences within the same specificity group.
+# Cross-cohort clusters validate convergent antigen recognition.
 # ------------------------------------------------------------------------------
 message("--- Cross-cohort alluvial ---")
 
@@ -565,6 +648,9 @@ if (exists("cross_cohort") && nrow(cross_cohort) > 0 &&
 
 # ------------------------------------------------------------------------------
 # B3: Sukenikova Timepoint Comparison (grouped bar)
+# Counts Sukenikova GBS TCR sequences from acute (AC) vs recovery (REC)
+# phases within disease-enriched clusters. An acute bias supports active
+# immune-mediated pathology; persistent clones at recovery suggest memory.
 # ------------------------------------------------------------------------------
 message("--- Sukenikova timepoint comparison ---")
 
@@ -615,6 +701,9 @@ if (exists("timepoint_summary") && nrow(timepoint_summary) > 0) {
 
 # ------------------------------------------------------------------------------
 # B4: Cross-Cohort Cluster Profiles (top 10 stacked bar)
+# Stacked bar of the 10 largest cross-cohort clusters, showing diagnosis
+# composition. Reveals which diseases contribute most to shared specificity
+# groups between our single-cell and Sukenikova's bulk data.
 # ------------------------------------------------------------------------------
 message("--- Cross-cohort cluster profiles ---")
 
@@ -664,9 +753,12 @@ if (exists("cross_cohort") && nrow(cross_cohort) > 0 &&
 # STORY C: Myelin Reactivity
 # ==============================================================================
 
-
 # ------------------------------------------------------------------------------
 # C1: Myelin Cluster Network (ggraph)
+# Network graph of GLIPH clusters that contain known myelin-reactive CDR3b
+# (from Sukenikova supp table 2). Edges connect clusters sharing CDR3
+# sequences. Node color = dominant diagnosis, triangle shape = contains a
+# myelin-reactive clone. Visualizes the myelin-reactive TCR landscape.
 # ------------------------------------------------------------------------------
 message("--- Myelin cluster network ---")
 
@@ -748,6 +840,9 @@ if (exists("myelin_clusters") && length(myelin_clusters) > 0 &&
 
 # ------------------------------------------------------------------------------
 # C2: Exact and Near Match Table
+# Table figure listing individual CDR3b sequences from the Heming cohort that
+# match Sukenikova myelin-reactive clones exactly or with Hamming distance = 1.
+# Shows patient, tissue, diagnosis, and antigen specificity for each match.
 # ------------------------------------------------------------------------------
 message("--- Exact/near match table ---")
 
@@ -821,6 +916,9 @@ if (has_exact || has_near) {
 
 # ------------------------------------------------------------------------------
 # S1: GLIPH Overview Bubble (enriched clusters jitter)
+# Jitter plot of all disease-enriched clusters: x = diagnosis, y = cluster size.
+# Point size = significance (-log10 FDR), shape = tissue bias. Provides a
+# high-level overview of how many and how large the enriched clusters are.
 # ------------------------------------------------------------------------------
 message("--- GLIPH overview bubble ---")
 
@@ -884,53 +982,71 @@ if (exists("diagnosis_enrichment") && nrow(diagnosis_enrichment) > 0) {
 
 
 # ------------------------------------------------------------------------------
-# S2: Diagnosis Sharing Heatmap (ComplexHeatmap)
+# S2: Diagnosis Sharing Heatmap (Jaccard-normalized, ComplexHeatmap)
+# Pairwise heatmap of GLIPH cluster sharing between all diagnoses.
+# Color scale = Jaccard index (|A intersect B| / |A union B|), which normalizes
+# for unequal numbers of clusters per diagnosis. Cell text shows both raw
+# count and Jaccard value. Without normalization, diagnoses with more patients
+# (e.g., CIAP) would artificially appear to share more clusters.
 # ------------------------------------------------------------------------------
 message("--- Diagnosis sharing heatmap ---")
 
 if (requireNamespace("ComplexHeatmap", quietly = TRUE) &&
     exists("cluster_meta") && nrow(cluster_meta) > 0) {
 
-  # Count shared clusters between each pair of diagnoses
+  # Build pairwise sharing matrix: for each pair of diagnoses, count how many
+  # GLIPH clusters contain TCRs from both, then compute Jaccard index to
+  # normalize for the differing total number of clusters per diagnosis.
   dx_pairs <- cluster_meta |>
     dplyr::filter(!is.na(diagnosis), !is.na(cluster)) |>
     dplyr::distinct(cluster, diagnosis)
 
   dx_list <- unique(dx_pairs$diagnosis)
 
-  # Build sharing matrix
+  # Build sharing matrix (raw counts) and Jaccard index matrix
   share_mat <- matrix(0, nrow = length(dx_list), ncol = length(dx_list),
                       dimnames = list(dx_list, dx_list))
+  jaccard_mat <- matrix(0, nrow = length(dx_list), ncol = length(dx_list),
+                        dimnames = list(dx_list, dx_list))
 
   for (i in seq_along(dx_list)) {
     for (j in seq_along(dx_list)) {
       cl_i <- dx_pairs$cluster[dx_pairs$diagnosis == dx_list[i]]
       cl_j <- dx_pairs$cluster[dx_pairs$diagnosis == dx_list[j]]
-      share_mat[i, j] <- length(intersect(cl_i, cl_j))
+      n_intersect <- length(intersect(cl_i, cl_j))
+      n_union <- length(union(cl_i, cl_j))
+      share_mat[i, j] <- n_intersect
+      jaccard_mat[i, j] <- if (n_union > 0) n_intersect / n_union else 0
     }
   }
 
   # Order by dx_order
   order_idx <- intersect(c(dx_order, "GBS_Sukenikova"), rownames(share_mat))
   share_mat <- share_mat[order_idx, order_idx]
+  jaccard_mat <- jaccard_mat[order_idx, order_idx]
 
+  # Use Jaccard index for color scale, raw counts as cell text
+  jaccard_offdiag <- jaccard_mat[upper.tri(jaccard_mat)]
   col_fun_s2 <- circlize::colorRamp2(
-    c(0, max(share_mat[upper.tri(share_mat)]) / 2, max(share_mat[upper.tri(share_mat)])),
+    c(0, max(jaccard_offdiag) / 2, max(jaccard_offdiag)),
     c("white", "#FEE08B", "#D73027")
   )
 
   pdf(file.path(fig_dir, "fig_gliph_diagnosis_cluster_sharing_heatmap.pdf"), width = 8, height = 7)
   ht_s2 <- ComplexHeatmap::Heatmap(
-    share_mat,
-    name = "Shared\nclusters",
+    jaccard_mat,
+    name = "Jaccard\nindex",
     col = col_fun_s2,
     cluster_rows = FALSE,
     cluster_columns = FALSE,
     row_title = "Diagnosis",
-    column_title = "GLIPH2 cluster sharing between diagnoses",
+    column_title = "GLIPH2 cluster sharing between diagnoses (Jaccard index)",
     column_names_rot = 45,
     cell_fun = function(j, i, x, y, w, h, fill) {
-      grid::grid.text(share_mat[i, j], x, y, gp = grid::gpar(fontsize = 8))
+      grid::grid.text(
+        sprintf("%d\n(%.2f)", share_mat[i, j], jaccard_mat[i, j]),
+        x, y, gp = grid::gpar(fontsize = 7)
+      )
     },
     border = TRUE
   )
@@ -942,6 +1058,9 @@ if (requireNamespace("ComplexHeatmap", quietly = TRUE) &&
 
 # ------------------------------------------------------------------------------
 # S3: Tissue Bias Fractions (fraction-based stacked bar)
+# Per diagnosis, shows the fraction of disease-enriched clusters that are
+# CSF-enriched, PBMC-enriched, or unbiased. A high CSF fraction in GBS/CIDP
+# supports intrathecal immune activation in inflammatory neuropathies.
 # ------------------------------------------------------------------------------
 message("--- Tissue bias fractions ---")
 
@@ -984,6 +1103,9 @@ if (exists("tissue_bias_summary") && nrow(tissue_bias_summary) > 0) {
 
 # ------------------------------------------------------------------------------
 # S4: Tissue Motifs Mirrored Bar (CSF vs PBMC)
+# Top 20 most significant CDR3 k-mer motifs comparing CSF-enriched vs
+# PBMC-enriched clusters. Positive log2FC = motif more common in CSF clusters.
+# Explores whether compartment-specific responses use distinct CDR3 motifs.
 # ------------------------------------------------------------------------------
 message("--- Tissue motifs mirrored ---")
 
@@ -1034,6 +1156,10 @@ if (exists("tissue_motif_comparison") && !is.null(tissue_motif_comparison) &&
 
 # ------------------------------------------------------------------------------
 # S5: Myelin Enrichment Bar (per diagnosis)
+# Bar chart of the myelin-reactive TCR fraction (exact + cluster matches)
+# per neuropathy diagnosis. OR and significance vs CTRL annotated above bars.
+# Tests whether any neuropathy has an elevated proportion of TCRs predicted
+# to target peripheral nerve myelin antigens (P0, P2, PMP22).
 # ------------------------------------------------------------------------------
 message("--- Myelin enrichment bar ---")
 
@@ -1071,39 +1197,119 @@ if (exists("myelin_enrichment") && nrow(myelin_enrichment) > 0) {
 
 
 # ------------------------------------------------------------------------------
-# S6: Cross-Cohort Overlap Bar (shared clusters per Heming dx)
+# S5b: Myelin Reactive Fraction by Tissue (CSF vs PBMC)
+# Companion to S5: breaks down myelin-reactive fraction by compartment.
+# Grouped bar chart with CSF (red) vs PBMC (blue) per diagnosis. Fisher's
+# exact test annotations show whether myelin-reactive clones are enriched
+# in CSF vs blood for each neuropathy. Addresses: "Are the myelin-reactive
+# TCRs predominantly found in CSF for GBS?"
+# ------------------------------------------------------------------------------
+message("--- Myelin reactive fraction by tissue ---")
+
+if (exists("myelin_by_dx_tissue") && nrow(myelin_by_dx_tissue) > 0) {
+
+  mt_plot <- myelin_by_dx_tissue |>
+    dplyr::filter(tissue %in% c("CSF", "PBMC")) |>
+    dplyr::mutate(
+      pct = fraction * 100,
+      diagnosis = factor(diagnosis, levels = intersect(neuropathy_dx, diagnosis))
+    ) |>
+    dplyr::filter(!is.na(diagnosis))
+
+  # Add significance annotations from tissue enrichment if available
+  if (exists("myelin_tissue_enrichment") && nrow(myelin_tissue_enrichment) > 0) {
+    sig_annot <- myelin_tissue_enrichment |>
+      dplyr::mutate(sig_label = sapply(p.adj, format_pval)) |>
+      dplyr::filter(sig_label != "") |>
+      dplyr::select(diagnosis, sig_label, odds_ratio)
+  } else {
+    sig_annot <- tibble::tibble()
+  }
+
+  if (nrow(mt_plot) > 0) {
+    p_s5b <- ggplot(mt_plot, aes(x = diagnosis, y = pct, fill = tissue)) +
+      geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+      geom_text(aes(label = sprintf("%.2f%%", pct)),
+                position = position_dodge(width = 0.7),
+                vjust = -0.5, size = 2.8) +
+      scale_fill_manual(values = c("CSF" = "#E41A1C", "PBMC" = "#377EB8"),
+                        name = "Compartment") +
+      theme_pub() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      labs(
+        title = "Myelin-reactive TCR fraction by tissue compartment",
+        subtitle = "Exact + cluster-level matches to Sukenikova myelin-reactive clones",
+        x = "",
+        y = "Myelin-reactive TCRs (%)"
+      ) +
+      expand_limits(y = max(mt_plot$pct, na.rm = TRUE) * 1.3)
+
+    # Add significance annotations if available
+    if (nrow(sig_annot) > 0) {
+      sig_annot <- sig_annot |>
+        dplyr::filter(diagnosis %in% levels(mt_plot$diagnosis)) |>
+        dplyr::mutate(x_pos = match(diagnosis, levels(mt_plot$diagnosis)))
+      if (nrow(sig_annot) > 0) {
+        p_s5b <- p_s5b +
+          annotate("text",
+                   x = sig_annot$x_pos,
+                   y = max(mt_plot$pct, na.rm = TRUE) * 1.2,
+                   label = sig_annot$sig_label,
+                   size = 4, fontface = "bold")
+      }
+    }
+
+    safe_save("fig_gliph_myelin_reactive_fraction_by_tissue.pdf", p_s5b, 8, 5.5)
+  }
+} else {
+  message("  SKIP: no myelin tissue data")
+}
+
+
+# ------------------------------------------------------------------------------
+# S6: Cross-Cohort Overlap Bar (normalized, shared clusters per Heming dx)
+# Bar chart of what fraction of GLIPH clusters per diagnosis are shared with
+# Sukenikova GBS data. Normalized by total clusters per diagnosis (not raw
+# counts) to correct for unequal group sizes — e.g., CIAP has more patients
+# than MAG, so raw shared counts would be misleadingly higher for CIAP.
+# Labels show percentage and raw counts (shared / total).
 # ------------------------------------------------------------------------------
 message("--- Cross-cohort overlap ---")
 
-if (exists("cross_dx") && nrow(cross_dx) > 0) {
+if (exists("cross_dx") && nrow(cross_dx) > 0 &&
+    "shared_fraction" %in% colnames(cross_dx)) {
 
   cc_bar <- cross_dx |>
     dplyr::filter(heming_diagnoses != "CTRL") |>
     dplyr::mutate(
+      shared_pct = shared_fraction * 100,
       heming_diagnoses = factor(heming_diagnoses,
                                 levels = intersect(c(neuropathy_dx, "GBS_Sukenikova"),
                                                     heming_diagnoses))
     )
 
   if (nrow(cc_bar) > 0) {
-    p_s6 <- ggplot(cc_bar, aes(x = heming_diagnoses, y = n_shared_clusters,
+    p_s6 <- ggplot(cc_bar, aes(x = heming_diagnoses, y = shared_pct,
                                 fill = heming_diagnoses)) +
       geom_col(width = 0.7, show.legend = FALSE) +
-      geom_text(aes(label = n_shared_clusters), vjust = -0.5, size = 3.5) +
+      geom_text(aes(label = sprintf("%.1f%%\n(%d/%d)", shared_pct,
+                                     n_shared_clusters, total_clusters_with_dx)),
+                vjust = -0.3, size = 2.8, lineheight = 0.85) +
       scale_fill_manual(values = diagnosis_col) +
       theme_pub() +
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
       labs(
         title = "GLIPH2 clusters shared with Sukenikova GBS cohort",
+        subtitle = "Normalized by total clusters per diagnosis",
         x = "Heming diagnosis",
-        y = "Number of shared clusters"
+        y = "Shared clusters (% of total)"
       ) +
-      expand_limits(y = max(cc_bar$n_shared_clusters, na.rm = TRUE) * 1.15)
+      expand_limits(y = max(cc_bar$shared_pct, na.rm = TRUE) * 1.3)
 
-    safe_save("fig_gliph_sukenikova_shared_clusters_by_diagnosis.pdf", p_s6, 7, 5)
+    safe_save("fig_gliph_sukenikova_shared_clusters_by_diagnosis.pdf", p_s6, 7, 5.5)
   }
 } else {
-  message("  SKIP: no cross_dx data")
+  message("  SKIP: no cross_dx data or missing shared_fraction")
 }
 
 

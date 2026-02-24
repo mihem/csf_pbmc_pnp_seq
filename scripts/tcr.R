@@ -712,7 +712,7 @@ shared_clones_ratio_plot <- ggplot(
         subtitle = "Positive = enriched in CSF, Negative = enriched in blood"
     ) +
     theme_classic() +
-    theme(legend.position = "none") 
+    theme(legend.position = "none")
 
 ggsave(
     plot = shared_clones_ratio_plot,
@@ -763,6 +763,7 @@ write_xlsx(
     shared_clones_between_patients,
     file.path("results", "tcr", "shared_clones_between_patients.xlsx")
 )
+
 
 #
 tcr_clonal_distribution <- clonalSizeDistribution(
@@ -965,6 +966,57 @@ sc_tcr_csf@meta.data <-
     tibble::rownames_to_column("barcode") |>
     dplyr::left_join(csf_protein_lookup) |>
     tibble::column_to_rownames("barcode")
+
+# correlate shared clones with CSF protein levels
+shared_clones_protein_data <-
+    shared_clones_csf_pbmc |>
+    left_join(select(lookup, patient, csf_protein), by = join_by(patient))
+
+.cor_test <- cor.test(
+    shared_clones_protein_data$csf_protein,
+    shared_clones_protein_data$log2_ratio,
+    method = "spearman"
+)
+.label <- sprintf(
+    "rho = %.2f, p = %.3f",
+    .cor_test$estimate,
+    .cor_test$p.value
+)
+
+shared_clones_protein_correlation <-
+    shared_clones_protein_data |>
+    ggplot(aes(x = csf_protein, y = log2_ratio, color = diagnosis)) +
+    geom_point(size = 1) +
+    geom_smooth(
+        aes(group = 1),
+        method = "lm",
+        se = TRUE,
+        linewidth = 0.5,
+        color = "black"
+    ) +
+    annotate(
+        "text",
+        x = Inf,
+        y = Inf,
+        label = .label,
+        hjust = 1.05,
+        vjust = 1.5,
+        size = 3,
+        color = "black"
+    ) +
+    scale_color_manual(values = sc_tcr@misc$diagnosis_col) +
+    labs(
+        x = "CSF Protein (mg/L)",
+        y = "log2(CSF / blood frequency)"
+    ) +
+    theme_classic()
+
+ggsave(
+    plot = shared_clones_protein_correlation,
+    file.path("results", "tcr", "shared_clones_csf_protein_correlation.pdf"),
+    width = 5,
+    height = 3
+)
 
 # Calculate correlation between clonality and CSF protein
 protein_correlation_data <-

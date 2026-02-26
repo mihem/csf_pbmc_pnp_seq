@@ -781,11 +781,11 @@ ggsave(
 )
 
 tcr_clonal_diversity <- clonalDiversity(
-    sc_tcr_main_groups,
+    sc_tcr,
     cloneCall = "gene",
     group.by = "tissue_diagnosis"
 ) +
-    scale_fill_manual(values = sc_tcr_main_groups@misc$tissue_diagnosis_col)
+    scale_fill_manual(values = sc_tcr@misc$tissue_diagnosis_col)
 
 ggsave(
     plot = tcr_clonal_diversity,
@@ -1071,14 +1071,19 @@ ggsave(
 sc_tcr <- qs::qread(file.path("objects", "sc_tcr.qs"))
 str(sc_tcr@meta.data)
 
+sc_tcr_cd8tem <- subset(
+    sc_tcr,
+    subset = cluster %in% c("CD8TEM_1", "CD8TEM_2", "CD8TEM_3")
+)
+
 clonal_bias <-
     clonalBias(
-        sc_tcr,
+        sc_tcr_cd8tem,
         cloneCall = "aa",
-        split.by = "patient",
+        split.by = "sample",
         group.by = "cluster",
         n.boots = 10,
-        min.expand = 5
+        min.expand = 2
     )
 
 ggsave(file.path("results", "tcr", "clonal_bias.pdf"), clonal_bias)

@@ -321,6 +321,15 @@ sc_tcr_pbmc <- subset(
     subset = tissue == "PBMC"
 )
 
+sc_tcr_csf_cd8tem_3 <- subset(
+    sc_tcr_csf,
+    subset = cluster == "CD8TEM_3"
+)
+sc_tcr_pbmc_cd8tem_3 <- subset(
+    sc_tcr_pbmc,
+    subset = cluster == "CD8TEM_3"
+)
+
 
 sc_tcr_main_groups <- subset(
     sc_tcr,
@@ -361,6 +370,30 @@ stackedPlot(
     x_axis = "diagnosis",
     y_axis = "cloneSize",
     x_order = sc_tcr_pbmc@misc$diagnosis_order,
+    y_order = clone_labels,
+    color = clone_cols,
+    width = 5,
+    height = 3,
+    dir_output = file.path("results", "abundance")
+)
+
+stackedPlot(
+    object = sc_tcr_csf_cd8tem_3,
+    x_axis = "diagnosis",
+    y_axis = "cloneSize",
+    x_order = sc_tcr_csf_cd8tem_3@misc$diagnosis_order,
+    y_order = clone_labels,
+    color = clone_cols,
+    width = 5,
+    height = 3,
+    dir_output = file.path("results", "abundance")
+)
+
+stackedPlot(
+    object = sc_tcr_pbmc_cd8tem_3,
+    x_axis = "diagnosis",
+    y_axis = "cloneSize",
+    x_order = sc_tcr_pbmc_cd8tem_3@misc$diagnosis_order,
     y_order = clone_labels,
     color = clone_cols,
     width = 5,
@@ -780,12 +813,33 @@ ggsave(
     height = 7
 )
 
-tcr_clonal_diversity <- clonalDiversity(
-    sc_tcr,
-    cloneCall = "gene",
-    group.by = "tissue_diagnosis"
+sc_tcr_pbmc <- subset(sc_tcr, tissue == "PBMC")
+
+tcr_clonal_diversity_df <- clonalDiversity(
+    sc_tcr_pbmc,
+    cloneCall = "aa",
+    group.by = "patient",
+    x.axis = "diagnosis",
+    exportTable = TRUE,
+    metric = "ace"
+) |>
+    select(-diagnosis) |>
+    left_join(select(lookup, patient, diagnosis))
+
+tcr_clonal_diversity <- ggplot(
+    tcr_clonal_diversity_df,
+    aes(x = diagnosis, y = value, fill = diagnosis)
 ) +
-    scale_fill_manual(values = sc_tcr@misc$tissue_diagnosis_col)
+    geom_boxplot(outlier.shape = NA, alpha = 0.6) +
+    geom_jitter(shape = 21, width = 0.2) +
+    scale_fill_manual(values = sc_tcr_pbmc@misc$diagnosis_col) +
+    facet_wrap(~metric, scales = "free_y") +
+    labs(x = NULL, y = "Diversity Score", fill = "Diagnosis") +
+    theme_bw() +
+    theme(
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        legend.position = "none"
+    )
 
 ggsave(
     plot = tcr_clonal_diversity,

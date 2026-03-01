@@ -321,15 +321,25 @@ sc_tcr_pbmc <- subset(
     subset = tissue == "PBMC"
 )
 
+# subset CD8TEM_3 cluster in CSF and PBMC for abundance plot
+# subset to CTRL, CIAP, GBS, CIDP, CAN because other diagnoses have not enough cells in both compartments
 sc_tcr_csf_cd8tem_3 <- subset(
     sc_tcr_csf,
     subset = cluster == "CD8TEM_3"
 )
+sc_tcr_csf_cd8tem_3_groups <- subset(
+    sc_tcr_csf_cd8tem_3,
+    subset = diagnosis %in% c("CIAP", "CIDP", "GBS")
+)
+
 sc_tcr_pbmc_cd8tem_3 <- subset(
     sc_tcr_pbmc,
     subset = cluster == "CD8TEM_3"
 )
-
+sc_tcr_pbmc_cd8tem_3_groups <- subset(
+    sc_tcr_pbmc_cd8tem_3,
+    subset = diagnosis %in% c("CIAP", "CIDP", "GBS")
+)
 
 sc_tcr_main_groups <- subset(
     sc_tcr,
@@ -378,28 +388,31 @@ stackedPlot(
 )
 
 stackedPlot(
-    object = sc_tcr_csf_cd8tem_3,
+    object = sc_tcr_csf_cd8tem_3_groups,
     x_axis = "diagnosis",
     y_axis = "cloneSize",
-    x_order = sc_tcr_csf_cd8tem_3@misc$diagnosis_order,
+    x_order = sc_tcr_csf_cd8tem_3_groups@misc$diagnosis_order,
     y_order = clone_labels,
     color = clone_cols,
-    width = 5,
+    width = 3.2,
     height = 3,
     dir_output = file.path("results", "abundance")
 )
 
 stackedPlot(
-    object = sc_tcr_pbmc_cd8tem_3,
+    object = sc_tcr_pbmc_cd8tem_3_groups,
     x_axis = "diagnosis",
     y_axis = "cloneSize",
-    x_order = sc_tcr_pbmc_cd8tem_3@misc$diagnosis_order,
+    x_order = sc_tcr_pbmc_cd8tem_3_groups@misc$diagnosis_order,
     y_order = clone_labels,
     color = clone_cols,
-    width = 5,
+    width = 3.2,
     height = 3,
     dir_output = file.path("results", "abundance")
 )
+
+table(sc_tcr_csf_cd8tem_3$diagnosis)
+table(sc_tcr_pbmc_cd8tem_3$diagnosis)
 
 stackedPlot(
     object = sc_tcr_main_groups_csf,
@@ -704,7 +717,8 @@ write_xlsx(
 )
 
 # Compare abundance of shared clones between CSF and PBMC
-shared_clones_csf_pbmc <- sc_tcr@meta.data |>
+shared_clones_csf_pbmc <-
+    sc_tcr@meta.data |>
     tibble() |>
     dplyr::select(CTaa, tissue, diagnosis, clonalFrequency, patient) |>
     tidyr::drop_na() |>

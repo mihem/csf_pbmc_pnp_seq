@@ -23,7 +23,7 @@ sc_tcr <- qread(file.path("objects", "sc_tcr.qs"))
 
 # extract CTaa from TRB data from sc_tcr object
 heming_tcr <- sc_tcr@meta.data |>
-  dplyr::select(patient, CTaa, CTgene, CTnt, tissue, diagnosis) |>
+  dplyr::select(patient, cluster, CTaa, CTgene, CTnt, tissue, diagnosis) |>
   tidyr::separate_wider_delim(CTaa, names = c("TRA", "TRB"), delim = "_") |>
   tidyr::drop_na() |>
   dplyr::distinct() |>

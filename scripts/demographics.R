@@ -178,3 +178,71 @@ create_and_save_barplots(
   x_var = "diagnosis",
   output_dir = file.path("results", "demographics")
 )
+
+# Flow cytometry cohort analysis ----
+flow <- qread(file.path("objects", "flow_pre.qs"))
+
+flow_patients <-
+  flow$blood |>
+  mutate(id = as.character(id)) |>
+  mutate(patient = coalesce(patient, id)) |>
+  dplyr::select(patient, diagnosis, age, sex, cohort) |>
+  distinct() |>
+  dplyr::filter(diagnosis %in% c("CTRL", "GBS", "CIDP")) |>
+  dplyr::mutate(
+    diagnosis = factor(
+      diagnosis,
+      levels = c("CTRL", "GBS", "CIDP")
+    )
+  ) 
+
+overview_table_flow <- create_overview_table(flow_patients |> dplyr::rename(orbis_id = patient))
+
+writexl::write_xlsx(
+  overview_table_flow,
+  file.path("results", "table", "overview_table_flow.xlsx")
+)
+
+# Define plot configurations ----
+boxplot_configs_flow <- list(
+  age_flow = list(
+    y_var = "age",
+    title = "age",
+    geom_type = "point",
+    width = 2,
+    height = 3
+  )
+)
+
+barplot_configs_flow <- list(
+  disease_flow = list(
+    fill_var = "diagnosis",
+    title = "diagnosis",
+    color_palette = pals::cols25(9),
+    width = 3,
+    height = 3
+  ),
+  sex_flow = list(
+    fill_var = "sex",
+    title = "sex",
+    color_palette = rev(pals::cols25(2)),
+    width = 3,
+    height = 3
+  )
+)
+
+create_and_save_boxplots(
+  data = flow_patients,
+  configs = boxplot_configs_flow,
+  x_var = "diagnosis",
+  group_var = "diagnosis",
+  color_palette = sc_merge@misc$diagnosis_col,
+  output_dir = file.path("results", "demographics")
+)
+
+create_and_save_barplots(
+  data = flow_patients,
+  configs = barplot_configs_flow,
+  x_var = "diagnosis",
+  output_dir = file.path("results", "demographics")
+)

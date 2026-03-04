@@ -184,10 +184,6 @@ flow <- qread(file.path("objects", "flow_pre.qs"))
 
 flow_patients <-
   flow$blood |>
-  mutate(id = as.character(id)) |>
-  mutate(patient = coalesce(patient, id)) |>
-  dplyr::select(patient, diagnosis, age, sex, cohort) |>
-  distinct() |>
   dplyr::filter(diagnosis %in% c("CTRL", "GBS", "CIDP")) |>
   dplyr::mutate(
     diagnosis = factor(

@@ -4158,6 +4158,18 @@
       ],
       "Hash": "5b79228594f02385d4df4979284879ae"
     },
+    "grr": {
+      "Package": "grr",
+      "Version": "0.9.5",
+      "Source": "URL",
+      "Repository": "CRAN",
+      "RemoteType": "url",
+      "RemoteUrl": "https://cran.r-project.org/src/contrib/Archive/grr/grr_0.9.5.tar.gz",
+      "Requirements": [
+        "R"
+      ],
+      "Hash": "eae711fb32a309859a60a6b44a4accde"
+    },
     "gsl": {
       "Package": "gsl",
       "Version": "2.1-8",
@@ -5552,6 +5564,16 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "09eb987710984fc2905c7129c7d85e65"
+    },
+    "plotfunctions": {
+      "Package": "plotfunctions",
+      "Version": "1.5",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R"
+      ],
+      "Hash": "150b2a6899b8121d6429247898d877d0"
     },
     "plotly": {
       "Package": "plotly",
@@ -7617,6 +7639,33 @@
       ],
       "Hash": "ed3ed12875e0417a645baaecc07dd536"
     },
+    "turboGliph": {
+      "Package": "turboGliph",
+      "Version": "0.99.2",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "HetzDra",
+      "RemoteRepo": "turboGliph",
+      "RemoteRef": "main",
+      "RemoteSha": "2a5264b7c2b156a295c9067d30d38876f28b28de",
+      "Requirements": [
+        "R",
+        "doParallel",
+        "dplyr",
+        "foreach",
+        "grDevices",
+        "grr",
+        "igraph",
+        "parallel",
+        "plotfunctions",
+        "stringdist",
+        "stringr",
+        "viridis",
+        "visNetwork"
+      ],
+      "Hash": "53bcd8ca88b42059975b48aee1c1e8ec"
+    },
     "tweenr": {
       "Package": "tweenr",
       "Version": "2.0.3",
@@ -7773,6 +7822,24 @@
         "R"
       ],
       "Hash": "c826c7c4241b6fc89ff55aaea3fa7491"
+    },
+    "visNetwork": {
+      "Package": "visNetwork",
+      "Version": "2.1.4",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "grDevices",
+        "htmltools",
+        "htmlwidgets",
+        "jsonlite",
+        "magrittr",
+        "methods",
+        "stats",
+        "utils"
+      ],
+      "Hash": "5925096277c19e4ea9209e175a61d3d3"
     },
     "vroom": {
       "Package": "vroom",

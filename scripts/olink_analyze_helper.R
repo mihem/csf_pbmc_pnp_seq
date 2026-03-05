@@ -307,8 +307,8 @@ VolPlotOlink <- function(data, colors, n) {
       linetype = "dashed"
     ) +
     geom_vline(xintercept = 0, color = "red", linetype = "solid") +
-    geom_vline(xintercept = -1, color = "red", linetype = "dashed") +
-    geom_vline(xintercept = 1, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = -.5, color = "red", linetype = "dashed") +
+    geom_vline(xintercept = .5, color = "red", linetype = "dashed") +
     ggrepel::geom_text_repel() +
     theme_classic() +
     theme(legend.position = "none") +

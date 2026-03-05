@@ -171,7 +171,7 @@ ggsave(
   file.path("results", "interaction", "liana_selected_dotplot.pdf"),
   liana_dotplot_selected,
   width = 5,
-  height = 9
+  height = 7
 )
 
 # Chord diagram filtered for selected interactions
@@ -188,19 +188,3 @@ liana_results_aggregate |>
   ) |>
   chord_freq()
 dev.off()
-
-# # Visualize CXCR4 expression ----
-# dplot_cxcr4 <-
-#   DotPlot(sc_merge, features = c("CXCR4"), dot.min = 0.01) +
-#   viridis::scale_color_viridis(option = "viridis") +
-#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, face = "italic")) +
-#   xlab(NULL) +
-#   ylab(NULL) +
-#   scale_size(range = c(0, 5))
-
-# ggsave(
-#   file.path("results", "liana", "cxcr4_dotplot.pdf"),
-#   dplot_cxcr4,
-#   width = 3.5,
-#   height = 5
-# )

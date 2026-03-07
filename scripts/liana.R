@@ -104,7 +104,7 @@ ggsave(
 )
 
 selected_olink_markers <- c(
-  "CC7",
+  "CCL7",
   "CXCL8",
   "CCL3",
   "CCL2",
@@ -142,7 +142,7 @@ ggsave(
 
 # selected ligands and receptors that are validated interactions
 selected_ligands <- c("APOE", "CCL3", "TNFSF14")
-selected_receptors <- c("TREM2", "CCR4", "CCR1")
+selected_receptors <- c("TREM2", "CCR4", "CCR1", "CCR5")
 
 liana_dotplot_selected <-
   liana_results_aggregate |>
@@ -170,7 +170,7 @@ liana_dotplot_selected <-
 ggsave(
   file.path("results", "interaction", "liana_selected_dotplot.pdf"),
   liana_dotplot_selected,
-  width = 5,
+  width = 6,
   height = 7
 )
 

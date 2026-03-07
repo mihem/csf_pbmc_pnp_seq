@@ -374,11 +374,23 @@ Idents(sc_merge) <- sc_merge$cluster
 
 dotPlot(
   path = file.path("lookup", "markers.csv"),
+  dir_output = file.path("results", "dotplot"),
   object = sc_merge,
   par = "cellmarkers_seed",
   dot_min = 0.01,
   height = 8,
   width = 12
+)
+
+# CD8TEM_3 markers
+dotPlot(
+  path = file.path("lookup", "markers.csv"),
+  dir_output = file.path("results", "dotplot"),
+  object = sc_merge,
+  par = "cd8tem3",
+  dot_min = 0.01,
+  height = 8,
+  width = 6
 )
 
 # exhaustion markers
@@ -505,26 +517,29 @@ dotPlot(
   width = 6
 )
 
-
 # feature plots ---
-scMisc::fPlot(
-  path = file.path("lookup", "markers.csv"),
-  object = sc_merge,
-  par = "cellmarkers_seed",
-  reduction = "umap.stacas.ss.all",
-  order = FALSE,
-  width = 35
-)
-
-fplot_selected_cd8_nk <-
+fplot_selected_cd8tem3 <-
   FeaturePlot(
     object = sc_merge,
-    features = c("CD8A", "NCAM1", "IKZF2"),
+    features = c(
+      "CCR4",
+      "CXCR6",
+      "CCR5",
+      "SLAMF6",
+      "FASLG",
+      "CRTAM",
+      "CSF1",
+      "IL10RA",
+      "SIRT2",
+      "TNFRSF9",
+      "KLRG1",
+      "IFNG"
+    ),
     reduction = "umap.stacas.ss.all",
     order = TRUE,
-    cols = c("#F0F0F0", "#CB181D"),
+    cols = viridis::viridis(100),
     raster = FALSE,
-    ncol = 3
+    ncol = 4
   ) &
   theme(
     axis.text = element_blank(),
@@ -533,10 +548,45 @@ fplot_selected_cd8_nk <-
   )
 
 ggsave(
-  plot = fplot_selected_cd8_nk,
-  file = file.path("results", "featureplot", "fplot_selected_cd8_nk.png"),
-  width = 20,
-  height = 7
+  plot = fplot_selected_cd8tem3,
+  file = file.path("results", "featureplot", "fplot_selected_cd8tem3.png"),
+  width = 25,
+  height = 14
+)
+
+sc_merge <- AddModuleScore(
+  sc_merge,
+  features = list(
+    c("CCR4", "CXCR6", "CCR5")
+  ),
+  name = "CD8TEM_3"
+)
+
+fplot_selected_cd8tem3_score <-
+  FeaturePlot(
+    object = sc_merge,
+    features = c("CD8TEM_31"),
+    reduction = "umap.stacas.ss.all",
+    order = TRUE,
+    cols = viridis::viridis(100),
+    raster = FALSE,
+    ncol = 1
+  ) &
+  theme(
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.border = element_rect(color = "black", linewidth = 1, fill = NA)
+  )
+
+ggsave(
+  plot = fplot_selected_cd8tem3_score,
+  file = file.path(
+    "results",
+    "featureplot",
+    "fplot_selected_cd8tem3_score.png"
+  ),
+  width = 10,
+  height = 10
 )
 
 scMisc::fPlot(

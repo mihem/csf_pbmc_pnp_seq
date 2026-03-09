@@ -378,8 +378,8 @@ dotPlot(
   object = sc_merge,
   par = "cellmarkers_seed",
   dot_min = 0.01,
-  height = 8,
-  width = 12
+  height = 7,
+  width = 10
 )
 
 # CD8TEM_3 markers
@@ -389,8 +389,8 @@ dotPlot(
   object = sc_merge,
   par = "cd8tem3",
   dot_min = 0.01,
-  height = 8,
-  width = 6
+  height = 7,
+  width = 5.5
 )
 
 # exhaustion markers

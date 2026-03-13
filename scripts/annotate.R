@@ -315,9 +315,9 @@ umap <-
 
 ggsave(
   plot = umap,
-  file.path("results", "umap", "umap_annotated.png"),
-  width = 10,
-  height = 10
+  file.path("results", "umap", "umap_annotated.pdf"),
+  width = 6,
+  height = 6
 )
 
 qs::qsave(sc_merge, file.path("objects", "sc_merge.qs"))

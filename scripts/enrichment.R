@@ -21,7 +21,7 @@ source(file.path("scripts", "enrichment_helper.R"))
 # Load and prepare data ----
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthread = 4)
 
-# Extract CD8/NK markers ----
+# Extract CD8TEM_3 markers ----
 topmarkers_cd8tem_3 <- read_xlsx(
   file.path("results", "de", "topmarkers.xlsx"),
   sheet = "CD8TEM_3"
@@ -98,7 +98,7 @@ background_genes <- map_to_entrez(rownames(sc_merge))
 background_genes <- background_genes[!is.na(background_genes)]
 
 # Prepare GSEA input ----
-# Get all CD8/NK markers for ranking
+# Get all CD8TEM_3 markers for ranking
 all_cd8tem_3_markers <- FindMarkers(
   object = sc_merge,
   ident.1 = "CD8TEM_3",

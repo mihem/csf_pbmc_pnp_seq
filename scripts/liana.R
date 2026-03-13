@@ -103,43 +103,6 @@ ggsave(
   limitsize = FALSE
 )
 
-selected_olink_markers <- c(
-  "CCL7",
-  "CXCL8",
-  "CCL3",
-  "CCL2",
-  "CXCL10",
-  "TREM2",
-  "IFNG"
-)
-
-liana_plot_selected_markers <-
-  liana_results_aggregate |>
-  dplyr::filter(
-    ligand.complex %in%
-      selected_olink_markers |
-      receptor.complex %in% selected_olink_markers
-  ) |>
-  liana_dotplot() +
-  theme(
-    axis.text.x = element_text(
-      size = 10,
-      angle = 90,
-      hjust = 1,
-      vjust = 0.5,
-      face = "plain"
-    ),
-    strip.text = element_text(size = 10),
-  )
-
-ggsave(
-  file.path("results", "interaction", "liana_selected_markers_dotplot.pdf"),
-  liana_plot_selected_markers,
-  width = 50,
-  height = 7,
-  limitsize = FALSE
-)
-
 # selected ligands and receptors that are validated interactions
 selected_ligands <- c("APOE", "CCL3", "TNFSF14")
 selected_receptors <- c("TREM2", "CCR4", "CCR1", "CCR5")

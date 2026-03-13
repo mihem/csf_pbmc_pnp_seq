@@ -226,7 +226,6 @@ colors_dutch <- c(
   '#6F1E51'
 )
 
-
 sc_merge@misc$cluster_order <- cluster_order[!is.na(cluster_order)]
 sc_merge@misc$cluster_col <- setNames(
   unname(Polychrome::createPalette(
@@ -380,130 +379,6 @@ dotPlot(
   width = 5.5
 )
 
-# exhaustion markers
-dotPlot(
-  path = file.path("lookup", "markers.csv"),
-  object = sc_merge,
-  par = "exhaustion",
-  dot_min = 0.01,
-  height = 8,
-  width = 12
-)
-
-
-# go blood brain barrier
-dotPlot(
-  path = file.path("lookup", "markers.csv"),
-  object = sc_merge,
-  par = "GO_Transport_Across_Blood_Brain_Barrier_GO_0150104",
-  dot_min = 0.01,
-  height = 8,
-  width = 14
-)
-
-sc_merge_pbmc <- subset(sc_merge, tissue %in% "PBMC")
-# go blood brain barrier
-dotPlot(
-  path = file.path("lookup", "markers.csv"),
-  object = sc_merge_pbmc,
-  par = "BNB",
-  dot_min = 0.01,
-  height = 8,
-  width = 14
-)
-
-# olink markers
-olink_cols <- c(
-  "olink_96_immuno_onco",
-  "olink_96_inflammation",
-  "olink_48_immune_surv",
-  "olink_48_cytokine",
-  "blood_nerve_olink"
-)
-
-lapply(
-  olink_cols,
-  function(x) {
-    dotPlot(
-      path = file.path("lookup", "markers.csv"),
-      object = sc_merge,
-      par = x,
-      dot_min = 0.01,
-      height = 8,
-      width = 15
-    )
-  }
-)
-
-
-# spectal flow panels
-aurora_cols <- c("Tcells3", "Tfu", "ILC1", "NKFu")
-
-lapply(
-  aurora_cols,
-  function(x) {
-    dotPlot(
-      path = file.path("lookup", "markers.csv"),
-      object = sc_merge,
-      par = x,
-      dot_min = 0.01,
-      height = 8,
-      width = 12
-    )
-  }
-)
-
-# Louisas markers
-dotPlot(
-  path = file.path("lookup", "markers.csv"),
-  object = sc_merge,
-  par = "louisa",
-  dot_min = 0.01,
-  height = 8,
-  width = 12
-)
-
-tcells <- subset(
-  sc_merge,
-  cluster %in%
-    c(
-      "CD4naive_1",
-      "CD4TCM_1",
-      "CD4TCM_2",
-      "CD4TEM",
-      "Treg",
-      "MAIT",
-      "gdT",
-      "CD4CTL",
-      "CD8naive",
-      "CD8TCM",
-      "CD8TEM_1",
-      "CD8TEM_2",
-      "CD8_NK",
-      "NKCD56bright",
-      "NKCD56dim"
-    )
-)
-
-dotPlot(
-  path = file.path("lookup", "markers.csv"),
-  object = tcells,
-  par = "louisa",
-  dot_min = 0.01,
-  height = 8,
-  width = 12
-)
-
-
-dotPlot(
-  path = file.path("lookup", "markers.csv"),
-  object = sc_merge,
-  par = "olink_de",
-  dot_min = 0.01,
-  height = 8,
-  width = 6
-)
-
 # feature plots ---
 fplot_selected_cd8tem3 <-
   FeaturePlot(
@@ -590,16 +465,6 @@ scMisc::fPlot(
   path = file.path("lookup", "markers.csv"),
   object = sc_merge,
   par = "dying_cells",
-  reduction = "umap.stacas.ss.all",
-  order = FALSE,
-  width = 40,
-  height = 20
-)
-
-scMisc::fPlot(
-  path = file.path("lookup", "markers.csv"),
-  object = sc_merge,
-  par = "louisa",
   reduction = "umap.stacas.ss.all",
   order = FALSE,
   width = 40,

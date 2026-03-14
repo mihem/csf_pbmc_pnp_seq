@@ -1,6 +1,4 @@
-# CSF/PBMC Polyneuropathy Study
-
-This is the code of the corresponding manuscript (preprint/in preparation).
+# CSF/PBMC Polyneuropathy Sequencing Study
 
 All scripts can be found in the `scripts/` folder.
 

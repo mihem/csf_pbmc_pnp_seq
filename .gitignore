@@ -6,6 +6,7 @@
 !renv.lock
 !Dockerfile
 !.gitignore
+!README.md
 
 # But not download.sh and pre-processing script
 scripts/download.sh

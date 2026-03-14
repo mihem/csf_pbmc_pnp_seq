@@ -19,7 +19,7 @@ The analysis pipeline covers:
 | `tcr.R` / `tcr_comparison.R` | TCR repertoire analysis and GLIPH2 motif clustering |
 | `liana.R` | Cell-cell communication (LIANA) |
 | `olink_prepare.R` / `olink_analyze.R` | Olink proteomics preparation and differential analysis |
-| `flow_pre.R` / `flow.R` | Flow cytometry preprocessing and analysis |
+| `flow.R` | Flow cytometry preprocessing and analysis |
 | `correlation.R` | Correlation of immune cell abundance with clinical scores |
 | `enrichment.R` | Pathway enrichment (MSigDB, Enrichr) |
 | `demographics.R` | Patient demographics analysis |

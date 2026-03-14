@@ -14,7 +14,7 @@ The analysis pipeline covers:
 | `integrate.R` | Batch correction and data integration |
 | `annotate.R` | Cell type annotation and clustering |
 | `azimuth.R` | Reference mapping with Azimuth |
-| `abundance.R` | Differential cell abundance (MiloDE) |
+| `abundance.R` | Differential cell abundance |
 | `deg.R` | Differential gene expression (limma) |
 | `tcr.R` / `tcr_comparison.R` | TCR repertoire analysis and GLIPH2 motif clustering |
 | `liana.R` | Cell-cell communication (LIANA) |

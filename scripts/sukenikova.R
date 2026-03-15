@@ -51,7 +51,6 @@ writexl::write_xlsx(
   path = file.path("results", "tcr", "sukenikova_reactive_shared.xlsx")
 )
 
-
 # Prepare clean data for the table
 sukenikova_table_clean <- sukenikova_reactive_shared |>
   dplyr::arrange(heming_tissue, heming_diagnosis, CTaa_TRB) |>
@@ -74,9 +73,16 @@ sukenikova_table_clean <- sukenikova_reactive_shared |>
     "Sukenikova Patient" = sukenikova_pt,
     "Sukenikova Diagnosis" = sukenikova_diagnosis,
     "Sukenikova Tissue" = sukenikova_source,
-    "Sukenikova Specificity" = sukenikova_specificity
+    "Sukenikova Specificity" = sukenikova_specificity,
+    "Sukenikova Clone ID" = sukenikova_clone_id
   )
 
+write_xlsx(
+  sukenikova_table_clean,
+  path = file.path("results", "table", "sukenikova_reactive_table.xlsx")
+)
+
+# Save as PDF using base R graphics
 table_plot <- gridExtra::tableGrob(
   sukenikova_table_clean,
   rows = NULL,
@@ -92,9 +98,8 @@ table_plot <- gridExtra::tableGrob(
   )
 )
 
-# Save as PDF using base R graphics (very reliable)
 pdf(
-  file.path("results", "table", "sukenikova_reactive_table_grid.pdf"),
+  file.path("results", "table", "sukenikova_reactive_table.pdf"),
   width = 12,
   height = 8
 )

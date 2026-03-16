@@ -50,11 +50,33 @@ olink_npx_file <- file.path(
   "olink_npx_long_filtered.xlsx"
 )
 
+olink_proteins <- c(
+  "CCL2",
+  "CCL3",
+  "CXCL8",
+  "GZMA",
+  "KLRD1",
+  "SIRT2",
+  "TNFSF14",
+  "TREM2",
+  "VEGFA",
+  "IFNG",
+  "CXCL12",
+  "CXCL10",
+  "TNFRSF9",
+  "CCL7", 
+  "TNFSF12",
+  "IL1B",
+  "IL18"
+)
+
 olink_quant <- read_xlsx(olink_quant_file) |>
-  mutate(Quantified_value = as.numeric(Quantified_value))
+  mutate(Quantified_value = as.numeric(Quantified_value)) |>
+  dplyr::filter(Assay %in% olink_proteins)
 
 olink_npx <- read_xlsx(olink_npx_file) |>
-  mutate(NPX = as.numeric(NPX))
+  mutate(NPX = as.numeric(NPX)) |>
+  dplyr::filter(Assay %in% olink_proteins)
 
 # Loop through both group and meta_group
 for (group_name in names(group_configs)) {

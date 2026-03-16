@@ -218,7 +218,8 @@ statVolcanoOlink <- function(
   vars,
   reference,
   data,
-  fdr_threshold = 0.1
+  fdr_threshold = 0.1,
+  n_perm = 10000
 ) {
   result <- vector("list")
   n_group <- length(unique(data[[reference]]))
@@ -262,12 +263,40 @@ statVolcanoOlink <- function(
 
   result <- do.call(rbind, result)
 
-  # Apply BH correction (same as in calcStats for boxplots)
+  # Prepare matrix for permFDP (rows = analytes, columns = samples)
+  # Use only complete vars to compute threshold
+  quant_df <- data |>
+    dplyr::select(all_of(result$var)) |>
+    t() |>
+    as.data.frame()
+  
+  complete_rows <- complete.cases(quant_df)
+  quant_df_complete <- quant_df[complete_rows, , drop = FALSE]
+  result_complete <- result[complete_rows, ]
+
+  if (nrow(quant_df_complete) == 0) {
+    warning("No complete cases for permFDP")
+    return(NULL)
+  }
+
+  # Create binary group vector (1s and 2s)
+  group_levels <- unique(data[[reference]])
+  group_vector <- ifelse(data[[reference]] == group_levels[1], 1, 2)
+
+  # Get corrected threshold using permFDP (computed on complete vars only)
+  corrected_threshold <- permFDP::permFDP.adjust.threshold(
+    pVals = result_complete$p.value,
+    threshold = fdr_threshold,
+    myDesign = group_vector,
+    intOnly = quant_df_complete,
+    nPerms = n_perm
+  )
+
+  # Apply threshold to all vars (including those with some NAs)
   result <- result |>
     dplyr::mutate(
-      p.adj = p.adjust(p.value, method = "BH"),
-      significant = p.adj < fdr_threshold,
-      p.adj.threshold = fdr_threshold
+      p.adj.threshold = corrected_threshold,
+      significant = p.value < corrected_threshold
     ) |>
     mutate(neg_log10_p = -log10(p.value))
 
@@ -290,7 +319,7 @@ logfcVolcanoOlink <- function(data, group, group1, group2, vars) {
 
 # Volcano plot visualization function
 VolPlotOlink <- function(data, colors, n) {
-  # Get the corrected threshold for the horizontal line
+  # Threshold line at FDR cutoff on -log10(p.adj) scale
   threshold_line <- -log10(data$p.adj.threshold[1])
 
   data |>

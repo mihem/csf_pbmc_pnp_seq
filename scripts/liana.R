@@ -42,16 +42,11 @@ liana_results <- liana_wrap(
 qs::qsave(liana_results, file.path("objects", "liana_results.qs"))
 
 # Results processing and visualization ----
-liana_results$natmi |>
-  print(width = Inf)
-
 liana_results_aggregate <-
   liana_results |>
   liana_aggregate()
 
-
 liana_results_aggregate |>
-  #   dplyr::filter(ligand.complex == "CXCL14") |>
   print(width = Inf)
 
 
@@ -72,47 +67,14 @@ ggsave(
   limitsize = FALSE
 )
 
-liana_plot_CD8TEM3_target <-
-  liana_results_aggregate |>
-  liana_dotplot(target_groups = c("CD8TEM_3")) +
-  theme(
-    axis.text.x = element_text(size = 14, face = "plain"),
-    strip.text = element_text(size = 14),
-  )
-
-ggsave(
-  file.path("results", "interaction", "liana_cd8tem3_target_dotplot.pdf"),
-  liana_plot_CD8TEM3_target,
-  width = 40,
-  height = 7,
-  limitsize = FALSE
-)
-liana_plot_CD8TEM3_source <-
-  liana_results_aggregate |>
-  liana_dotplot(source_groups = c("CD8TEM_3")) +
-  theme(
-    axis.text.x = element_text(size = 14, face = "plain"),
-    strip.text = element_text(size = 14),
-  )
-
-ggsave(
-  file.path("results", "interaction", "liana_cd8tem3_source_dotplot.pdf"),
-  liana_plot_CD8TEM3_source,
-  width = 20,
-  height = 5,
-  limitsize = FALSE
-)
-
 # selected ligands and receptors that are validated interactions
-selected_ligands <- c("APOE", "CCL3", "TNFSF14")
-selected_receptors <- c("TREM2", "CCR4", "CCR1", "CCR5")
+selected_ligands <- c("CCL7", "CXCL8", "CCL2", "CCL3", "CXCL10", "IFNG")
 
 liana_dotplot_selected <-
   liana_results_aggregate |>
   dplyr::filter(
-    ligand.complex %in%
-      selected_ligands &
-      receptor.complex %in% selected_receptors
+    ligand.complex %in% selected_ligands,
+    target == "CD8TEM_3"
   ) |>
   liana_dotplot() +
   coord_flip() +
@@ -134,7 +96,7 @@ ggsave(
   file.path("results", "interaction", "liana_selected_dotplot.pdf"),
   liana_dotplot_selected,
   width = 6,
-  height = 7
+  height = 4
 )
 
 # Chord diagram filtered for selected interactions

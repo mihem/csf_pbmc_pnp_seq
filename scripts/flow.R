@@ -87,8 +87,8 @@ volcano_results_list <- pmap(
       group2 = condition2,
       tissue = tissue,
       output_dir = "flow",
-      width = 4,
-      height = 4
+      width = 3,
+      height = 3
     )
   }
 )

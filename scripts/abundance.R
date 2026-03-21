@@ -12,6 +12,8 @@ library(speckle)
 library(writexl)
 library(permFDP)
 
+source(file.path("scripts", "abundance_helper.R"))
+
 # load preprocessed data ----
 sc_merge <- qs::qread(file.path("objects", "sc_merge.qs"), nthread = 4)
 
@@ -158,12 +160,14 @@ lapply(seq_along(propeller_results), function(i) {
     abundance_configs$condition2[i]
   )
 
-  scMisc::plotPropeller(
+  plotPropeller(
     data = propeller_results[[i]],
     color = sc_merge@misc$cluster_col,
     filename = filename,
     use_permFDP = TRUE,
     dir_output = file.path("results", "abundance", "propeller_plots"),
+    width = 3,
+    height = 3
   )
 })
 

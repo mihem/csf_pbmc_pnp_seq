@@ -269,7 +269,7 @@ statVolcanoOlink <- function(
     dplyr::select(all_of(result$var)) |>
     t() |>
     as.data.frame()
-  
+
   complete_rows <- complete.cases(quant_df)
   quant_df_complete <- quant_df[complete_rows, , drop = FALSE]
   result_complete <- result[complete_rows, ]
@@ -338,7 +338,12 @@ VolPlotOlink <- function(data, colors, n) {
     geom_vline(xintercept = 0, color = "red", linetype = "solid") +
     geom_vline(xintercept = -.5, color = "red", linetype = "dashed") +
     geom_vline(xintercept = .5, color = "red", linetype = "dashed") +
-    ggrepel::geom_text_repel() +
+    ggrepel::geom_text_repel(
+      data = ~ dplyr::filter(
+        .x,
+        neg_log10_p >= threshold_line & abs(log2_ratio) >= 0.5
+      )
+    ) +
     theme_classic() +
     theme(legend.position = "none") +
     xlab(bquote(~ Log[2] ~ "fold change")) +

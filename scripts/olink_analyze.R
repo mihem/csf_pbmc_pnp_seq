@@ -163,8 +163,8 @@ for (group_name in names(group_configs)) {
       group2 = "CTRL",
       output_dir = "olink",
       suffix = paste0(config$suffix, "_quant"),
-      width = 6,
-      height = 5
+      width = 3,
+      height = 3
     )
 
     volcano_quant_gbs_ctrl <- createVolcanoPlotOlink(
@@ -175,8 +175,8 @@ for (group_name in names(group_configs)) {
       group2 = "CTRL",
       output_dir = "olink",
       suffix = paste0(config$suffix, "_quant"),
-      width = 6,
-      height = 5
+      width = 3,
+      height = 3
     )
 
     volcano_quant_cidp_gbs <- createVolcanoPlotOlink(
@@ -187,8 +187,8 @@ for (group_name in names(group_configs)) {
       group2 = "GBS",
       output_dir = "olink",
       suffix = paste0(config$suffix, "_quant"),
-      width = 6,
-      height = 5
+      width = 3,
+      height = 3
     )
 
     # NPX volcano plots
@@ -200,8 +200,8 @@ for (group_name in names(group_configs)) {
       group2 = "CTRL",
       output_dir = "olink",
       suffix = paste0(config$suffix, "_npx"),
-      width = 6,
-      height = 5
+      width = 3,
+      height = 3
     )
 
     volcano_npx_gbs_ctrl <- createVolcanoPlotOlink(
@@ -212,8 +212,8 @@ for (group_name in names(group_configs)) {
       group2 = "CTRL",
       output_dir = "olink",
       suffix = paste0(config$suffix, "_npx"),
-      width = 6,
-      height = 5
+      width = 3,
+      height = 3
     )
 
     volcano_npx_cidp_gbs <- createVolcanoPlotOlink(
@@ -224,8 +224,8 @@ for (group_name in names(group_configs)) {
       group2 = "GBS",
       output_dir = "olink",
       suffix = paste0(config$suffix, "_npx"),
-      width = 6,
-      height = 5
+      width = 3,
+      height = 3
     )
   }
 }

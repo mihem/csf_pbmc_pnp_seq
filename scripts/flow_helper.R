@@ -117,7 +117,14 @@ VolPlot <- function(data, cols, n) {
     geom_vline(xintercept = 0, color = "red", linetype = "solid") +
     geom_vline(xintercept = -0.5, color = "red", linetype = "dashed") +
     geom_vline(xintercept = 0.5, color = "red", linetype = "dashed") +
-    ggrepel::geom_text_repel() +
+    ggrepel::geom_text_repel(
+      data = function(x) {
+        dplyr::filter(
+          x,
+          neg_log10_p >= threshold_line & abs(log2_ratio) >= 0.5
+        )
+      }
+    ) +
     theme_classic() +
     theme(legend.position = "none") +
     xlab(bquote(~ Log[2] ~ "fold change")) +

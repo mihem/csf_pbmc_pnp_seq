@@ -1040,17 +1040,6 @@ shared_clones_protein_data <-
     shared_clones_csf_pbmc |>
     left_join(select(lookup, patient, csf_protein), by = join_by(patient))
 
-.cor_test <- cor.test(
-    shared_clones_protein_data$csf_protein,
-    shared_clones_protein_data$log2_ratio,
-    method = "spearman"
-)
-.label <- sprintf(
-    "rho = %.2f, p = %.3f",
-    .cor_test$estimate,
-    .cor_test$p.value
-)
-
 shared_clones_protein_correlation <-
     shared_clones_protein_data |>
     ggplot(aes(x = csf_protein, y = log2_ratio, color = diagnosis)) +
@@ -1060,16 +1049,6 @@ shared_clones_protein_correlation <-
         method = "lm",
         se = TRUE,
         linewidth = 0.5,
-        color = "black"
-    ) +
-    annotate(
-        "text",
-        x = Inf,
-        y = Inf,
-        label = .label,
-        hjust = 1.05,
-        vjust = 1.5,
-        size = 3,
         color = "black"
     ) +
     scale_color_manual(values = sc_tcr@misc$diagnosis_col) +

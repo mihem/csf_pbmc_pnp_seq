@@ -133,9 +133,9 @@ create_combined_correlation_plot <- function(
 
     # Format p-value
     p_text <- ifelse(
-      cell_stats$limma_p_value < 0.001,
+      cell_stats$limma_p_adj < 0.001,
       "adj. p < 0.001",
-      paste("adj. p =", round(cell_stats$limma_p_value, 3))
+      paste("adj. p =", round(cell_stats$limma_p_adj, 3))
     )
 
     # Create individual plot

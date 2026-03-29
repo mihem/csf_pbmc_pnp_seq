@@ -54,9 +54,7 @@ sc_merge_cerebro@meta.data <-
         nFeature_RNA,
         percent_mt,
         sample,
-        patient,
-        sex,
-        age
+        patient
     ) |>
     tibble::column_to_rownames(var = "barcode")
 
@@ -71,6 +69,11 @@ sc_merge_cerebro <- getMarkerGenes(
     thres_logFC = 0.25,
     thres_p_val = 0.05
 )
+
+# Sort marker genes by avg_log2FC descending ----
+sc_merge_cerebro@misc$marker_genes$cerebro_seurat$cluster <-
+    sc_merge_cerebro@misc$marker_genes$cerebro_seurat$cluster |>
+    dplyr::arrange(dplyr::desc(avg_log2FC))
 
 # Export for CerebroApp ----
 # Save processed object and export to Cerebro format

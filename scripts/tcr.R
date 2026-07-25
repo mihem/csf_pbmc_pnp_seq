@@ -205,6 +205,8 @@ qs::qsave(
     file = file.path("objects", "sc_tcr.qs")
 )
 
+sc_tcr <- qs::qread(file.path("objects", "sc_tcr.qs"))
+
 # sanity checks
 str(sc_tcr@meta.data)
 table(sc_tcr$clonalFrequency)
@@ -288,6 +290,12 @@ stackedPlot(
     width = 5,
     height = 3
 )
+scMisc::abundanceTbl(
+    object = sc_tcr,
+    row_var = "cloneSize",
+    col_var = "cluster",
+    dir_output = file.path("results", "abundance")
+)
 
 stackedPlot(
     object = sc_tcr,
@@ -299,6 +307,12 @@ stackedPlot(
     width = 10,
     height = 3
 )
+scMisc::abundanceTbl(
+    object = sc_tcr,
+    row_var = "cloneSize",
+    col_var = "sample",
+    dir_output = file.path("results", "abundance")
+)
 
 stackedPlot(
     object = sc_tcr,
@@ -309,6 +323,12 @@ stackedPlot(
     color = clone_cols,
     width = 5,
     height = 5
+)
+scMisc::abundanceTbl(
+    object = sc_tcr,
+    row_var = "cloneSize",
+    col_var = "tissue_group",
+    dir_output = file.path("results", "abundance")
 )
 
 sc_tcr_csf <- subset(
@@ -374,6 +394,12 @@ stackedPlot(
     height = 3,
     dir_output = file.path("results", "abundance")
 )
+scMisc::abundanceTbl(
+    object = sc_tcr_csf,
+    row_var = "cloneSize",
+    col_var = "diagnosis",
+    dir_output = file.path("results", "abundance")
+)
 
 stackedPlot(
     object = sc_tcr_pbmc,
@@ -384,6 +410,12 @@ stackedPlot(
     color = clone_cols,
     width = 5,
     height = 3,
+    dir_output = file.path("results", "abundance")
+)
+scMisc::abundanceTbl(
+    object = sc_tcr_pbmc,
+    row_var = "cloneSize",
+    col_var = "diagnosis",
     dir_output = file.path("results", "abundance")
 )
 
@@ -398,6 +430,12 @@ stackedPlot(
     height = 3,
     dir_output = file.path("results", "abundance")
 )
+scMisc::abundanceTbl(
+    object = sc_tcr_csf_cd8tem_3_groups,
+    row_var = "cloneSize",
+    col_var = "diagnosis",
+    dir_output = file.path("results", "abundance")
+)
 
 stackedPlot(
     object = sc_tcr_pbmc_cd8tem_3_groups,
@@ -408,6 +446,12 @@ stackedPlot(
     color = clone_cols,
     width = 3.2,
     height = 3,
+    dir_output = file.path("results", "abundance")
+)
+scMisc::abundanceTbl(
+    object = sc_tcr_pbmc_cd8tem_3_groups,
+    row_var = "cloneSize",
+    col_var = "diagnosis",
     dir_output = file.path("results", "abundance")
 )
 
@@ -425,6 +469,12 @@ stackedPlot(
     height = 4,
     dir_output = file.path("results", "abundance")
 )
+scMisc::abundanceTbl(
+    object = sc_tcr_main_groups_csf,
+    row_var = "cloneSize",
+    col_var = "diagnosis",
+    dir_output = file.path("results", "abundance")
+)
 
 stackedPlot(
     object = sc_tcr_main_groups_pbmc,
@@ -435,6 +485,12 @@ stackedPlot(
     color = clone_cols,
     width = 4,
     height = 4,
+    dir_output = file.path("results", "abundance")
+)
+scMisc::abundanceTbl(
+    object = sc_tcr_main_groups_pbmc,
+    row_var = "cloneSize",
+    col_var = "diagnosis",
     dir_output = file.path("results", "abundance")
 )
 

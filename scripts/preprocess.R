@@ -24,18 +24,12 @@ library(renv)
 future::plan("multicore", workers = 6)
 options(future.globals.maxSize = 16000 * 1024^2)
 
+
 # meta data ----
 lookup <-
-  read_excel(file.path("lookup", "SEED_lookup_v11.xlsx")) |>
+  read_excel(file.path("lookup", "SEED_lookup_v11_anonymized.xlsx")) |>
   janitor::clean_names() |>
   dplyr::filter(cohort %in% c("scRNA", "scRNA_flow")) |>
-  mutate(age = lubridate::time_length(difftime(date, birth_date), "years")) |>
-  mutate(
-    follow_up = lubridate::time_length(
-      difftime(date_follow_up, date),
-      "years"
-    )
-  ) |>
   mutate(
     incat_progress = (incat_follow_up - incat_at_lumbar_puncture) /
       follow_up

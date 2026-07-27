@@ -146,7 +146,7 @@ create_overview_table <- function(patient_data) {
     dplyr::group_by(diagnosis) |>
     dplyr::summarize(
       samples = n(),
-      patients = n_distinct(SampleID),
+      patients = n_distinct(orbis_id),
       age = mean(age, na.rm = TRUE),
       female = (1 - mean(sex_cat, na.rm = TRUE)) * 100
     )

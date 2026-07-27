@@ -118,8 +118,8 @@ olink_metadata <- read_xlsx(file.path("lookup", "olink_flow_lookup.xlsx"))
 
 olink_patients <- olink_quant |>
   left_join(olink_metadata, by = "SampleID") |>
-  dplyr::select(SampleID, age, sex, diagnosis) |>
-  dplyr::distinct(SampleID, .keep_all = TRUE) |>
+  dplyr::select(SampleID, orbis_id, age, sex, diagnosis) |>
+  dplyr::distinct(SampleID, orbis_id, .keep_all = TRUE) |>
   dplyr::mutate(
     diagnosis = factor(
       diagnosis,

@@ -22,7 +22,7 @@ nkt_flow_pre <-
   mutate(sample = gsub("(\\d+-V\\d).*", "\\1", Sample))
 
 flow_metadata <-
-  read_excel(file.path("lookup", "olink_flow_lookup.xlsx")) |>
+  read_excel(file.path("lookup", "olink_flow_lookup_anonymized.xlsx")) |>
   mutate(tissue = ifelse(grepl("C", SampleID), "PBMC", "CSF")) |>
   dplyr::filter(tissue == "PBMC") |>
   mutate(sample = gsub("(\\d+)_(\\d).*", "\\1-V\\2", SampleID)) |>

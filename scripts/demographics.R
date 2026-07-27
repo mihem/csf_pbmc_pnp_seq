@@ -114,7 +114,7 @@ olink_quant <- read_xlsx(file.path(
   "olink",
   "olink_quant_long_filtered.xlsx"
 ))
-olink_metadata <- read_xlsx(file.path("lookup", "olink_flow_lookup.xlsx"))
+olink_metadata <- read_xlsx(file.path("lookup", "olink_flow_lookup_anonymized.xlsx"))
 
 olink_patients <- olink_quant |>
   left_join(olink_metadata, by = "SampleID") |>

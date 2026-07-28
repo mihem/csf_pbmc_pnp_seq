@@ -5,10 +5,10 @@
 !scripts/
 !renv.lock
 !Dockerfile
+!.dockerignore
 !.gitignore
 !README.md
 
 # But not download.sh and pre-processing script
 scripts/download.sh
 scripts/flow_pre.R
-

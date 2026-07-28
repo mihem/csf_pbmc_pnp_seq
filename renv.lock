@@ -2159,6 +2159,11 @@
       ],
       "Hash": "543776ae6848fde2f48ff3816d0628bc"
     },
+    "base64url": {
+      "Package": "base64url",
+      "Version": "1.4",
+      "Source": "Repository"
+    },
     "basilisk": {
       "Package": "basilisk",
       "Version": "1.21.0",
@@ -6731,6 +6736,11 @@
       ],
       "Hash": "6d94b72071aefd6e8b041c34ee83ebd0"
     },
+    "secretbase": {
+      "Package": "secretbase",
+      "Version": "1.0.0",
+      "Source": "Repository"
+    },
     "selectr": {
       "Package": "selectr",
       "Version": "0.4-2",
@@ -7303,6 +7313,16 @@
         "lifecycle"
       ],
       "Hash": "213b6b8ed5afbf934843e6c3b090d418"
+    },
+    "tarchetypes": {
+      "Package": "tarchetypes",
+      "Version": "0.9.0",
+      "Source": "Repository"
+    },
+    "targets": {
+      "Package": "targets",
+      "Version": "1.7.1",
+      "Source": "Repository"
     },
     "tensor": {
       "Package": "tensor",

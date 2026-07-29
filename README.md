@@ -1,8 +1,7 @@
 # CSF/PBMC Polyneuropathy Sequencing Study
 
 The reproducible workflow is a single hierarchical `targets` graph. Pipeline
-functions live in `R/`, stage definitions live in `pipeline/`, and the original
-scripts are preserved in `legacy/scripts/` as the historical implementation.
+functions live in `R/` and stage definitions live in `pipeline/`.
 
 ## Overview
 
@@ -50,8 +49,8 @@ Rscript -e 'targets::tar_make(names = tidyselect::starts_with("deg_"))'
 Rscript -e 'targets::tar_make(names = tidyselect::starts_with("flow_"))'
 ```
 
-Historical regression baselines are archived under `legacy/` and are not part
-of the active graph. The graph has two explicit reference dependencies:
+Historical regression checks are not part of the active graph. The graph has
+two explicit reference dependencies:
 
 - `references/checkpoints/sc_merge_batch.qs` supplies the validated historical
   STACAS and UMAP reductions required for exact historical annotation.
@@ -69,10 +68,6 @@ explicitly with `TAR_INCLUDE_HEAVY=true`. The overlay-heavy TCR plot bundle is
 not in the active graph because `clonalOverlay()` exceeded workstation memory;
 the bounded TCR tables, comparisons, alluvial plots, basic plots, and invariant
 plots remain active.
-
-Historical scripts, checkpoints, outputs, and runtime artifacts are retained
-under `legacy/` for provenance only. See `legacy/README.md`; active code does
-not read from that directory.
 
 ## Reproducibility
 

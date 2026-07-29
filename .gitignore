@@ -17,18 +17,8 @@
 !.gitignore
 !README.md
 
-# Track historical source and archive documentation, but not archived data.
-!legacy/
-legacy/*
-!legacy/README.md
-!legacy/scripts/
-!legacy/scripts/**
-
 # Track reference provenance, but not large binary reference objects.
 !references/
 references/*
 !references/README.md
 
-# Historical untracked source files remain local-only in the archive.
-legacy/scripts/download.sh
-legacy/scripts/flow_pre.R

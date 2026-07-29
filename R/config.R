@@ -3,6 +3,11 @@ use_legacy_validation <- function() {
   tolower(value) %in% c("1", "true", "yes")
 }
 
+include_heavy_targets <- function() {
+  value <- Sys.getenv("TAR_INCLUDE_HEAVY", unset = "false")
+  tolower(value) %in% c("1", "true", "yes")
+}
+
 read_analysis_config <- function(path) {
   config <- yaml::read_yaml(path)
   stopifnot(

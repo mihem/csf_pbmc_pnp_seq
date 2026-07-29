@@ -26,11 +26,6 @@ targets_annotation <- c(
   ),
   tar_target(sc_annotated, apply_annotations(sc_clustered, manual_overrides, analysis_config)),
   tar_target(
-    cerebro_checkpoint,
-    export_cerebro_checkpoint(sc_clustered, "objects/targets/sc_cerebro.crb"),
-    format = "file"
-  ),
-  tar_target(
     annotated_umap,
     write_annotation_umap(sc_annotated, "results/targets/umap/umap_annotated.pdf"),
     format = "file"

@@ -20,6 +20,7 @@ source("pipeline/targets_correlation.R")
 source("pipeline/targets_demographics.R")
 source("pipeline/targets_projectil.R")
 source("pipeline/targets_cerebro.R")
+source("pipeline/targets_tables.R")
 source("pipeline/targets_validation.R")
 
 tar_option_set(
@@ -89,7 +90,8 @@ pipeline <- c(
   targets_olink,
   targets_correlation,
   targets_demographics,
-  targets_projectil
+  targets_projectil,
+  targets_tables
 )
 
 if (include_heavy_targets()) {

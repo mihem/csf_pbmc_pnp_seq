@@ -8,7 +8,7 @@ targets_abundance <- list(
     abundance_table_sample_file,
     write_abundance_table(
       abundance_tables$sample,
-      file.path(abundance_result_dir(), "abundance_tbl_sc_annotated_sample.xlsx")
+      file.path(abundance_result_dir(), "abundance_tbl_sc_merge_sample.xlsx")
     ),
     format = "file"
   ),
@@ -18,7 +18,7 @@ targets_abundance <- list(
       abundance_tables$tissue_diagnosis,
       file.path(
         abundance_result_dir(),
-        "abundance_tbl_sc_annotated_tissue_diagnosis.xlsx"
+        "abundance_tbl_sc_merge_tissue_diagnosis.xlsx"
       )
     ),
     format = "file"
@@ -28,8 +28,20 @@ targets_abundance <- list(
     write_abundance_table(
       abundance_tables$tissue_group,
       file.path(
-        abundance_result_dir(), "abundance_tbl_sc_annotated_tissue_group.xlsx"
+        abundance_result_dir(), "abundance_tbl_sc_merge_tissue_group.xlsx"
       )
+    ),
+    format = "file"
+  ),
+  tar_target(
+    abundance_table_csf_sample_file,
+    write_abundance_table(
+      make_abundance_table(
+        subset(abundance_object, subset = tissue == "CSF"),
+        "cluster",
+        "sample"
+      ),
+      file.path(abundance_result_dir(), "abundance_tbl_seu_subset_sample.xlsx")
     ),
     format = "file"
   ),

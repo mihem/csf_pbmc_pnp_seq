@@ -17,17 +17,16 @@ write_scrna_overview_table <- function(lookup, path) {
   path
 }
 
-collect_publication_tables <- function(paths, output_dir = table_result_dir()) {
-  paths <- unique(paths[grepl("[.]xlsx$", paths)])
-  stopifnot(length(paths) > 0L, all(file.exists(paths)), !anyDuplicated(basename(paths)))
+write_table_workbook <- function(table, path) {
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  writexl::write_xlsx(table, path)
+  path
+}
+
+write_named_table_workbooks <- function(tables, output_dir = table_result_dir()) {
+  stopifnot(length(tables) > 0L, !is.null(names(tables)), !anyDuplicated(names(tables)))
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-  outputs <- file.path(output_dir, basename(paths))
-  copy <- normalizePath(paths, mustWork = TRUE) != normalizePath(
-    outputs, mustWork = FALSE
-  )
-  copied <- file.copy(
-    paths[copy], outputs[copy], overwrite = TRUE, copy.mode = FALSE
-  )
-  stopifnot(all(copied), all(file.exists(outputs)), all(file.size(outputs) > 0L))
-  outputs
+  paths <- file.path(output_dir, paste0(names(tables), ".xlsx"))
+  purrr::walk2(tables, paths, writexl::write_xlsx)
+  paths
 }

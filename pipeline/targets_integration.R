@@ -11,14 +11,5 @@ targets_integration <- list(
       stacas_ss_all,
       analysis_config
     )
-  ),
-  tar_target(
-    azimuth_level2_stacas_map_file,
-    write_azimuth_level2_map(
-      sc_integrated,
-      "results/targets/map/map_pbmcref_level2_stacas.ss.all.png",
-      seed = 123L
-    ),
-    format = "file"
   )
 )

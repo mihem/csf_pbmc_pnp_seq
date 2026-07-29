@@ -26,6 +26,15 @@ targets_annotation <- c(
   ),
   tar_target(sc_annotated, apply_annotations(sc_clustered, manual_overrides, analysis_config)),
   tar_target(
+    azimuth_level2_stacas_map_file,
+    write_azimuth_level2_map(
+      sc_annotated,
+      "results/targets/map/map_pbmcref_level2_stacas.ss.all.png",
+      seed = 123L
+    ),
+    format = "file"
+  ),
+  tar_target(
     annotation_marker_file,
     analysis_config$paths$markers,
     format = "file"

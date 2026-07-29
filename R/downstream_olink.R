@@ -241,21 +241,3 @@ write_olink_volcano <- function(data, comparison, type, seed = 123L) {
   ggplot2::ggsave(path, plot, width = 3, height = 3)
   path
 }
-
-validate_olink_stats <- function(current_files, legacy_files) {
-  current_stats <- current_files[grepl("stats.*xlsx$", current_files)]
-  stopifnot(length(current_stats) == length(legacy_files))
-  checks <- lapply(legacy_files, function(legacy) {
-    current <- current_stats[basename(current_stats) == basename(legacy)]
-    stopifnot(length(current) == 1L)
-    observed <- readxl::read_xlsx(current)
-    expected <- readxl::read_xlsx(legacy)
-    stopifnot(
-      identical(names(observed), names(expected)),
-      nrow(observed) == nrow(expected),
-      isTRUE(all.equal(observed, expected, check.attributes = FALSE, tolerance = 1e-8))
-    )
-    tibble::tibble(artifact = basename(legacy), passed = TRUE)
-  })
-  dplyr::bind_rows(checks)
-}

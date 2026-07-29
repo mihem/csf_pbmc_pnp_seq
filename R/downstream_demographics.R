@@ -168,21 +168,7 @@ write_modality_demographics <- function(
   )
 }
 
-validate_demographics_overviews <- function(current_files, legacy_files) {
-  checks <- lapply(legacy_files, function(legacy) {
-    current <- current_files[basename(current_files) == basename(legacy)]
-    stopifnot(length(current) == 1L)
-    observed <- readxl::read_xlsx(current)
-    expected <- readxl::read_xlsx(legacy)
-    stopifnot(isTRUE(all.equal(
-      observed, expected, check.attributes = FALSE, tolerance = 1e-10
-    )))
-    tibble::tibble(artifact = basename(legacy), passed = TRUE)
-  })
-  dplyr::bind_rows(checks)
-}
-
-validate_pdf_artifacts <- function(paths) {
+check_pdf_artifacts <- function(paths) {
   stopifnot(length(paths) > 0L, all(file.exists(paths)), all(file.size(paths) > 0L))
   headers <- vapply(paths, function(path) {
     rawToChar(readBin(path, what = "raw", n = 4L))

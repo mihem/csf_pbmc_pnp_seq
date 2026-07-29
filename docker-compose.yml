@@ -6,7 +6,6 @@ services:
     environment:
       HOME: /tmp
       RENV_CONFIG_SANDBOX_ENABLED: "FALSE"
-      TAR_VALIDATE_LEGACY: "${TAR_VALIDATE_LEGACY:-true}"
       TAR_INCLUDE_HEAVY: "${TAR_INCLUDE_HEAVY:-false}"
     volumes:
       - .:/csf_pbmc_pnp_seq

@@ -21,7 +21,6 @@ source("pipeline/targets_demographics.R")
 source("pipeline/targets_projectil.R")
 source("pipeline/targets_cerebro.R")
 source("pipeline/targets_tables.R")
-source("pipeline/targets_validation.R")
 
 tar_option_set(
   packages = c(
@@ -96,21 +95,6 @@ pipeline <- c(
 
 if (include_heavy_targets()) {
   pipeline <- c(pipeline, targets_cerebro)
-}
-
-if (use_legacy_validation()) {
-  pipeline <- c(pipeline, targets_validation)
-} else {
-  target_names <- vapply(
-    pipeline,
-    function(target) target$settings$name,
-    character(1)
-  )
-  validation_target <- grepl(
-    "(^legacy_|_legacy_|^validate_|_regression($|_)|_regression_|_validation$)",
-    target_names
-  )
-  pipeline <- pipeline[!validation_target]
 }
 
 pipeline

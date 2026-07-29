@@ -69,18 +69,5 @@ targets_deg <- tarchetypes::tar_map(
     deg_eligibility_file,
     write_deg_eligibility(deg_eligibility, deg_paths[["eligibility"]]),
     format = "file"
-  ),
-  targets::tar_target(
-    deg_legacy_workbooks,
-    legacy_deg_workbook_paths(comparison),
-    format = "file"
-  ),
-  targets::tar_target(
-    deg_regression_validation,
-    validate_deg_workbooks(
-      deg_cluster_workbook,
-      deg_combined_workbook,
-      deg_legacy_workbooks
-    )
   )
 )

@@ -1,21 +1,13 @@
-targets_annotation_input <- if (use_legacy_validation()) {
-  list(
-    tar_target(
-      sc_annotation_input,
-      stabilize_annotation_input(
-        sc_integrated,
-        legacy_sc_integrated_file,
-        validate_sc_integrated_result
-      )
-    )
-  )
-} else {
-  list(tar_target(sc_annotation_input, sc_integrated))
-}
-
-targets_annotation <- c(
-  targets_annotation_input,
-  list(
+targets_annotation <- list(
+  tar_target(
+    annotation_checkpoint_file,
+    "references/checkpoints/sc_merge_batch.qs",
+    format = "file"
+  ),
+  tar_target(
+    sc_annotation_input,
+    apply_annotation_checkpoint(sc_integrated, annotation_checkpoint_file)
+  ),
   tar_target(
     sc_clustered,
     cluster_integrated_object(sc_annotation_input, analysis_config)
@@ -76,6 +68,5 @@ targets_annotation <- c(
     annotated_umap,
     write_annotation_umap(sc_annotated, "results/targets/umap/umap_annotated.pdf"),
     format = "file"
-  )
   )
 )

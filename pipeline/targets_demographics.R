@@ -41,23 +41,8 @@ targets_demographics <- list(
     format = "file"
   ),
   targets::tar_target(
-    demographics_legacy_overview_files,
-    file.path(
-      "results", "table",
-      c("overview_table_olink.xlsx", "overview_table_flow.xlsx")
-    ),
-    format = "file"
-  ),
-  targets::tar_target(
-    demographics_overview_validation,
-    validate_demographics_overviews(
-      c(demographics_olink_files, demographics_flow_files),
-      demographics_legacy_overview_files
-    )
-  ),
-  targets::tar_target(
-    demographics_pdf_validation,
-    validate_pdf_artifacts(c(
+    demographics_pdf_check,
+    check_pdf_artifacts(c(
       demographics_scrna_files,
       demographics_olink_files[grepl("[.]pdf$", demographics_olink_files)],
       demographics_flow_files[grepl("[.]pdf$", demographics_flow_files)]

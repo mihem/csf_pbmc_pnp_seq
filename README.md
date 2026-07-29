@@ -2,7 +2,7 @@
 
 The reproducible workflow is a single hierarchical `targets` graph. Pipeline
 functions live in `R/`, stage definitions live in `pipeline/`, and the original
-scripts remain in `scripts/` as the historical implementation.
+scripts are preserved in `legacy/scripts/` as the historical implementation.
 
 ## Overview
 
@@ -50,13 +50,19 @@ Rscript -e 'targets::tar_make(names = tidyselect::starts_with("deg_"))'
 Rscript -e 'targets::tar_make(names = tidyselect::starts_with("flow_"))'
 ```
 
-Legacy regression checks are enabled by default. A production graph without
-dependencies on historical `objects/` and `results/` baselines is available
-with:
+Historical regression baselines are archived under `legacy/` and are not part
+of the active graph. The graph has two explicit reference dependencies:
 
-```bash
-TAR_VALIDATE_LEGACY=false Rscript -e 'targets::tar_make()'
-```
+- `references/checkpoints/sc_merge_batch.qs` supplies the validated historical
+  STACAS and UMAP reductions required for exact manuscript annotation.
+- `references/projectil/conventional_cd8_projectil_reference.qs` is the
+  external Terekhova CD8 atlas used by ProjecTILs.
+
+Their provenance and checksums are documented in `references/README.md`.
+The unused `legacy` block in `config/analysis.yml` is retained only to avoid
+invalidating the cached memory-intensive STACAS target; no active command reads
+those paths. It can be removed when `_targets/` is intentionally rebuilt from
+scratch.
 
 Memory-intensive Cerebro export targets are excluded by default. Enable them
 explicitly with `TAR_INCLUDE_HEAVY=true`. The overlay-heavy TCR plot bundle is
@@ -71,6 +77,10 @@ active targets below `results/targets/`. Figure 1A (study workflow) and
 Supplementary Figure 2C (BBB leakage schematic) are manually designed
 illustrations rather than data-derived analysis outputs, so they intentionally
 remain source artwork only and are not pipeline targets.
+
+Historical scripts, checkpoints, outputs, and runtime artifacts are retained
+under `legacy/` for provenance only. See `legacy/README.md`; active code does
+not read from that directory.
 
 ## Reproducibility
 

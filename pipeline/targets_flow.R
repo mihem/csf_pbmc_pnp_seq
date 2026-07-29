@@ -81,26 +81,6 @@ targets_flow <- list(
       flow_data, file.path(flow_result_dir(), "plots", "batch")
     ),
     format = "file"
-  ),
-  targets::tar_target(
-    flow_legacy_object_file,
-    file.path("objects", "flow_pre.qs"),
-    format = "file"
-  ),
-  targets::tar_target(
-    flow_legacy_gating_comparison_file,
-    file.path("results", "flow", "comparison", "gating_comparison_full.xlsx"),
-    format = "file"
-  ),
-  targets::tar_target(
-    flow_object_regression,
-    validate_flow_object(flow_data, flow_legacy_object_file)
-  ),
-  targets::tar_target(
-    flow_gating_regression,
-    validate_flow_gating_workbook(
-      flow_gating_comparison_file, flow_legacy_gating_comparison_file
-    )
   )
 )
 

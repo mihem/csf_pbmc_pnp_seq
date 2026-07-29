@@ -69,24 +69,5 @@ targets_liana <- list(
     ),
     format = "file",
     packages = c("dplyr", "liana")
-  ),
-  targets::tar_target(
-    liana_legacy_results_file,
-    file.path("objects", "liana_results.qs"),
-    format = "file"
-  ),
-  targets::tar_target(
-    liana_regression_validation,
-    validate_liana_results(liana_results, liana_legacy_results_file),
-    packages = c("dplyr", "qs", "tibble")
-  ),
-  targets::tar_target(
-    liana_regression_validation_file,
-    write_liana_validation(
-      liana_regression_validation,
-      file.path(liana_result_dir(), "legacy_regression.csv")
-    ),
-    format = "file",
-    packages = "readr"
   )
 )

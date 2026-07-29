@@ -243,20 +243,3 @@ write_rcna_plot <- function(object, score) {
   ggplot2::ggsave(path, plot, width = 8, height = 6)
   path
 }
-
-validate_correlation_result <- function(current_files, legacy_file,
-                                        tolerance = 1e-8) {
-  current <- current_files[basename(current_files) == basename(legacy_file)]
-  stopifnot(length(current) == 1L)
-  observed <- readr::read_csv(current, show_col_types = FALSE)
-  expected <- readr::read_csv(legacy_file, show_col_types = FALSE)
-  stopifnot(
-    identical(names(observed), names(expected)),
-    identical(as.character(observed$cell_type), as.character(expected$cell_type)),
-    all(vapply(setdiff(names(observed), "cell_type"), function(column) {
-      isTRUE(all.equal(observed[[column]], expected[[column]],
-                       check.attributes = FALSE, tolerance = tolerance))
-    }, logical(1)))
-  )
-  tibble::tibble(artifact = basename(legacy_file), passed = TRUE)
-}

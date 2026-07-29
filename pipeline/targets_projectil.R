@@ -1,7 +1,7 @@
 targets_projectil <- list(
   tar_target(
     projectil_reference_file,
-    file.path("objects", "conventional_cd8_projectil_reference.qs"),
+    "references/projectil/conventional_cd8_projectil_reference.qs",
     format = "file"
   ),
   tar_target(

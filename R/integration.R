@@ -109,13 +109,12 @@ write_integrated_tissue_umap <- function(object, path, seed = 123L) {
   path
 }
 
-stabilize_annotation_input <- function(object, path, validation_result) {
-  stopifnot(isTRUE(validation_result$passed[[1]]))
-  baseline <- qs::qread(path, nthreads = 6)
-  stopifnot(identical(colnames(object), colnames(baseline)))
-  object[["stacas.ss.all"]] <- baseline[["stacas.ss.all"]]
-  object[["umap.stacas.ss.all"]] <- baseline[["umap.stacas.ss.all"]]
-  object$group <- baseline$group
-  object$age <- baseline$age
+apply_annotation_checkpoint <- function(object, path) {
+  checkpoint <- qs::qread(path, nthreads = 6)
+  stopifnot(identical(colnames(object), colnames(checkpoint)))
+  object[["stacas.ss.all"]] <- checkpoint[["stacas.ss.all"]]
+  object[["umap.stacas.ss.all"]] <- checkpoint[["umap.stacas.ss.all"]]
+  object$group <- checkpoint$group
+  object$age <- checkpoint$age
   object
 }

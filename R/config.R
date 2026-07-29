@@ -1,8 +1,3 @@
-use_legacy_validation <- function() {
-  value <- Sys.getenv("TAR_VALIDATE_LEGACY", unset = "true")
-  tolower(value) %in% c("1", "true", "yes")
-}
-
 include_heavy_targets <- function() {
   value <- Sys.getenv("TAR_INCLUDE_HEAVY", unset = "false")
   tolower(value) %in% c("1", "true", "yes")

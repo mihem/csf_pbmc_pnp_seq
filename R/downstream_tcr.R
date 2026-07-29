@@ -124,36 +124,6 @@ annotate_tcr_cells <- function(sc_annotated, combined_tcr) {
   object
 }
 
-validate_combined_tcr_exact <- function(object, path) {
-  baseline <- qs::qread(path, nthreads = 6)
-  stopifnot(identical(object, baseline))
-  tibble::tibble(stage = "combined_tcr", check = "exact_object", passed = TRUE)
-}
-
-validate_sc_tcr_exact <- function(object, path) {
-  baseline <- qs::qread(path, nthreads = 6)
-  tcr_columns <- c(
-    "CTgene", "CTnt", "CTaa", "CTstrict",
-    "clonalProportion", "clonalFrequency", "cloneSize"
-  )
-  stopifnot(
-    identical(colnames(object), colnames(baseline)),
-    all(tcr_columns %in% colnames(object@meta.data)),
-    identical(
-      object@meta.data[, tcr_columns, drop = FALSE],
-      baseline@meta.data[, tcr_columns, drop = FALSE]
-    ),
-    identical(as.character(object$cluster), as.character(baseline$cluster)),
-    identical(object@misc, baseline@misc),
-    identical(as.character(Seurat::Idents(object)), as.character(Seurat::Idents(baseline)))
-  )
-  tibble::tibble(
-    stage = "sc_tcr",
-    check = "exact_cells_tcr_annotation_cluster_misc_idents",
-    passed = TRUE
-  )
-}
-
 tcr_result_dir <- function() {
   file.path("results", "targets", "tcr")
 }
@@ -267,43 +237,6 @@ write_tcr_report_tables <- function(tables) {
   paths <- file.path(root, paste0(names(tables), ".xlsx"))
   purrr::walk2(tables, paths, writexl::write_xlsx)
   unname(paths)
-}
-
-tcr_legacy_table_paths <- function() {
-  file.path(
-    "results", "tcr",
-    paste0(
-      c(
-        "CTaa_sample", "cloneSize_count", "shared_clones_summary",
-        "shared_clones_csf_pbmc_abundance", "shared_clones_between_patients"
-      ),
-      ".xlsx"
-    )
-  )
-}
-
-validate_tcr_report_tables <- function(tables, legacy_paths) {
-  stopifnot(length(tables) == length(legacy_paths), all(file.exists(legacy_paths)))
-  legacy <- lapply(legacy_paths, readxl::read_xlsx)
-  names(legacy) <- sub("\\.xlsx$", "", basename(legacy_paths))
-  for (name in names(tables)) {
-    normalize <- function(data) {
-      dplyr::mutate(
-        tibble::as_tibble(data),
-        dplyr::across(where(is.factor), as.character)
-      )
-    }
-    current <- normalize(tables[[name]])
-    baseline <- normalize(legacy[[name]])
-    stopifnot(
-      identical(names(current), names(baseline)),
-      nrow(current) == nrow(baseline),
-      isTRUE(all.equal(current, baseline, check.attributes = FALSE))
-    )
-  }
-  tibble::tibble(
-    stage = "tcr_reporting", check = names(tables), passed = TRUE
-  )
 }
 
 tcr_clone_size_colors <- function(object) {

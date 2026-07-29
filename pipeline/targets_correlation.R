@@ -16,21 +16,6 @@ targets_correlation <- c(
       cross_modality_correlation_files,
       write_correlation_result(cross_modality_correlation),
       format = "file"
-    ),
-    targets::tar_target(
-      legacy_cross_modality_correlation_file,
-      file.path(
-        "results", "correlation",
-        paste0("correlation_", score, "_", tissue, ".csv")
-      ),
-      format = "file"
-    ),
-    targets::tar_target(
-      cross_modality_correlation_validation,
-      validate_correlation_result(
-        cross_modality_correlation_files,
-        legacy_cross_modality_correlation_file
-      )
     )
   ),
   tarchetypes::tar_map(

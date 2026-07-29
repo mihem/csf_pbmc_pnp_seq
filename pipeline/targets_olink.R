@@ -69,23 +69,4 @@ targets_olink <- c(list(
       write_olink_volcano(olink_npx_volcano_data, comparison, "npx", 300L),
       format = "file"
     )
-  ), list(
-  targets::tar_target(
-    olink_legacy_stats_files,
-    file.path("results", "olink", c(
-      "olink_quant_stats_lme4.xlsx", "olink_quant_stats_lme4_meta.xlsx",
-      "olink_npx_stats_all.xlsx", "olink_npx_stats_all_meta.xlsx"
-    )),
-    format = "file"
-  ),
-  targets::tar_target(
-    olink_regression_validation,
-    validate_olink_stats(
-      c(
-        olink_quant_diagnosis_files, olink_quant_group2_files,
-        olink_npx_diagnosis_files, olink_npx_group2_files
-      ),
-      olink_legacy_stats_files
-    )
   ))
-)

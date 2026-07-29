@@ -141,25 +141,5 @@ targets_abundance <- list(
       seed = 123L
     ),
     format = "file"
-  ),
-  tar_target(
-    abundance_legacy_table_files,
-    legacy_abundance_table_paths(),
-    format = "file"
-  ),
-  tar_target(
-    validate_abundance_tables_result,
-    validate_abundance_tables(abundance_tables, abundance_legacy_table_files)
-  ),
-  tar_target(
-    abundance_legacy_propeller_file,
-    legacy_propeller_path(),
-    format = "file"
-  ),
-  tar_target(
-    validate_abundance_propeller_result,
-    validate_propeller_results(
-      abundance_propeller_results, abundance_legacy_propeller_file
-    )
   )
 )

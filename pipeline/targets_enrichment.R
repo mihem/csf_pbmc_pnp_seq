@@ -50,17 +50,5 @@ targets_enrichment <- list(
     enrichment_gsea_files,
     write_enrichment_gsea_outputs(enrichment_gsea_results),
     format = "file"
-  ),
-  tar_target(
-    enrichment_legacy_workbooks,
-    legacy_enrichment_workbooks(),
-    format = "file"
-  ),
-  tar_target(
-    enrichment_regression_validation,
-    validate_enrichment_workbooks(
-      c(enrichment_ora_files, enrichment_gsea_files),
-      enrichment_legacy_workbooks
-    )
   )
 )

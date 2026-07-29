@@ -1,6 +1,8 @@
 # CSF/PBMC Polyneuropathy Sequencing Study
 
-All scripts can be found in the `scripts/` folder.
+The reproducible workflow is a single hierarchical `targets` graph. Pipeline
+functions live in `R/`, stage definitions live in `pipeline/`, and the original
+scripts remain in `scripts/` as the historical implementation.
 
 ## Overview
 
@@ -25,20 +27,76 @@ The analysis pipeline covers:
 | `projectil.R` | ProjecTILs reference mapping |
 | `sukenikova.R` | Comparison with Sukenikova et al. dataset |
 
+## Pipeline
+
+The default graph covers preprocessing, Azimuth mapping, STACAS integration,
+annotation, abundance, DEG, enrichment, LIANA, TCR, flow cytometry, Olink,
+clinical correlations, demographics, Sukenikova comparison, and ProjectIL
+readiness. Outputs are written below `results/targets/`; large intermediate
+objects are managed by the `_targets/` store.
+
+Inspect or run the graph from the project root:
+
+```bash
+Rscript -e 'targets::tar_manifest()'
+Rscript -e 'targets::tar_make()'
+Rscript -e 'targets::tar_visnetwork()'
+```
+
+Run a bounded stage instead of the full graph:
+
+```bash
+Rscript -e 'targets::tar_make(names = tidyselect::starts_with("deg_"))'
+Rscript -e 'targets::tar_make(names = tidyselect::starts_with("flow_"))'
+```
+
+Legacy regression checks are enabled by default. A production graph without
+dependencies on historical `objects/` and `results/` baselines is available
+with:
+
+```bash
+TAR_VALIDATE_LEGACY=false Rscript -e 'targets::tar_make()'
+```
+
+Memory-intensive Cerebro export targets are excluded by default. Enable them
+explicitly with `TAR_INCLUDE_HEAVY=true`. The overlay-heavy TCR plot bundle is
+not in the active graph because `clonalOverlay()` exceeded workstation memory;
+the bounded TCR tables, comparisons, alluvial plots, basic plots, and invariant
+plots remain active.
+
 ## Reproducibility
 
 ### renv
 To ensure reproducibility, we used the *renv* package. To restore the environment from the *renv.lock* file, use:
 
-```R
+```r
 renv::restore()
 ```
 
 ## Docker
-If you have trouble restoring the environment via *renv*, you can also use the *Docker* image.
+The Docker image includes the locked R environment and Azimuth PBMC reference.
 
 ```bash
-docker pull mihem/csf_pbmc_pnp_seq:v0.5
+docker pull mihem/csf_pbmc_pnp_seq:v0.6
+LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose run --rm csf_pbmc_pnp_seq
+```
+
+Compose limits the container to 48 GiB by default so a single analysis cannot
+exhaust the workstation. Override this only when necessary:
+
+```bash
+PIPELINE_MEMORY_LIMIT=56g LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) \
+  docker compose run --rm csf_pbmc_pnp_seq
+```
+
+Run a specific target set in a 16 GiB container:
+
+```bash
+docker run --rm --memory=16g --memory-swap=16g \
+  --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -e RENV_CONFIG_SANDBOX_ENABLED=FALSE -v "$PWD:/csf_pbmc_pnp_seq" \
+  -w /csf_pbmc_pnp_seq mihem/csf_pbmc_pnp_seq:v0.6 \
+  Rscript -e 'targets::tar_make(names = "tcr_alluvial_plot_files")'
 ```
 
 ## Questions?

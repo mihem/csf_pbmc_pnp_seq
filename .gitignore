@@ -12,6 +12,7 @@
 !_targets.R
 !renv.lock
 !Dockerfile
+!docker-compose.yml
 !.dockerignore
 !.gitignore
 !README.md

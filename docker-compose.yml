@@ -1,0 +1,16 @@
+services:
+  csf_pbmc_pnp_seq:
+    image: mihem/csf_pbmc_pnp_seq:v0.6
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-100}"
+    working_dir: /csf_pbmc_pnp_seq
+    environment:
+      HOME: /tmp
+      RENV_CONFIG_SANDBOX_ENABLED: "FALSE"
+      TAR_VALIDATE_LEGACY: "${TAR_VALIDATE_LEGACY:-true}"
+      TAR_INCLUDE_HEAVY: "${TAR_INCLUDE_HEAVY:-false}"
+    volumes:
+      - .:/csf_pbmc_pnp_seq
+    mem_limit: "${PIPELINE_MEMORY_LIMIT:-48g}"
+    memswap_limit: "${PIPELINE_MEMORY_LIMIT:-48g}"
+    command: Rscript -e "targets::tar_make()"
+    restart: "no"

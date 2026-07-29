@@ -15,5 +15,14 @@ targets_projectil <- list(
       file.path(projectil_result_dir(), "readiness.csv")
     ),
     format = "file"
+  ),
+  tar_target(
+    projectil_cd8tem3,
+    run_projectil_cd8tem3(sc_annotated, projectil_reference_file, ncores = 2L)
+  ),
+  tar_target(
+    projectil_plot_files,
+    write_projectil_plots(projectil_cd8tem3),
+    format = "file"
   )
 )

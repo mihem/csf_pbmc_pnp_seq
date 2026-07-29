@@ -1,0 +1,48 @@
+project:
+  seed: 123
+  workers: 6
+  future_globals_gib: 16
+
+preprocess:
+  min_cells: 3
+  min_features: 200
+  max_features_default: 200
+  normalization_method: LogNormalize
+  scale_factor: 10000
+  variable_features: 2000
+  nmf_factors: 50
+  nmf_seed: 123
+
+azimuth:
+  reference: pbmcref
+  score_threshold: 0.4
+
+integration:
+  split_by: batch
+  labels: azimuth_pbmcref2
+  dimensions: 30
+  k_weight: 50
+  seed: 123
+  umap_seed: 42
+
+annotation:
+  dimensions: 30
+  resolutions: [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
+  final_resolution: 1.0
+  cluster_seed: 0
+
+paths:
+  lookup: lookup/SEED_lookup_v11_anonymized.xlsx
+  qc_thresholds: lookup/filter_df.csv
+  annotations: lookup/annotations.xlsx
+  markers: lookup/markers.csv
+  nk_overrides: lookup/nk_cd8_nk.csv
+  raw_rna: raw/rna
+  target_results: results/targets
+
+legacy:
+  sc_list: objects/sc_list.qs
+  sc_merge_pre: objects/sc_merge_pre.qs
+  sc_azimuth: objects/sc_merge_azimuth.qs
+  sc_integrated: objects/sc_merge_batch.qs
+  sc_annotated: objects/sc_merge.qs

@@ -3,6 +3,13 @@
 
 # But not scripts
 !scripts/
+!R/
+!R/**
+!pipeline/
+!pipeline/**
+!config/
+!config/analysis.yml
+!_targets.R
 !renv.lock
 !Dockerfile
 !.dockerignore

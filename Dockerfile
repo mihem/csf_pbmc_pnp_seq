@@ -31,3 +31,7 @@ COPY renv.lock ./renv.lock
 # are copied into the image library because the cache mount is build-time only.
 RUN --mount=type=cache,id=csf-pbmc-pnp-renv-r4.4-${TARGETARCH},target=/renv-cache,sharing=locked \
  R -e 'renv::restore(library = renv::paths$library(), prompt = FALSE)'
+
+# Install the exact Azimuth PBMC reference during the image build. This avoids
+# package installation and network access from the analysis pipeline itself.
+RUN R -e 'SeuratData::InstallData("pbmcref", lib = renv::paths$library())'

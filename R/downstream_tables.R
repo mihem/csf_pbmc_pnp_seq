@@ -22,7 +22,12 @@ collect_publication_tables <- function(paths, output_dir = table_result_dir()) {
   stopifnot(length(paths) > 0L, all(file.exists(paths)), !anyDuplicated(basename(paths)))
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   outputs <- file.path(output_dir, basename(paths))
-  copied <- file.copy(paths, outputs, overwrite = TRUE, copy.mode = FALSE)
-  stopifnot(all(copied), all(file.size(outputs) > 0L))
+  copy <- normalizePath(paths, mustWork = TRUE) != normalizePath(
+    outputs, mustWork = FALSE
+  )
+  copied <- file.copy(
+    paths[copy], outputs[copy], overwrite = TRUE, copy.mode = FALSE
+  )
+  stopifnot(all(copied), all(file.exists(outputs)), all(file.size(outputs) > 0L))
   outputs
 }

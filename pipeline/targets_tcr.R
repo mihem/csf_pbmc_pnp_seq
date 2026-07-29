@@ -42,6 +42,16 @@ targets_tcr <- list(
     format = "file"
   ),
   tar_target(
+    tcr_abundance_table_files,
+    write_tcr_abundance_tables(sc_tcr),
+    format = "file"
+  ),
+  tar_target(
+    tcr_abundance_plot_files,
+    write_tcr_abundance_plots(sc_tcr),
+    format = "file"
+  ),
+  tar_target(
     tcr_invariant_plot_files,
     write_tcr_invariant_plots(sc_tcr, seed = 42L),
     format = "file"

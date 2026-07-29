@@ -306,6 +306,116 @@ validate_tcr_report_tables <- function(tables, legacy_paths) {
   )
 }
 
+tcr_clone_size_colors <- function(object) {
+  levels <- levels(object$cloneSize)
+  stats::setNames(rev(viridis::turbo(length(levels))), levels)
+}
+
+make_tcr_abundance_table <- function(metadata, x_axis) {
+  absolute <- table(metadata$cloneSize, metadata[[x_axis]]) |>
+    as.data.frame.matrix() |>
+    tibble::rownames_to_column("cell")
+  percentage <- absolute |>
+    dplyr::mutate(dplyr::across(
+      tidyselect::where(is.numeric),
+      ~ round(.x / sum(.x) * 100, 2)
+    ))
+  list(absolute = absolute, percentage = percentage)
+}
+
+write_tcr_abundance_tables <- function(sc_tcr) {
+  root <- abundance_result_dir()
+  dir.create(root, recursive = TRUE, showWarnings = FALSE)
+  metadata <- sc_tcr[[]]
+  tables <- list(
+    cluster = make_tcr_abundance_table(metadata, "cluster"),
+    sample = make_tcr_abundance_table(metadata, "sample"),
+    tissue_group = make_tcr_abundance_table(metadata, "tissue_group")
+  )
+  paths <- file.path(
+    root,
+    paste0("abundance_tbl_sc_tcr_", names(tables), ".xlsx")
+  )
+  for (index in seq_along(tables)) {
+    writexl::write_xlsx(tables[[index]], paths[[index]])
+  }
+  paths
+}
+
+make_tcr_stacked_plot <- function(metadata, x_axis, x_order, colors) {
+  data <- table(metadata$cloneSize, metadata[[x_axis]]) |>
+    as.data.frame.matrix() |>
+    tibble::rownames_to_column("cloneSize") |>
+    tidyr::pivot_longer(-cloneSize, names_to = "group", values_to = "count")
+  data$cloneSize <- factor(data$cloneSize, levels = names(colors))
+  data$group <- factor(data$group, levels = x_order)
+  data <- dplyr::filter(data, .data$count != 0)
+  ggplot2::ggplot(
+    data,
+    ggplot2::aes(x = .data$group, y = .data$count, fill = .data$cloneSize)
+  ) +
+    ggplot2::geom_col(color = "black", linewidth = 0.1, position = "fill") +
+    ggplot2::scale_fill_manual(values = colors) +
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    ggplot2::guides(fill = ggplot2::guide_legend(title = NULL)) +
+    ggplot2::labs(x = NULL, y = "Proportion of cells") +
+    ggplot2::theme_classic() +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 90, hjust = 1, vjust = 0.3)
+    )
+}
+
+write_tcr_abundance_plots <- function(sc_tcr) {
+  root <- abundance_result_dir()
+  dir.create(root, recursive = TRUE, showWarnings = FALSE)
+  metadata <- sc_tcr[[]]
+  diagnosis_order <- sc_tcr@misc$diagnosis_order
+  main <- metadata$diagnosis %in% c("CTRL", "CIAP", "CIDP", "GBS")
+  configs <- list(
+    list("sc_tcr_cluster", rep(TRUE, nrow(metadata)), "cluster",
+         sc_tcr@misc$cluster_order, 5, 3),
+    list("sc_tcr_sample", rep(TRUE, nrow(metadata)), "sample",
+         unique(metadata$sample), 10, 3),
+    list("sc_tcr_tissue_group", rep(TRUE, nrow(metadata)), "tissue_group",
+         unique(metadata$tissue_group), 5, 5),
+    list("sc_tcr_csf_diagnosis", metadata$tissue == "CSF", "diagnosis",
+         diagnosis_order, 5, 3),
+    list("sc_tcr_pbmc_diagnosis", metadata$tissue == "PBMC", "diagnosis",
+         diagnosis_order, 5, 3),
+    list(
+      "sc_tcr_csf_cd8tem_3_groups_diagnosis",
+      metadata$tissue == "CSF" & metadata$cluster == "CD8TEM_3" &
+        metadata$diagnosis %in% c("CIAP", "CIDP", "GBS"),
+      "diagnosis", diagnosis_order, 3.2, 3
+    ),
+    list(
+      "sc_tcr_pbmc_cd8tem_3_groups_diagnosis",
+      metadata$tissue == "PBMC" & metadata$cluster == "CD8TEM_3" &
+        metadata$diagnosis %in% c("CIAP", "CIDP", "GBS"),
+      "diagnosis", diagnosis_order, 3.2, 3
+    ),
+    list("sc_tcr_main_groups_csf_diagnosis", main & metadata$tissue == "CSF",
+         "diagnosis", diagnosis_order, 4, 4),
+    list("sc_tcr_main_groups_pbmc_diagnosis", main & metadata$tissue == "PBMC",
+         "diagnosis", diagnosis_order, 4, 4),
+    list("sc_tcr_main_groups_tissue_diagnosis", main, "tissue_diagnosis",
+         sc_tcr@misc$tissue_diagnosis_order, 5, 5)
+  )
+  colors <- tcr_clone_size_colors(sc_tcr)
+  paths <- vapply(configs, function(config) {
+    path <- file.path(root, paste0("stacked_barplot_", config[[1L]], ".pdf"))
+    plot <- make_tcr_stacked_plot(
+      metadata[config[[2L]], , drop = FALSE],
+      config[[3L]],
+      config[[4L]],
+      colors
+    )
+    ggplot2::ggsave(path, plot, width = config[[5L]], height = config[[6L]])
+    path
+  }, character(1))
+  unname(paths)
+}
+
 write_tcr_basic_plots <- function(combined_tcr, sc_tcr, seed = 42L) {
   root <- tcr_result_dir()
   dir.create(root, recursive = TRUE, showWarnings = FALSE)
@@ -550,65 +660,23 @@ write_tcr_analysis_plots <- function(sc_tcr, lookup, tables, seed = 42L) {
 }
 
 make_tcr_alluvial_plot <- function(object) {
-  axes <- c("tissue", "patient", "diagnosis", "cluster")
   top_clones <- object[[]] |>
     dplyr::count(.data$CTaa, .data$tissue, .data$diagnosis) |>
     tidyr::drop_na() |>
-    dplyr::arrange(dplyr::desc(.data$n), .data$CTaa) |>
-    dplyr::slice_max(.data$n, n = 10L, with_ties = FALSE) |>
-    dplyr::pull("CTaa")
-  data <- object[[]] |>
-    dplyr::filter(!is.na(.data$CTaa)) |>
-    dplyr::select(tidyselect::all_of(c(axes, "CTaa"))) |>
-    dplyr::distinct() |>
-    dplyr::mutate(
-      CTaa_top = dplyr::if_else(.data$CTaa %in% top_clones, .data$CTaa, NA_character_),
-      highlighted = !is.na(.data$CTaa_top),
-      alluvium = dplyr::row_number()
-    ) |>
-    tidyr::pivot_longer(
-      tidyselect::all_of(axes), names_to = "axis", values_to = "stratum"
-    ) |>
-    dplyr::mutate(axis = factor(.data$axis, levels = axes))
-  clone_levels <- sort(unique(stats::na.omit(data$CTaa_top)))
-  stratum_levels <- sort(unique(data$stratum))
-  clone_colors <- stats::setNames(viridis::turbo(length(clone_levels)), clone_levels)
-  data$flow_fill <- unname(clone_colors[data$CTaa_top])
-  data$flow_fill[is.na(data$flow_fill)] <- "grey85"
-  stratum_colors <- stats::setNames(
-    scales::hue_pal(l = 65, c = 100)(length(stratum_levels)),
-    stratum_levels
+    dplyr::arrange(dplyr::desc(.data$n)) |>
+    dplyr::slice_max(.data$n, n = 10L, with_ties = FALSE)
+  object$CTaa_top <- ifelse(
+    object$CTaa %in% top_clones$CTaa,
+    object$CTaa,
+    NA
   )
-
-  ggplot2::ggplot(
-    data,
-    ggplot2::aes(
-      x = .data$axis, stratum = .data$stratum, alluvium = .data$alluvium
-    )
+  scRepertoire::alluvialClones(
+    object,
+    cloneCall = "aa",
+    y.axes = c("tissue", "patient", "diagnosis", "cluster"),
+    color = "CTaa_top"
   ) +
-    ggalluvial::geom_flow(
-      ggplot2::aes(fill = .data$flow_fill, alpha = .data$highlighted),
-      width = 0.2, color = NA
-    ) +
-    ggplot2::scale_fill_identity() +
-    ggplot2::scale_alpha_manual(values = c(`FALSE` = 0.04, `TRUE` = 0.8), guide = "none") +
-    ggnewscale::new_scale_fill() +
-    ggalluvial::geom_stratum(
-      ggplot2::aes(fill = ggplot2::after_stat(stratum)),
-      width = 0.2, color = "white", linewidth = 0.2
-    ) +
-    ggplot2::geom_text(
-      stat = ggalluvial::StatStratum,
-      ggplot2::aes(label = ggplot2::after_stat(stratum)),
-      size = 2
-    ) +
-    ggplot2::scale_fill_manual(values = stratum_colors) +
-    ggplot2::theme_classic() +
-    ggplot2::theme(
-      axis.title.x = ggplot2::element_blank(),
-      axis.ticks.x = ggplot2::element_blank(),
-      legend.position = "none"
-    )
+    ggplot2::scale_fill_manual(values = scales::hue_pal()(10L))
 }
 
 write_tcr_alluvial_plots <- function(sc_tcr, seed = 42L) {

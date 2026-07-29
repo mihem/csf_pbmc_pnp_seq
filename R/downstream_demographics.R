@@ -21,7 +21,8 @@ demographics_barplot_config <- function() {
     ~name, ~variable, ~title, ~palette, ~width, ~height,
     "disease", "diagnosis", "diagnosis", "diagnosis", 4.5, 3,
     "sex", "sex", "sex", "sex", 4.5, 3,
-    "therapy_status", "therapy", "therapy status", "binary", 4.5, 3
+    "therapy_status", "therapy", "therapy status", "binary", 4.5, 3,
+    "bbb_dysfunction", "bbbd", "BBB dysfunction", "bbb", 5, 5
   )
 }
 
@@ -125,7 +126,8 @@ write_scrna_demographics <- function(lookup, diagnosis_colors, seed = 123L) {
   palettes <- list(
     diagnosis = pals::cols25(9),
     sex = rev(pals::cols25(2)),
-    binary = pals::cols25(2)
+    binary = pals::cols25(2),
+    bbb = c(no = "#1F78C8", yes = "#FF0000")
   )
   bar_files <- vapply(seq_len(nrow(bars)), function(index) {
     plot <- demographics_barplot(

@@ -59,6 +59,30 @@ assemble_stacas_integration <- function(object, lookup, reduction, config) {
   )
 }
 
+write_azimuth_level2_map <- function(object, path, seed = 123L) {
+  stopifnot(
+    "azimuth_pbmcref2" %in% colnames(object[[]]),
+    "umap.stacas.ss.all" %in% names(object@reductions)
+  )
+  colors <- withr::with_seed(
+    seed,
+    unname(Polychrome::createPalette(100, pals::cols25()))
+  )
+  plot <- Seurat::DimPlot(
+    object,
+    reduction = "umap.stacas.ss.all",
+    group.by = "azimuth_pbmcref2",
+    raster = FALSE,
+    pt.size = 0.1,
+    alpha = 0.1,
+    cols = colors,
+    label = TRUE
+  ) + scMisc::theme_rect()
+  ensure_parent_dir(path)
+  ggplot2::ggsave(path, plot, width = 20, height = 8, dpi = 300)
+  path
+}
+
 stabilize_annotation_input <- function(object, path, validation_result) {
   stopifnot(isTRUE(validation_result$passed[[1]]))
   baseline <- qs::qread(path, nthreads = 6)

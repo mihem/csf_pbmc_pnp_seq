@@ -156,3 +156,32 @@ write_annotation_umap <- function(object, path) {
   ggplot2::ggsave(path, plot = plot, width = 6, height = 6)
   path
 }
+
+write_annotation_dotplot <- function(
+  object, marker_file, marker_column, path, width, height
+) {
+  markers <- utils::read.csv(marker_file, check.names = FALSE)[[marker_column]]
+  markers <- unique(markers[!is.na(markers) & nzchar(markers)])
+  stopifnot(length(markers) > 0L, all(markers %in% rownames(object)))
+  Seurat::DefaultAssay(object) <- "RNA"
+  Seurat::Idents(object) <- object$cluster
+  plot <- Seurat::DotPlot(
+    object,
+    features = markers,
+    dot.scale = 10,
+    scale.by = "size",
+    dot.min = 0.01,
+    scale = TRUE
+  ) +
+    viridis::scale_color_viridis(option = "viridis") +
+    ggplot2::scale_size(range = c(0, 10)) +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(
+        angle = 90, vjust = 0.5, hjust = 1, face = "italic"
+      )
+    ) +
+    ggplot2::labs(x = NULL, y = NULL)
+  ensure_parent_dir(path)
+  ggplot2::ggsave(path, plot, width = width, height = height)
+  path
+}

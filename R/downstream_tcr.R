@@ -356,7 +356,6 @@ make_tcr_stacked_plot <- function(metadata, x_axis, x_order, colors) {
   ) +
     ggplot2::geom_col(color = "black", linewidth = 0.1, position = "fill") +
     ggplot2::scale_fill_manual(values = colors) +
-    ggplot2::scale_y_continuous(labels = scales::percent) +
     ggplot2::guides(fill = ggplot2::guide_legend(title = NULL)) +
     ggplot2::labs(x = NULL, y = "Proportion of cells") +
     ggplot2::theme_classic() +

@@ -83,6 +83,32 @@ write_azimuth_level2_map <- function(object, path, seed = 123L) {
   path
 }
 
+write_integrated_tissue_umap <- function(object, path, seed = 123L) {
+  stopifnot(
+    "tissue" %in% colnames(object[[]]),
+    "umap.stacas.ss.all" %in% names(object@reductions)
+  )
+  colors <- withr::with_seed(
+    seed,
+    unname(Polychrome::createPalette(100, pals::cols25()))
+  )
+  plot <- Seurat::DimPlot(
+    object,
+    reduction = "umap.stacas.ss.all",
+    pt.size = 0.5,
+    raster = FALSE,
+    alpha = 0.1,
+    group.by = "tissue",
+    cols = colors
+  ) +
+    scMisc::theme_rect() +
+    ggplot2::xlab("UMAP1") +
+    ggplot2::ylab("UMAP2")
+  ensure_parent_dir(path)
+  ggplot2::ggsave(path, plot = plot, width = 20, height = 8, dpi = 300)
+  path
+}
+
 stabilize_annotation_input <- function(object, path, validation_result) {
   stopifnot(isTRUE(validation_result$passed[[1]]))
   baseline <- qs::qread(path, nthreads = 6)

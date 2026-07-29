@@ -54,6 +54,58 @@ enrichment_background_genes <- function(object) {
   sort(unique(genes[!is.na(genes)]))
 }
 
+find_cd8tem3_markers <- function(object) {
+  stopifnot(inherits(object, "Seurat"), "cluster" %in% colnames(object[[]]))
+  Seurat::Idents(object) <- object$cluster
+  Seurat::FindMarkers(
+    object = object,
+    ident.1 = "CD8TEM_3",
+    only.pos = TRUE,
+    min.pct = 0.1,
+    logfc.threshold = 0.25,
+    assay = "RNA"
+  ) |>
+    tibble::rownames_to_column("gene") |>
+    dplyr::filter(.data$p_val_adj < 0.05) |>
+    dplyr::arrange(dplyr::desc(.data$avg_log2FC))
+}
+
+run_cd8tem3_marker_ora <- function(markers, background_genes) {
+  selected <- markers |>
+    dplyr::mutate(entrez_id = map_enrichment_entrez(.data$gene)) |>
+    dplyr::filter(!is.na(.data$entrez_id), .data$avg_log2FC > 1) |>
+    dplyr::slice_min(order_by = .data$p_val_adj, n = 200)
+  database <- get("org.Hs.eg.db", envir = asNamespace("org.Hs.eg.db"))
+  clusterProfiler::enrichGO(
+    gene = selected$entrez_id,
+    universe = background_genes,
+    OrgDb = database,
+    ont = "BP",
+    pAdjustMethod = "BH",
+    pvalueCutoff = 0.01,
+    qvalueCutoff = 0.05,
+    readable = TRUE
+  )
+}
+
+write_cd8tem3_marker_ora <- function(
+  result,
+  root = file.path(enrichment_result_dir(), "cd8tem_3")
+) {
+  stopifnot(nrow(as.data.frame(result)) > 0L)
+  workbook <- file.path(root, "cd8tem_3_go_ora_results.xlsx")
+  dotplot <- file.path(root, "cd8tem_3_go_ora_dotplot.pdf")
+  ensure_parent_dir(workbook)
+  writexl::write_xlsx(as.data.frame(result), workbook)
+  save_enrichment_plot(
+    enrichplot::dotplot(result, showCategory = 10),
+    dotplot,
+    width = 6,
+    height = 6
+  )
+  c(workbook, dotplot)
+}
+
 make_enrichment_analyses <- function(deg_results) {
   analyses <- list()
   for (comparison in names(deg_results)) {

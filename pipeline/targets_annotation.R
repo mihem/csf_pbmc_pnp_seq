@@ -35,6 +35,15 @@ targets_annotation <- c(
     format = "file"
   ),
   tar_target(
+    integrated_tissue_umap_file,
+    write_integrated_tissue_umap(
+      sc_annotated,
+      "results/targets/umap/stacas.ss.all_umap_tissue.png",
+      seed = 123L
+    ),
+    format = "file"
+  ),
+  tar_target(
     annotation_marker_file,
     analysis_config$paths$markers,
     format = "file"

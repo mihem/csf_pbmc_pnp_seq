@@ -37,6 +37,11 @@ targets_tcr <- list(
     format = "file"
   ),
   tar_target(
+    tcr_shared_clone_plot_files,
+    write_tcr_shared_clone_plots(sc_tcr, tcr_report_tables),
+    format = "file"
+  ),
+  tar_target(
     tcr_alluvial_plot_files,
     write_tcr_alluvial_plots(sc_tcr, seed = 42L),
     format = "file"

@@ -21,6 +21,19 @@ targets_enrichment <- list(
     enrichment_background_genes(sc_annotated)
   ),
   tar_target(
+    cd8tem3_markers,
+    find_cd8tem3_markers(sc_annotated)
+  ),
+  tar_target(
+    cd8tem3_marker_ora,
+    run_cd8tem3_marker_ora(cd8tem3_markers, enrichment_background)
+  ),
+  tar_target(
+    cd8tem3_marker_ora_files,
+    write_cd8tem3_marker_ora(cd8tem3_marker_ora),
+    format = "file"
+  ),
+  tar_target(
     enrichment_ora_results,
     run_enrichment_ora(enrichment_deg_results, enrichment_background)
   ),

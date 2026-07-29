@@ -458,6 +458,61 @@ write_tcr_basic_plots <- function(combined_tcr, sc_tcr, seed = 42L) {
   )
 }
 
+write_tcr_shared_clone_plots <- function(sc_tcr, tables) {
+  root <- tcr_result_dir()
+  dir.create(root, recursive = TRUE, showWarnings = FALSE)
+  summary <- tables$shared_clones_summary
+  total_unique <- dplyr::n_distinct(stats::na.omit(sc_tcr$CTaa))
+  shared_plot <- tibble::tibble(
+    category = c("unique", "shared_between_patients", "shared_within_patient"),
+    count = c(
+      total_unique - nrow(summary),
+      sum(summary$patients_count > 1),
+      sum(summary$patients_count == 1)
+    )
+  ) |>
+    ggplot2::ggplot(ggplot2::aes(x = "", y = .data$count, fill = .data$category)) +
+    ggplot2::geom_col(width = 1) +
+    ggplot2::geom_text(
+      ggplot2::aes(label = .data$count),
+      position = ggplot2::position_stack(vjust = 0.5)
+    ) +
+    ggplot2::coord_polar("y") +
+    ggplot2::theme_void()
+  enrichment_plot <- tables$shared_clones_csf_pbmc_abundance |>
+    ggplot2::ggplot(
+      ggplot2::aes(
+        x = .data$diagnosis,
+        y = .data$log2_ratio,
+        fill = .data$diagnosis
+      )
+    ) +
+    ggplot2::geom_violin(alpha = 0.5, width = 1.5) +
+    ggplot2::geom_boxplot(alpha = 0.5, width = 0.2) +
+    ggplot2::geom_hline(
+      yintercept = 0,
+      linetype = "dashed",
+      color = "grey30"
+    ) +
+    ggplot2::scale_fill_manual(values = sc_tcr@misc$diagnosis_col) +
+    ggplot2::scale_y_continuous(breaks = seq(-10, 10)) +
+    ggplot2::labs(
+      x = "",
+      y = "log2(CSF / blood frequency)",
+      title = "Shared Clone Enrichment",
+      subtitle = "Positive = enriched in CSF, Negative = enriched in blood"
+    ) +
+    ggplot2::theme_classic() +
+    ggplot2::theme(legend.position = "none")
+  paths <- file.path(
+    root,
+    c("tcr_shared_clones_summary.pdf", "shared_clones_enrichment_ratio_expanded.pdf")
+  )
+  ggplot2::ggsave(paths[[1L]], shared_plot, width = 5, height = 5)
+  ggplot2::ggsave(paths[[2L]], enrichment_plot, width = 5, height = 3)
+  paths
+}
+
 write_tcr_analysis_plots <- function(sc_tcr, lookup, tables, seed = 42L) {
   root <- tcr_result_dir()
   dir.create(root, recursive = TRUE, showWarnings = FALSE)

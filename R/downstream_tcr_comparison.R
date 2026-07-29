@@ -203,8 +203,22 @@ prepare_tcr_comparison <- function(sc_tcr, input_files, seed = 42L) {
 tcr_comparison_theme <- function(base_size = 11) {
   ggplot2::theme_classic(base_size = base_size) + ggplot2::theme(
     plot.title = ggplot2::element_text(size = base_size + 1, face = "bold", hjust = 0.5),
+    axis.title = ggplot2::element_text(size = base_size),
+    axis.text = ggplot2::element_text(size = base_size - 1),
+    legend.title = ggplot2::element_text(size = base_size),
+    legend.text = ggplot2::element_text(size = base_size - 1),
     strip.text = ggplot2::element_text(size = base_size, face = "bold"),
     strip.background = ggplot2::element_rect(fill = "grey95")
+  )
+}
+
+tcr_comparison_p_label <- function(p_value) {
+  dplyr::case_when(
+    is.na(p_value) ~ "",
+    p_value < 0.001 ~ "***",
+    p_value < 0.01 ~ "**",
+    p_value < 0.05 ~ "*",
+    TRUE ~ ""
   )
 }
 
@@ -216,6 +230,7 @@ write_tcr_comparison_plots <- function(result, seed = 42L) {
     withr::with_seed(seed, ggplot2::ggsave(path, plot, width = width, height = height))
     path
   }
+  neuropathy <- c("CIAP", "CIDP", "GBS", "MAG", "MFS", "PNC", "CAN", "PPN")
   overview <- result$diagnosis_enrichment |>
     dplyr::filter(.data$p_adj < 0.1, .data$odds_ratio > 1) |>
     dplyr::left_join(
@@ -223,7 +238,11 @@ write_tcr_comparison_plots <- function(result, seed = 42L) {
     ) |>
     dplyr::mutate(
       tissue_bias = tidyr::replace_na(.data$tissue_bias, "No bias"),
-      neg_log10_fdr = -log10(pmax(.data$p_adj, 1e-300))
+      neg_log10_fdr = -log10(pmax(.data$p_adj, 1e-300)),
+      diagnosis = factor(
+        .data$diagnosis,
+        levels = intersect(c(neuropathy, "GBS_Sukenikova"), unique(.data$diagnosis))
+      )
     )
   labels <- overview |>
     dplyr::group_by(.data$diagnosis) |>
@@ -242,29 +261,38 @@ write_tcr_comparison_plots <- function(result, seed = 42L) {
     ggplot2::scale_fill_manual(values = result$diagnosis_colors, guide = "none") +
     ggplot2::scale_shape_manual(values = c(
       "CSF-enriched" = 24, "No bias" = 21, "PBMC-enriched" = 25
-    )) +
+    ), name = "Tissue compartment") +
     ggplot2::scale_size_continuous(range = c(2, 8), name = "-log10(FDR)") +
     ggrepel::geom_text_repel(
       data = labels, ggplot2::aes(label = paste0("C", .data$cluster)),
-      size = 2.5, max.overlaps = 15, seed = seed
+      size = 2.5, max.overlaps = 15, fontface = "italic",
+      segment.color = "grey50", segment.size = 0.3, seed = seed
     ) + tcr_comparison_theme() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)) +
     ggplot2::labs(
-      title = "Disease-enriched GLIPH2 specificity groups overview", x = NULL,
+      title = "Disease-enriched GLIPH2 specificity groups overview", x = "",
       y = "Cluster size (# clonotypes)"
     )
   tissue <- overview |>
     dplyr::count(.data$diagnosis, .data$tissue_bias, name = "n_clusters") |>
-    dplyr::mutate(tissue_bias = factor(
-      .data$tissue_bias, c("CSF-enriched", "No bias", "PBMC-enriched")
-    ))
+    dplyr::mutate(
+      tissue_bias = factor(
+        .data$tissue_bias, c("CSF-enriched", "No bias", "PBMC-enriched")
+      ),
+      diagnosis = factor(
+        .data$diagnosis,
+        levels = intersect(c("CTRL", neuropathy, "GBS_Sukenikova"), unique(.data$diagnosis))
+      )
+    )
   tissue_plot <- ggplot2::ggplot(
     tissue,
     ggplot2::aes(x = .data$diagnosis, y = .data$n_clusters, fill = .data$tissue_bias)
   ) + ggplot2::geom_col(width = 0.7, color = "white", linewidth = 0.3) +
     ggplot2::scale_fill_manual(values = c(
       "CSF-enriched" = "#E41A1C", "No bias" = "grey70", "PBMC-enriched" = "#377EB8"
-    )) + tcr_comparison_theme() +
+    ), name = "Tissue bias") +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.05))) +
+    tcr_comparison_theme() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)) +
     ggplot2::labs(
       title = "Tissue compartmentalization of disease-enriched clusters",
@@ -272,9 +300,10 @@ write_tcr_comparison_plots <- function(result, seed = 42L) {
     )
   myelin <- dplyr::mutate(
     result$myelin_enrichment,
-    label = ifelse(.data$p_adj < 0.05, "*", ""),
-    diagnosis = factor(.data$diagnosis, levels = unique(.data$diagnosis))
-  )
+    label = tcr_comparison_p_label(.data$p_adj),
+    diagnosis = factor(.data$diagnosis, levels = intersect(neuropathy, .data$diagnosis))
+  ) |>
+    dplyr::filter(!is.na(.data$diagnosis))
   myelin_plot <- ggplot2::ggplot(
     myelin,
     ggplot2::aes(x = .data$diagnosis, y = .data$fraction * 100, fill = .data$diagnosis)
@@ -288,14 +317,32 @@ write_tcr_comparison_plots <- function(result, seed = 42L) {
     ggplot2::labs(
       title = "Myelin-reactive TCR fraction by diagnosis",
       subtitle = "Exact + cluster-level matches to Sukenikova myelin-reactive clones",
-      x = NULL, y = "Myelin-reactive TCRs (%)"
+      x = "", y = "Myelin-reactive TCRs (%)"
     ) + ggplot2::expand_limits(y = max(myelin$fraction * 100) * 1.4)
   table_data <- result$exact_matches |>
     dplyr::arrange(.data$tissue, .data$diagnosis, .data$TRB_CDR3) |>
-    dplyr::select("TRB_CDR3", "patient", "tissue", "diagnosis", "pt", "specificity")
+    dplyr::select("TRB_CDR3", "patient", "tissue", "diagnosis", "pt", "specificity") |>
+    dplyr::rename(
+      "CDR3 beta" = "TRB_CDR3", "Patient" = "patient", "Tissue" = "tissue",
+      "Diagnosis" = "diagnosis", "Sukenikova Patient" = "pt",
+      "Sukenikova Specificity" = "specificity"
+    )
   table_path <- file.path(root, "sukenikova_reactive_table.pdf")
   grDevices::pdf(table_path, width = 12, height = 8)
-  grid::grid.draw(gridExtra::tableGrob(table_data, rows = NULL))
+  grid::grid.draw(gridExtra::tableGrob(
+    table_data,
+    rows = NULL,
+    theme = gridExtra::ttheme_default(
+      core = list(
+        fg_params = list(cex = 0.8),
+        bg_params = list(fill = c("white", "lightgray"), alpha = 0.5)
+      ),
+      colhead = list(
+        fg_params = list(cex = 0.9, fontface = "bold"),
+        bg_params = list(fill = "darkgray", alpha = 0.8)
+      )
+    )
+  ))
   grDevices::dev.off()
   c(
     save("fig_gliph_enriched_clusters_overview_bubble.pdf", overview_plot, 9, 6.5),

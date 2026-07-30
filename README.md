@@ -42,6 +42,17 @@ Rscript -e 'targets::tar_make()'
 Rscript -e 'targets::tar_visnetwork()'
 ```
 
+Export the complete target DAG as a self-contained interactive HTML file:
+
+```bash
+LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose run --rm dag
+```
+
+The graph is written to `results/pipeline_dag.html`. Nodes are colored by
+their current `targets` status, and generating the graph does not run the
+pipeline. To include the optional Cerebro branch, set
+`TAR_INCLUDE_HEAVY=true` for the Compose command.
+
 Run a bounded stage instead of the full graph:
 
 ```bash

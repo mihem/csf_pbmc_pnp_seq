@@ -111,10 +111,20 @@ write_integrated_tissue_umap <- function(object, path, seed = 123L) {
 
 apply_annotation_checkpoint <- function(object, path) {
   checkpoint <- qs::qread(path, nthreads = 6)
-  stopifnot(identical(colnames(object), colnames(checkpoint)))
+  stopifnot(
+    identical(names(checkpoint), c("stacas.ss.all", "umap.stacas.ss.all")),
+    inherits(checkpoint[["stacas.ss.all"]], "DimReduc"),
+    inherits(checkpoint[["umap.stacas.ss.all"]], "DimReduc"),
+    identical(
+      rownames(Seurat::Embeddings(checkpoint[["stacas.ss.all"]])),
+      colnames(object)
+    ),
+    identical(
+      rownames(Seurat::Embeddings(checkpoint[["umap.stacas.ss.all"]])),
+      colnames(object)
+    )
+  )
   object[["stacas.ss.all"]] <- checkpoint[["stacas.ss.all"]]
   object[["umap.stacas.ss.all"]] <- checkpoint[["umap.stacas.ss.all"]]
-  object$group <- checkpoint$group
-  object$age <- checkpoint$age
   object
 }

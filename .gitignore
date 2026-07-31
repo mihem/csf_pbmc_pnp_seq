@@ -1,8 +1,7 @@
 # Ignore everything
 /*
 
-# But not scripts
-!scripts/
+# But not pipeline code
 !R/
 !R/**
 !pipeline/
@@ -17,8 +16,5 @@
 !.gitignore
 !README.md
 
-# Track reference provenance, but not large binary reference objects.
-!references/
-references/*
-!references/README.md
-
+# Local binary dependencies are never tracked.
+/references/

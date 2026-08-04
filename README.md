@@ -1,7 +1,8 @@
 # CSF/PBMC Polyneuropathy Sequencing Study
 
 Reproducible analysis of paired CSF and PBMC single-cell RNA/TCR sequencing,
-flow cytometry, and Olink proteomics using an R `targets` pipeline.
+flow cytometry, Olink proteomics, and Luminex measurements using an R `targets`
+pipeline.
 
 ## Run
 

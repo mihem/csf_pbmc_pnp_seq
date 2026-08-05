@@ -38,7 +38,20 @@ paths:
   markers: lookup/markers.csv
   nk_overrides: lookup/nk_cd8_nk.csv
   raw_rna: raw/rna
+  sural_ic_metadata_umap: raw/sural/ic_metadata_umap.qs
+  sural_metadata_umap: raw/sural/sc_merge_metadata_umap.qs
+  sural_trust4: raw/sural/trust4
   target_results: results/targets
+
+trust4:
+  reduction: umap.scvi.full
+  cluster_column: cluster
+  ic_reduction: umap.rpca
+  ic_cluster_column: ic_cluster
+  sample_map:
+    GM_SN: S01
+    SN5: S02
+    SN6: S03
 
 legacy:
   sc_list: objects/sc_list.qs

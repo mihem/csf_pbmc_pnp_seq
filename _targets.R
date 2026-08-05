@@ -13,6 +13,7 @@ source("pipeline/targets_deg.R")
 source("pipeline/targets_enrichment.R")
 source("pipeline/targets_liana.R")
 source("pipeline/targets_tcr.R")
+source("pipeline/targets_trust4.R")
 source("pipeline/targets_sukenikova.R")
 source("pipeline/targets_flow.R")
 source("pipeline/targets_olink.R")
@@ -85,6 +86,7 @@ pipeline <- c(
   targets_enrichment,
   targets_liana,
   targets_tcr,
+  targets_trust4,
   targets_sukenikova,
   targets_flow,
   targets_olink,

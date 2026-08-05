@@ -10,7 +10,9 @@ read_analysis_config <- function(path) {
     is.list(config$preprocess),
     is.list(config$integration),
     is.list(config$annotation),
-    is.list(config$paths)
+    is.list(config$paths),
+    is.list(config$trust4),
+    is.list(config$trust4$sample_map)
   )
   config
 }

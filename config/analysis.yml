@@ -52,6 +52,10 @@ trust4:
     GM_SN: S01
     SN5: S02
     SN6: S03
+  patient_map:
+    GM_SN: P18
+    SN5: P28
+    SN6: P29
 
 legacy:
   sc_list: objects/sc_list.qs

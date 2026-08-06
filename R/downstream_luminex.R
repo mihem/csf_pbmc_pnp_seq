@@ -3,12 +3,7 @@ luminex_result_dir <- function() {
 }
 
 luminex_numeric_value <- function(value) {
-  numeric <- as.numeric(value)
-  is_excel_date <- !is.na(numeric) & numeric >= 40000 & numeric <= 60000
-  date <- as.Date(numeric[is_excel_date], origin = "1899-12-30")
-  numeric[is_excel_date] <- as.integer(format(date, "%d")) +
-    as.integer(format(date, "%m")) / 100
-  numeric
+  suppressWarnings(as.numeric(value))
 }
 
 read_luminex_input <- function(path) {
@@ -18,20 +13,12 @@ read_luminex_input <- function(path) {
 
   assay_start <- match("IL_1a", names(raw))
   assays <- names(raw)[seq.int(assay_start, ncol(raw))]
-  date_corrections <- tibble::tibble(
-    assay = assays,
-    corrected_values = vapply(raw[assays], function(value) {
-      numeric <- suppressWarnings(as.numeric(value))
-      sum(!is.na(numeric) & numeric >= 40000 & numeric <= 60000)
-    }, integer(1))
-  ) |>
-    dplyr::filter(.data$corrected_values > 0L)
   data <- raw |>
     dplyr::filter(!is.na(.data$ID_seq), .data$diagnosis %in% c("CIDP", "GBS")) |>
     dplyr::transmute(
       patient_id = as.character(.data$ID_seq),
       age = as.numeric(.data$age),
-      diagnosis = factor(.data$diagnosis, levels = c("CIDP", "GBS")),
+      diagnosis = as.character(.data$diagnosis),
       dplyr::across(tidyselect::all_of(assays), luminex_numeric_value)
     )
 
@@ -45,7 +32,57 @@ read_luminex_input <- function(path) {
     all(table(data$diagnosis) >= 4L),
     length(assays) > 0L
   )
-  list(data = data, assays = assays, date_corrections = date_corrections)
+  list(data = data, assays = assays)
+}
+
+read_luminex_controls <- function(path) {
+  raw <- readxl::read_xlsx(
+    path, col_types = "text", na = c("", "NA", "-")
+  )
+  required <- c("biobank_id", "age", "Group...8", "IL_1a")
+  stopifnot(all(required %in% names(raw)))
+  assays <- names(raw)[seq.int(match("IL_1a", names(raw)), ncol(raw))]
+  data <- raw |>
+    dplyr::filter(.data$Group...8 == "control") |>
+    dplyr::transmute(
+      patient_id = as.character(.data$biobank_id),
+      age = as.numeric(.data$age),
+      diagnosis = "CTRL",
+      dplyr::across(tidyselect::all_of(assays), luminex_numeric_value)
+    )
+  stopifnot(nrow(data) > 0L, !anyNA(data[c("patient_id", "age")]))
+  list(data = data, assays = assays)
+}
+
+combine_luminex_inputs <- function(disease, controls) {
+  stopifnot(setequal(disease$assays, controls$assays))
+  disease_data <- dplyr::mutate(
+    disease$data, patient_id = paste0("disease_", .data$patient_id)
+  )
+  control_data <- dplyr::mutate(
+    controls$data, patient_id = paste0("control_", .data$patient_id)
+  )
+  data <- dplyr::bind_rows(disease_data, control_data)
+  data$diagnosis <- factor(data$diagnosis, levels = c("CTRL", "GBS", "CIDP"))
+  stopifnot(all(table(data$diagnosis) >= 4L))
+  list(data = data, assays = disease$assays)
+}
+
+luminex_contrasts <- function() {
+  tibble::tribble(
+    ~comparison, ~group1, ~group2, ~seed,
+    "CIDP_vs_CTRL", "CIDP", "CTRL", 500L,
+    "GBS_vs_CTRL", "GBS", "CTRL", 600L,
+    "CIDP_vs_GBS", "CIDP", "GBS", 700L
+  )
+}
+
+luminex_contrast_methods <- function() {
+  list(
+    CIDP_vs_CTRL = c(-1, 0, 1),
+    GBS_vs_CTRL = c(-1, 1, 0),
+    CIDP_vs_GBS = c(0, -1, 1)
+  )
 }
 
 fit_luminex_assays <- function(data, assays) {
@@ -67,24 +104,22 @@ fit_luminex_assays <- function(data, assays) {
       stats::reformulate(c("diagnosis", "age"), response = assay),
       data = model_data
     )
-    raw_p_value <- emmeans::emmeans(raw_model, "diagnosis", adjust = "none") |>
-      graphics::pairs(adjust = "none") |>
+    raw <- emmeans::emmeans(raw_model, "diagnosis") |>
+      emmeans::contrast(luminex_contrast_methods(), adjust = "none") |>
       broom::tidy() |>
-      dplyr::pull("p.value")
-    result <- emmeans::emmeans(adjusted_model, "diagnosis", adjust = "none") |>
-      graphics::pairs(adjust = "none") |>
-      broom::tidy()
-    separated <- tidyr::separate_wider_delim(
-      result, "contrast", delim = " - ", names = c("group1", "group2")
-    )
-    dplyr::mutate(
-      separated,
-      var = assay,
-      raw_p_value = raw_p_value,
-      age_adjusted_p_value = .data$p.value,
-      .before = 1L
-    ) |>
-      dplyr::select(-"p.value")
+      dplyr::select(comparison = "contrast", raw_p_value = "p.value")
+    adjusted <- emmeans::emmeans(adjusted_model, "diagnosis") |>
+      emmeans::contrast(luminex_contrast_methods(), adjust = "none") |>
+      broom::tidy() |>
+      dplyr::rename(
+        comparison = "contrast", age_adjusted_p_value = "p.value"
+      )
+    dplyr::left_join(adjusted, raw, by = "comparison") |>
+      dplyr::left_join(
+        dplyr::select(luminex_contrasts(), "comparison", "group1", "group2"),
+        by = "comparison"
+      ) |>
+      dplyr::mutate(var = assay, .before = 1L)
   })
 
   dplyr::bind_rows(results) |>
@@ -117,7 +152,6 @@ analyze_luminex_data <- function(input, seed = 400L) {
     stats = stats,
     assays = tested,
     excluded_assays = excluded,
-    date_corrections = input$date_corrections,
     group = "diagnosis",
     unit = "pg/ml"
   )
@@ -128,7 +162,7 @@ luminex_boxplot <- function(result) {
     pals::cols25(nlevels(result$data_wide[[result$group]])),
     levels(result$data_wide[[result$group]])
   )
-  plots <- lapply(result$assays, function(assay) {
+  plots <- lapply(gtools::mixedsort(result$assays), function(assay) {
     annotations <- dplyr::filter(
       result$stats,
       .data$var == .env$assay,
@@ -142,7 +176,7 @@ luminex_boxplot <- function(result) {
       )
     ) +
       ggplot2::geom_boxplot(na.rm = TRUE) +
-      ggplot2::geom_jitter(width = 0.2, na.rm = TRUE) +
+      ggplot2::geom_jitter(width = 0.2, height = 0, na.rm = TRUE) +
       ggplot2::scale_fill_manual(values = colors) +
       ggplot2::labs(
         title = paste0(assay, " (", result$unit, ")"), x = NULL, y = NULL
@@ -174,26 +208,31 @@ write_luminex_artifacts <- function(result) {
   writexl::write_xlsx(
     list(
       statistics = result$stats,
-      excluded_assays = result$excluded_assays,
-      excel_date_corrections = result$date_corrections
+      excluded_assays = result$excluded_assays
     ),
     paths[["stats"]]
   )
   ggplot2::ggsave(
-    paths[["boxplot"]], luminex_boxplot(result), width = 10, height = 24,
+    paths[["boxplot"]], luminex_boxplot(result), width = 11, height = 24,
     limitsize = FALSE
   )
   unname(paths)
 }
 
 luminex_volcano_data <- function(
-  result, seed = 500L, fdr = 0.1, permutations = 10000L
+  result, comparison, group1, group2, seed = 500L, fdr = 0.1,
+  permutations = 10000L
 ) {
   tested <- dplyr::filter(
-    result$stats, is.finite(.data$age_adjusted_p_value)
+    result$stats,
+    .data$comparison == .env$comparison,
+    is.finite(.data$age_adjusted_p_value)
   ) |>
     dplyr::transmute(var = .data$var, p.value = .data$age_adjusted_p_value)
-  means <- result$data_wide |>
+  data <- result$data_wide |>
+    dplyr::filter(.data[[result$group]] %in% c(group1, group2)) |>
+    droplevels()
+  means <- data |>
     dplyr::group_by(.data[[result$group]]) |>
     dplyr::summarise(
       dplyr::across(
@@ -205,17 +244,24 @@ luminex_volcano_data <- function(
     tidyr::pivot_wider(
       names_from = tidyselect::all_of(result$group), values_from = "value"
     ) |>
-    dplyr::mutate(log2_ratio = log2(.data$CIDP / .data$GBS))
+    dplyr::mutate(log2_ratio = log2(.data[[group1]] / .data[[group2]]))
 
-  matrix <- t(as.matrix(result$data_wide[tested$var]))
+  matrix <- t(as.matrix(data[tested$var]))
   complete <- stats::complete.cases(matrix)
-  stopifnot(any(complete), permutations > 0L)
-  design <- ifelse(result$data_wide[[result$group]] == "CIDP", 1L, 2L)
+  pooled_variance <- vapply(tested$var, function(assay) {
+    values <- data[[assay]]
+    sum(vapply(c(group1, group2), function(group) {
+      stats::var(values[data[[result$group]] == group], na.rm = TRUE)
+    }, numeric(1)), na.rm = TRUE)
+  }, numeric(1))
+  permutation_rows <- complete & is.finite(pooled_variance) & pooled_variance > 0
+  stopifnot(any(permutation_rows), permutations > 0L)
+  design <- ifelse(data[[result$group]] == group1, 1L, 2L)
   threshold <- withr::with_seed(seed, permFDP::permFDP.adjust.threshold(
-    pVals = tested$p.value[complete],
+    pVals = tested$p.value[permutation_rows],
     threshold = fdr,
     myDesign = design,
-    intOnly = matrix[complete, , drop = FALSE],
+    intOnly = matrix[permutation_rows, , drop = FALSE],
     nPerms = permutations
   ))
   dplyr::left_join(means, tested, by = "var") |>
@@ -226,7 +272,9 @@ luminex_volcano_data <- function(
     )
 }
 
-write_luminex_volcano <- function(data, seed = 500L) {
+write_luminex_volcano <- function(
+  data, comparison, group1, group2, seed = 500L
+) {
   threshold <- -log10(data$p.adj.threshold[[1L]])
   plot <- ggplot2::ggplot(
     data, ggplot2::aes(x = log2_ratio, y = neg_log10_p, label = var)
@@ -246,11 +294,13 @@ write_luminex_volcano <- function(data, seed = 500L) {
       seed = seed
     ) +
     ggplot2::labs(
-      x = expression(Log[2] ~ "fold change (CIDP / GBS)"),
+      x = paste0("Log2 fold change (", group1, " / ", group2, ")"),
       y = expression(-Log[10] ~ "p value")
     ) +
     ggplot2::theme_classic()
-  path <- file.path(luminex_result_dir(), "volcano_CIDP_vs_GBS.pdf")
+  path <- file.path(
+    luminex_result_dir(), paste0("volcano_", comparison, ".pdf")
+  )
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
   ggplot2::ggsave(path, plot, width = 3, height = 3)
   path

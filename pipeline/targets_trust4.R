@@ -1,14 +1,14 @@
 targets_trust4 <- list(
   tar_target(
     sural_metadata_umap_file,
-    analysis_config$paths$sural_metadata_umap,
+    trust4_config$paths$sural_metadata_umap,
     format = "file"
   ),
   tar_target(
     sural_trust4_manifest,
     discover_sural_trust4_inputs(
-      analysis_config$paths$sural_trust4,
-      analysis_config$trust4$sample_map
+      trust4_config$paths$sural_trust4,
+      trust4_config$trust4$sample_map
     )
   ),
   tar_target(
@@ -20,7 +20,7 @@ targets_trust4 <- list(
     sural_metadata_umap,
     read_sural_metadata_umap(
       sural_metadata_umap_file,
-      analysis_config$trust4$reduction
+      trust4_config$trust4$reduction
     )
   ),
   tar_target(
@@ -29,7 +29,7 @@ targets_trust4 <- list(
       sural_trust4_manifest,
       sural_trust4_files,
       sural_metadata_umap,
-      analysis_config$trust4$cluster_column
+      trust4_config$trust4$cluster_column
     )
   ),
   tar_target(
@@ -52,14 +52,14 @@ targets_trust4 <- list(
   ),
   tar_target(
     sural_ic_metadata_umap_file,
-    analysis_config$paths$sural_ic_metadata_umap,
+    trust4_config$paths$sural_ic_metadata_umap,
     format = "file"
   ),
   tar_target(
     sural_ic_metadata_umap,
     read_sural_metadata_umap(
       sural_ic_metadata_umap_file,
-      analysis_config$trust4$ic_reduction
+      trust4_config$trust4$ic_reduction
     )
   ),
   tar_target(
@@ -68,7 +68,7 @@ targets_trust4 <- list(
       sural_trust4_manifest,
       sural_trust4_files,
       sural_ic_metadata_umap,
-      analysis_config$trust4$ic_cluster_column
+      trust4_config$trust4$ic_cluster_column
     )
   ),
   tar_target(
@@ -103,7 +103,7 @@ targets_trust4 <- list(
     prepare_sural_tcr_comparison(
       tcr_contigs,
       sural_trust4_mapped$records,
-      analysis_config$trust4$patient_map
+      trust4_config$trust4$patient_map
     )
   ),
   tar_target(
@@ -133,7 +133,7 @@ targets_trust4 <- list(
       tcr_contigs,
       combined_tcr,
       sural_trust4_mapped$records,
-      analysis_config$trust4$patient_map
+      trust4_config$trust4$patient_map
     )
   ),
   tar_target(

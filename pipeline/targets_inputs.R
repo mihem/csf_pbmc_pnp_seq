@@ -1,6 +1,7 @@
 targets_inputs <- list(
   tar_target(analysis_config_file, "config/analysis.yml", format = "file"),
   tar_target(analysis_config, read_analysis_config(analysis_config_file)),
+  tar_target(trust4_config, read_trust4_config(analysis_config_file)),
   tar_target(
     lookup_file,
     analysis_config$paths$lookup,

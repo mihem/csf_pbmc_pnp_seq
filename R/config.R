@@ -5,17 +5,36 @@ include_heavy_targets <- function() {
 
 read_analysis_config <- function(path) {
   config <- yaml::read_yaml(path)
+  config$trust4 <- NULL
+  config$paths[c(
+    "sural_ic_metadata_umap", "sural_metadata_umap", "sural_trust4"
+  )] <- NULL
   stopifnot(
     is.list(config),
     is.list(config$preprocess),
     is.list(config$integration),
     is.list(config$annotation),
-    is.list(config$paths),
-    is.list(config$trust4),
-    is.list(config$trust4$sample_map),
-    is.list(config$trust4$patient_map)
+    is.list(config$paths)
   )
   config
+}
+
+read_trust4_config <- function(path) {
+  config <- yaml::read_yaml(path)
+  stopifnot(
+    is.list(config$trust4),
+    is.list(config$trust4$sample_map),
+    is.list(config$trust4$patient_map),
+    all(c(
+      "sural_ic_metadata_umap", "sural_metadata_umap", "sural_trust4"
+    ) %in% names(config$paths))
+  )
+  list(
+    paths = config$paths[c(
+      "sural_ic_metadata_umap", "sural_metadata_umap", "sural_trust4"
+    )],
+    trust4 = config$trust4
+  )
 }
 
 configure_runtime <- function(config) {

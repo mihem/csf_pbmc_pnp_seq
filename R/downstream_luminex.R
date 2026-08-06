@@ -6,6 +6,23 @@ luminex_numeric_value <- function(value) {
   suppressWarnings(as.numeric(value))
 }
 
+luminex_validate_numeric <- function(data, assays) {
+  issues <- dplyr::bind_rows(lapply(assays, function(assay) {
+    value <- data[[assay]]
+    invalid <- !is.na(value) & is.na(suppressWarnings(as.numeric(value)))
+    tibble::tibble(
+      assay = assay, row = which(invalid), value = value[invalid]
+    )
+  }))
+  if (nrow(issues)) {
+    stop(
+      "Non-numeric Luminex assay values found: ",
+      paste0(issues$assay, "[", issues$row, "]=", issues$value, collapse = ", ")
+    )
+  }
+  invisible(data)
+}
+
 read_luminex_input <- function(path) {
   raw <- readxl::read_xlsx(path, col_types = "text", na = c("", "NA"))
   required <- c("ID_seq", "age", "diagnosis", "IL_1a")
@@ -13,6 +30,7 @@ read_luminex_input <- function(path) {
 
   assay_start <- match("IL_1a", names(raw))
   assays <- names(raw)[seq.int(assay_start, ncol(raw))]
+  luminex_validate_numeric(raw, assays)
   data <- raw |>
     dplyr::filter(!is.na(.data$ID_seq), .data$diagnosis %in% c("CIDP", "GBS")) |>
     dplyr::transmute(
@@ -42,6 +60,7 @@ read_luminex_controls <- function(path) {
   required <- c("biobank_id", "age", "Group...8", "IL_1a")
   stopifnot(all(required %in% names(raw)))
   assays <- names(raw)[seq.int(match("IL_1a", names(raw)), ncol(raw))]
+  luminex_validate_numeric(raw, assays)
   data <- raw |>
     dplyr::filter(.data$Group...8 == "control") |>
     dplyr::transmute(

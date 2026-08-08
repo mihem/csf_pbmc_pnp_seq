@@ -1,6 +1,6 @@
 targets_proteomics <- c(list(
   targets::tar_target(
-    proteomics_parameters, proteomics_settings(analysis_config)
+    proteomics_parameters, proteomics_settings()
   ),
   targets::tar_target(
     proteomics_luminex_marker_inventory_file,

@@ -2,8 +2,8 @@ proteomics_result_dir <- function() {
   file.path("results", "targets", "proteomics")
 }
 
-proteomics_settings <- function(config) {
-  fdr <- as.numeric(config$proteomics$fdr)
+proteomics_settings <- function(fdr = 0.1) {
+  fdr <- as.numeric(fdr)
   stopifnot(length(fdr) == 1L, is.finite(fdr), fdr > 0, fdr < 1)
   list(fdr = fdr)
 }

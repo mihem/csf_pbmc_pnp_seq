@@ -19,6 +19,7 @@ source("pipeline/targets_flow.R")
 source("pipeline/targets_olink.R")
 source("pipeline/targets_luminex.R")
 source("pipeline/targets_luminex_llod.R")
+source("pipeline/targets_proteomics.R")
 source("pipeline/targets_correlation.R")
 source("pipeline/targets_demographics.R")
 source("pipeline/targets_projectil.R")
@@ -30,7 +31,6 @@ tar_option_set(
     "Seurat",
     "Azimuth",
     "broom",
-    "brglm2",
     "cerebroAppLite",
     "dplyr",
     "edgeR",
@@ -94,6 +94,7 @@ pipeline <- c(
   targets_olink,
   targets_luminex,
   targets_luminex_llod,
+  targets_proteomics,
   targets_correlation,
   targets_demographics,
   targets_projectil,

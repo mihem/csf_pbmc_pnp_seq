@@ -7,7 +7,7 @@ pipeline.
 ## Run
 
 ```bash
-docker pull mihem/csf_pbmc_pnp_seq:v0.7
+docker pull mihem/csf_pbmc_pnp_seq:v0.6
 docker compose run --rm csf_pbmc_pnp_seq
 ```
 

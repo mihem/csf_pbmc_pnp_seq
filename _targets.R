@@ -30,6 +30,7 @@ tar_option_set(
     "Seurat",
     "Azimuth",
     "broom",
+    "brglm2",
     "cerebroAppLite",
     "dplyr",
     "edgeR",

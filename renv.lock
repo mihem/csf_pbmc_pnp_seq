@@ -2344,6 +2344,25 @@
       "Repository": "RSPM",
       "Hash": "8f4a384e19dccd8c65356dc096847b76"
     },
+    "brglm2": {
+      "Package": "brglm2",
+      "Version": "1.1.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "MASS",
+        "Matrix",
+        "R",
+        "enrichwith",
+        "graphics",
+        "nleqslv",
+        "nnet",
+        "numDeriv",
+        "statmod",
+        "stats"
+      ],
+      "Hash": "1b6a860e29cc1baf73a75923711c4f11"
+    },
     "brio": {
       "Package": "brio",
       "Version": "1.1.5",
@@ -3210,6 +3229,16 @@
         "rjson"
       ],
       "Hash": "0071a476f17645c9663bf288dfd613f1"
+    },
+    "enrichwith": {
+      "Package": "enrichwith",
+      "Version": "0.5.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R"
+      ],
+      "Hash": "d95376946a16088a1d6c5c2b6d99ae75"
     },
     "enrichplot": {
       "Package": "enrichplot",
@@ -5260,6 +5289,13 @@
         "stats"
       ],
       "Hash": "4d1891e59ac7a12b4e7e8a69349125f1"
+    },
+    "nleqslv": {
+      "Package": "nleqslv",
+      "Version": "3.3.7",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "27d44c582c17bb855bf6cd34e68b33ce"
     },
     "nlme": {
       "Package": "nlme",

@@ -3,6 +3,9 @@ project:
   workers: 6
   future_globals_gib: 16
 
+aligned_proteomics:
+  fdr: 0.1
+
 preprocess:
   min_cells: 3
   min_features: 200

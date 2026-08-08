@@ -1,6 +1,11 @@
 targets_aligned_proteomics <- c(list(
   targets::tar_target(
     aligned_bh_parameters, aligned_bh_settings(analysis_config)
+  ),
+  targets::tar_target(
+    proteomics_luminex_marker_inventory_file,
+    write_aligned_bh_luminex_inventory(luminex_llod_analysis),
+    format = "file"
   )
   ), tarchetypes::tar_map(
     values = luminex_contrasts(), names = comparison, unlist = TRUE,

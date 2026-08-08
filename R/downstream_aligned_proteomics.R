@@ -1,5 +1,5 @@
 aligned_bh_result_dir <- function() {
-  file.path("results", "targets", "aligned_proteomics_bh")
+  file.path("results", "targets", "proteomics")
 }
 
 aligned_bh_settings <- function(config) {
@@ -50,7 +50,7 @@ aligned_bh_fit_olink_marker <- function(data, assay, group1, group2) {
 }
 
 aligned_bh_fit_luminex_marker <- function(
-  result, assay, analysis, group1, group2
+  result, assay, analysis, group1, group2, detection_sensitivity = FALSE
 ) {
   model_data <- luminex_llod_assay_data(
     result$data_wide, assay, result$llod_by_batch
@@ -62,24 +62,14 @@ aligned_bh_fit_luminex_marker <- function(
     dplyr::mutate(
       diagnosis = factor(.data$diagnosis, levels = c(group2, group1))
     )
-  if (analysis == "primary_detection") {
+  if (detection_sensitivity) {
     model_data <- dplyr::filter(model_data, !is.na(.data$detected))
   }
   counts <- table(model_data$diagnosis)
-  outcome <- if (analysis == "primary_detection") {
-    model_data$detected
-  } else {
-    model_data$value
-  }
+  outcome <- if (detection_sensitivity) model_data$detected else model_data$value
   if (length(counts) < 2L || any(counts < 4L) ||
       length(unique(outcome)) < 2L) return(NULL)
-  if (analysis == "primary_linear") {
-    model <- stats::lm(
-      log2(value + 1) ~ diagnosis + age + assay_batch, data = model_data
-    )
-    model_type <- "linear_log2"
-    effect_scale <- "log2 concentration difference"
-  } else if (analysis == "primary_censored") {
+  if (!detection_sensitivity) {
     model <- survival::survreg(
       survival::Surv(
         log2(analysis_value + 1), !censored, type = "left"
@@ -87,7 +77,7 @@ aligned_bh_fit_luminex_marker <- function(
       data = model_data, dist = "gaussian", robust = TRUE,
       cluster = patient_id
     )
-    model_type <- "left_censored_log2"
+    model_type <- "unified_censored_log2_gaussian"
     effect_scale <- "log2 concentration difference"
   } else {
     model <- stats::glm(
@@ -114,8 +104,7 @@ aligned_bh_olink_lod_qc <- function(input, metadata, group1, group2) {
     ) |>
     dplyr::filter(.data$diagnosis %in% c(.env$group1, .env$group2)) |>
     dplyr::mutate(
-      PlateLOD = as.numeric(.data$PlateLOD),
-      LLOQ = as.numeric(.data$LLOQ),
+      PlateLOD = as.numeric(.data$PlateLOD), LLOQ = as.numeric(.data$LLOQ),
       below_lod = is.finite(.data$Quantified_value) &
         is.finite(.data$PlateLOD) & .data$Quantified_value < .data$PlateLOD,
       below_lloq = is.finite(.data$Quantified_value) &
@@ -130,6 +119,52 @@ aligned_bh_olink_lod_qc <- function(input, metadata, group1, group2) {
       .groups = "drop"
     ) |>
     dplyr::rename(assay = "Assay")
+}
+
+aligned_bh_luminex_marker_inventory <- function(result) {
+  rates <- result$detection_rates |>
+    dplyr::select(
+      "assay", "diagnosis", "detected_count", "detected_percent"
+    ) |>
+    tidyr::pivot_wider(
+      names_from = "diagnosis",
+      values_from = c("detected_count", "detected_percent"),
+      names_glue = "{diagnosis}_{.value}"
+    )
+  llods <- result$llod_by_batch |>
+    dplyr::select("assay", "assay_batch", "llod") |>
+    tidyr::pivot_wider(
+      names_from = "assay_batch", values_from = "llod",
+      names_glue = "llod_{assay_batch}"
+    ) |>
+    janitor::clean_names()
+  result$assay_qc |>
+    dplyr::mutate(
+      used_in_primary_analysis = .data$analysis %in% c(
+        "primary_linear", "primary_censored", "primary_detection"
+      ),
+      included_in_primary_bh = .data$used_in_primary_analysis,
+      primary_model = dplyr::if_else(
+        .data$used_in_primary_analysis,
+        "unified_censored_log2_gaussian", NA_character_
+      ),
+      reporting_status = dplyr::case_when(
+        .data$used_in_primary_analysis ~ "primary_inference",
+        .data$analysis == "exploratory_detection" ~ "exploratory_detection",
+        .data$analysis == "descriptive_only" ~ "descriptive_only",
+        .data$analysis == "no_test" ~ "not_testable",
+        TRUE ~ "excluded"
+      ),
+      why_not_primary = dplyr::if_else(
+        .data$used_in_primary_analysis, NA_character_, .data$reason
+      )
+    ) |>
+    dplyr::left_join(rates, by = "assay") |>
+    dplyr::left_join(llods, by = "assay") |>
+    dplyr::arrange(
+      dplyr::desc(.data$used_in_primary_analysis), .data$reporting_status,
+      .data$assay
+    )
 }
 
 analyze_aligned_bh_olink <- function(
@@ -172,22 +207,62 @@ analyze_aligned_bh_luminex <- function(
       significant = .data$bh_adjusted_p_value < fdr
     ) |>
     dplyr::arrange(.data$p_value)
+  sensitivity_plan <- dplyr::filter(plan, .data$analysis == "primary_detection")
+  detection <- dplyr::bind_rows(lapply(
+    seq_len(nrow(sensitivity_plan)), function(index) {
+      aligned_bh_fit_luminex_marker(
+        result, sensitivity_plan$assay[[index]],
+        sensitivity_plan$analysis[[index]], group1, group2,
+        detection_sensitivity = TRUE
+      )
+    }
+  ))
+  sensitivity_family <- dplyr::bind_rows(
+    dplyr::filter(statistics, !.data$assay %in% sensitivity_plan$assay) |>
+      dplyr::transmute(assay, p_value, source = "primary"),
+    dplyr::transmute(
+      detection, assay, p_value, source = "detection_sensitivity"
+    )
+  ) |>
+    dplyr::mutate(
+      sensitivity_bh_adjusted_p_value = stats::p.adjust(
+        .data$p_value, method = "BH"
+      )
+    ) |>
+    dplyr::filter(.data$source == "detection_sensitivity") |>
+    dplyr::select("assay", "sensitivity_bh_adjusted_p_value")
+  sensitivity <- dplyr::filter(
+    statistics, .data$assay %in% sensitivity_plan$assay
+  ) |>
+    dplyr::select(
+      "assay", "comparison", "group1", "group2",
+      primary_effect = "effect", primary_p_value = "p_value",
+      primary_bh_adjusted_p_value = "bh_adjusted_p_value"
+    ) |>
+    dplyr::left_join(
+      dplyr::select(
+        detection, "assay", detection_log_odds_ratio = "effect",
+        detection_p_value = "p_value"
+      ),
+      by = "assay"
+    ) |>
+    dplyr::left_join(sensitivity_family, by = "assay")
   list(
-    statistics = statistics, platform = "Luminex", comparison = comparison,
-    group1 = group1, group2 = group2, fdr = fdr
+    statistics = statistics, detection_sensitivity = sensitivity,
+    marker_inventory = aligned_bh_luminex_marker_inventory(result),
+    platform = "Luminex", comparison = comparison, group1 = group1,
+    group2 = group2, fdr = fdr
   )
 }
 
 aligned_bh_volcano <- function(result) {
   data <- dplyr::mutate(
-    result$statistics,
-    neg_log10_q = -log10(.data$bh_adjusted_p_value)
+    result$statistics, neg_log10_q = -log10(.data$bh_adjusted_p_value)
   )
-  plot <- ggplot2::ggplot(
+  ggplot2::ggplot(
     data,
     ggplot2::aes(
-      x = effect, y = neg_log10_q, label = assay, color = significant,
-      shape = model
+      x = effect, y = neg_log10_q, label = assay, color = significant
     )
   ) +
     ggplot2::geom_point(size = 3) +
@@ -203,23 +278,13 @@ aligned_bh_volcano <- function(result) {
       title = paste(result$platform, result$comparison),
       subtitle = "Separate two-group adjusted model; BH within comparison",
       x = paste0(
-        "Adjusted effect: ", result$group1, " - ", result$group2,
-        " (model-specific scale)"
+        "Adjusted log2 concentration difference: ", result$group1,
+        " - ", result$group2
       ),
       y = expression(-Log[10] ~ "BH-adjusted p value"),
-      color = "BH significant", shape = "Model"
+      color = "BH significant"
     ) +
     ggplot2::theme_classic()
-  if (identical(result$platform, "Olink quantified")) {
-    plot <- plot + ggplot2::guides(shape = "none") +
-      ggplot2::labs(
-        x = paste0(
-          "Adjusted log2 concentration difference: ", result$group1,
-          " - ", result$group2
-        )
-      )
-  }
-  plot
 }
 
 write_aligned_bh_artifacts <- function(result, platform) {
@@ -234,6 +299,12 @@ write_aligned_bh_artifacts <- function(result, platform) {
   qs::qsave(result, paths[["object"]])
   sheets <- list(statistics = result$statistics)
   if (!is.null(result$lod_qc)) sheets$lod_qc <- result$lod_qc
+  if (!is.null(result$detection_sensitivity)) {
+    sheets$detection_sensitivity <- result$detection_sensitivity
+  }
+  if (!is.null(result$marker_inventory)) {
+    sheets$marker_inventory <- result$marker_inventory
+  }
   writexl::write_xlsx(sheets, paths[["statistics"]])
   ggplot2::ggsave(paths[["volcano"]], aligned_bh_volcano(result), width = 7, height = 5)
   unname(paths)
@@ -268,5 +339,14 @@ write_aligned_bh_comparison <- function(data) {
   path <- file.path(aligned_bh_result_dir(), "shared_marker_comparison.xlsx")
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
   writexl::write_xlsx(data, path)
+  path
+}
+
+write_aligned_bh_luminex_inventory <- function(result) {
+  path <- file.path(aligned_bh_result_dir(), "luminex_marker_inventory.xlsx")
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  writexl::write_xlsx(
+    aligned_bh_luminex_marker_inventory(result), path
+  )
   path
 }

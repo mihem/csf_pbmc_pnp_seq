@@ -1,7 +1,3 @@
-luminex_result_dir <- function() {
-  file.path("results", "targets", "luminex")
-}
-
 luminex_numeric_value <- function(value) {
   suppressWarnings(as.numeric(value))
 }
@@ -31,7 +27,6 @@ read_luminex_input <- function(path) {
     "Origine", "IPP", "Age", "Diagnostic_category", "Diagnosis", "IL_1a"
   )
   stopifnot(all(required %in% names(raw)))
-
   assay_start <- match("IL_1a", names(raw))
   assay_end <- match("VEGALL", names(raw))
   stopifnot(!is.na(assay_start), !is.na(assay_end), assay_start < assay_end)
@@ -59,237 +54,21 @@ read_luminex_input <- function(path) {
   data$assay_batch <- factor(
     data$assay_batch, levels = c("First batch", "Second batch")
   )
-
   patient_diagnoses <- data |>
     dplyr::distinct(.data$patient_id, .data$diagnosis) |>
     dplyr::count(.data$patient_id)
   stopifnot(
-    nrow(data) > 0L,
-    !anyNA(data$patient_id),
-    !anyNA(data$assay_batch),
-    all(patient_diagnoses$n == 1L),
-    all(table(data$diagnosis) >= 4L),
-    length(assays) > 0L
+    nrow(data) > 0L, !anyNA(data$patient_id), !anyNA(data$assay_batch),
+    all(patient_diagnoses$n == 1L), all(table(data$diagnosis) >= 4L)
   )
   list(data = data, assays = assays)
 }
 
 luminex_contrasts <- function() {
   tibble::tribble(
-    ~comparison, ~group1, ~group2, ~seed,
-    "CIDP_vs_CTRL", "CIDP", "CTRL", 500L,
-    "GBS_vs_CTRL", "GBS", "CTRL", 600L,
-    "CIDP_vs_GBS", "CIDP", "GBS", 700L
+    ~comparison, ~group1, ~group2,
+    "CIDP_vs_CTRL", "CIDP", "CTRL",
+    "GBS_vs_CTRL", "GBS", "CTRL",
+    "CIDP_vs_GBS", "CIDP", "GBS"
   )
-}
-
-luminex_contrast_methods <- function() {
-  list(
-    CIDP_vs_CTRL = c(-1, 0, 1),
-    GBS_vs_CTRL = c(-1, 1, 0),
-    CIDP_vs_GBS = c(0, -1, 1)
-  )
-}
-
-fit_luminex_assays <- function(data, assays) {
-  results <- lapply(assays, function(assay) {
-    model_data <- data |>
-      dplyr::filter(
-        !is.na(.data[[assay]]), !is.na(.data$diagnosis), !is.na(.data$age)
-      ) |>
-      dplyr::filter(.data[[assay]] >= 0) |>
-      dplyr::mutate(
-        model_value = log2(.data[[assay]] + 1)
-      )
-    counts <- table(model_data$diagnosis)
-    if (length(unique(model_data[[assay]])) < 2L || any(counts < 4L)) {
-      return(NULL)
-    }
-
-    raw_model <- stats::lm(
-      model_value ~ diagnosis,
-      data = model_data
-    )
-    adjusted_model <- stats::lm(
-      model_value ~ diagnosis + age,
-      data = model_data
-    )
-    raw <- emmeans::emmeans(raw_model, "diagnosis") |>
-      emmeans::contrast(luminex_contrast_methods(), adjust = "none") |>
-      broom::tidy() |>
-      dplyr::select(comparison = "contrast", raw_p_value = "p.value")
-    adjusted <- emmeans::emmeans(adjusted_model, "diagnosis") |>
-      emmeans::contrast(luminex_contrast_methods(), adjust = "none") |>
-      broom::tidy() |>
-      dplyr::rename(
-        comparison = "contrast", log2_difference = "estimate",
-        age_adjusted_p_value = "p.value"
-      )
-    dplyr::left_join(adjusted, raw, by = "comparison") |>
-      dplyr::left_join(
-        dplyr::select(luminex_contrasts(), "comparison", "group1", "group2"),
-        by = "comparison"
-      ) |>
-      dplyr::mutate(var = assay, .before = 1L)
-  })
-
-  dplyr::bind_rows(results) |>
-    dplyr::group_by(.data$comparison) |>
-    dplyr::mutate(
-      bh_adjusted_p_value = stats::p.adjust(
-        .data$age_adjusted_p_value, method = "BH"
-      ),
-      bh_signif = as.character(stats::symnum(
-        .data$bh_adjusted_p_value,
-        corr = FALSE,
-        na = FALSE,
-        cutpoints = c(0, 0.001, 0.01, 0.1, 1),
-        symbols = c("***", "**", "*", " ")
-      ))
-    ) |>
-    dplyr::ungroup() |>
-    dplyr::arrange(.data$age_adjusted_p_value)
-}
-
-analyze_luminex_data <- function(input, seed = 400L) {
-  stats <- withr::with_seed(
-    seed, fit_luminex_assays(input$data, input$assays)
-  )
-  tested <- unique(stats$var)
-  excluded <- tibble::tibble(
-    assay = setdiff(input$assays, tested),
-    reason = "Invariant or insufficient complete observations"
-  )
-  list(
-    data_wide = input$data,
-    stats = stats,
-    assays = tested,
-    excluded_assays = excluded,
-    group = "diagnosis",
-    unit = "pg/ml"
-  )
-}
-
-luminex_boxplot <- function(result) {
-  colors <- stats::setNames(
-    pals::cols25(nlevels(result$data_wide[[result$group]])),
-    levels(result$data_wide[[result$group]])
-  )
-  plots <- lapply(gtools::mixedsort(result$assays), function(assay) {
-    plot_data <- result$data_wide |>
-      dplyr::transmute(
-        diagnosis = .data[[result$group]],
-        value = log2(.data[[assay]] + 1)
-      )
-    annotations <- dplyr::filter(
-      result$stats,
-      .data$var == .env$assay,
-      .data$bh_adjusted_p_value < 0.1
-    )
-    plot <- ggplot2::ggplot(
-      plot_data,
-      ggplot2::aes(
-        x = diagnosis, y = value, fill = diagnosis
-      )
-    ) +
-      ggplot2::geom_boxplot(na.rm = TRUE) +
-      ggplot2::geom_jitter(width = 0.2, height = 0, na.rm = TRUE) +
-      ggplot2::scale_fill_manual(values = colors) +
-      ggplot2::labs(
-        title = assay, x = NULL, y = "log2(pg/ml + 1)"
-      ) +
-      ggplot2::theme_bw() +
-      ggplot2::theme(legend.position = "none")
-    if (nrow(annotations)) {
-      plot <- plot + ggsignif::geom_signif(
-        comparisons = Map(c, annotations$group1, annotations$group2),
-        annotations = annotations$bh_signif,
-        step_increase = 0.05,
-        vjust = 0.7
-      )
-    }
-    plot
-  })
-  patchwork::wrap_plots(plots)
-}
-
-write_luminex_artifacts <- function(result) {
-  root <- luminex_result_dir()
-  paths <- c(
-    object = file.path(root, "luminex.qs"),
-    stats = file.path(root, "luminex_stats_age_adjusted.xlsx"),
-    boxplot = file.path(root, "luminex_boxplots_age_adjusted.pdf")
-  )
-  dir.create(root, recursive = TRUE, showWarnings = FALSE)
-  qs::qsave(result, paths[["object"]])
-  writexl::write_xlsx(
-    list(
-      statistics = result$stats,
-      excluded_assays = result$excluded_assays
-    ),
-    paths[["stats"]]
-  )
-  ggplot2::ggsave(
-    paths[["boxplot"]], luminex_boxplot(result), width = 11, height = 24,
-    limitsize = FALSE
-  )
-  unname(paths)
-}
-
-luminex_volcano_data <- function(
-  result, comparison, group1, group2
-) {
-  dplyr::filter(
-    result$stats,
-    .data$comparison == .env$comparison,
-    is.finite(.data$age_adjusted_p_value)
-  ) |>
-    dplyr::transmute(
-      var = .data$var,
-      log2_difference = .data$log2_difference,
-      p.value = .data$age_adjusted_p_value,
-      p.adj = .data$bh_adjusted_p_value,
-      significant = .data$bh_adjusted_p_value < 0.1,
-      neg_log10_q = -log10(.data$bh_adjusted_p_value)
-    )
-}
-
-write_luminex_volcano <- function(
-  data, comparison, group1, group2, seed = 500L
-) {
-  plot <- ggplot2::ggplot(
-    data,
-    ggplot2::aes(
-      x = log2_difference, y = neg_log10_q, label = var, color = significant
-    )
-  ) +
-    ggplot2::geom_point(size = 3) +
-    ggplot2::geom_hline(
-      yintercept = -log10(0.1), color = "blue", linetype = "dashed"
-    ) +
-    ggplot2::geom_vline(
-      xintercept = c(-0.5, 0, 0.5), color = "red",
-      linetype = c("dashed", "solid", "dashed")
-    ) +
-    ggrepel::geom_text_repel(
-      data = dplyr::filter(
-        data, .data$significant, abs(.data$log2_difference) >= 0.5
-      ),
-      seed = seed
-    ) +
-    ggplot2::scale_color_manual(values = c("FALSE" = "black", "TRUE" = "blue")) +
-    ggplot2::labs(
-      x = paste0(
-        "Adjusted difference in log2(value + 1): ", group1, " - ", group2
-      ),
-      y = expression(-Log[10] ~ "BH-adjusted p value"),
-      color = "BH < 0.1"
-    ) +
-    ggplot2::theme_classic()
-  path <- file.path(
-    luminex_result_dir(), paste0("volcano_", comparison, ".pdf")
-  )
-  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
-  ggplot2::ggsave(path, plot, width = 3, height = 3)
-  path
 }

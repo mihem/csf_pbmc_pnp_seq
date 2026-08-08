@@ -15,10 +15,7 @@ targets_olink <- list(
     read_olink_input(olink_quant_file, "Quantified_value")
   ),
   targets::tar_target(
-    olink_quant_diagnosis,
-    analyze_olink_data(
-      olink_quant_input, olink_metadata, "Quantified_value", "diagnosis",
-      "pg/ml", 123L
-    )
+    olink_quant_data,
+    prepare_olink_quantified(olink_quant_input, olink_metadata)
   )
 )

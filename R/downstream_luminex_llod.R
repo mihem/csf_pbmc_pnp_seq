@@ -69,13 +69,14 @@ luminex_llod_marker_plan <- function() {
   dplyr::mutate(
     plan,
     reason = dplyr::case_when(
-      .data$analysis == "primary_linear" ~ "No inferred LLOD; log-linear model",
+      .data$analysis == "primary_linear" ~
+        "No inferred LLOD; unified log-Gaussian model is fully observed",
       .data$assay == "CXCL12" ~
         "Second-batch LLOD only; batch-specific left-censored model",
       .data$analysis == "primary_censored" ~
-        "Moderate censoring; batch-specific left-censored model",
+        "Batch-specific LLOD; unified left-censored log-Gaussian model",
       .data$analysis == "primary_detection" ~
-        "Highly censored with at least 10 detections; bias-reduced logistic model",
+        "Highly censored; unified censored primary with detection sensitivity",
       .data$analysis == "exploratory_detection" ~
         "Highly censored with 5-6 detections; exploratory bias-reduced logistic model",
       .data$analysis == "descriptive_only" ~
@@ -198,7 +199,8 @@ luminex_llod_emmeans <- function(model) {
 }
 
 luminex_llod_fit_models <- function(
-  data, llod_qc, marker_plan, analyses, adjust_bh = FALSE
+  data, llod_qc, marker_plan, analyses, adjust_bh = FALSE,
+  force_censored = FALSE
 ) {
   selected <- dplyr::filter(marker_plan, .data$analysis %in% .env$analyses)
   results <- list()
@@ -226,7 +228,24 @@ luminex_llod_fit_models <- function(
       next
     }
     fitted <- tryCatch({
-      if (analysis == "primary_linear") {
+      if (force_censored) {
+        raw_model <- survival::survreg(
+          survival::Surv(
+            log2(analysis_value + 1), !censored, type = "left"
+          ) ~ diagnosis,
+          data = model_data, dist = "gaussian", robust = TRUE,
+          cluster = patient_id
+        )
+        adjusted_model <- survival::survreg(
+          survival::Surv(
+            log2(analysis_value + 1), !censored, type = "left"
+          ) ~ diagnosis + age + assay_batch,
+          data = model_data, dist = "gaussian", robust = TRUE,
+          cluster = patient_id
+        )
+        model_type <- "unified_censored_log2_gaussian"
+        effect_scale <- "log2 concentration difference"
+      } else if (analysis == "primary_linear") {
         raw_model <- stats::lm(
           log2(value + 1) ~ diagnosis, data = model_data
         )
@@ -330,6 +349,49 @@ luminex_llod_detection_rates <- function(data, assays, llod_qc) {
   }))
 }
 
+luminex_llod_detection_sensitivity <- function(primary, detection) {
+  sensitivity_assays <- unique(detection$assay)
+  sensitivity_family <- dplyr::bind_rows(
+    dplyr::filter(primary, !.data$assay %in% .env$sensitivity_assays) |>
+      dplyr::transmute(
+        assay, comparison, adjusted_p_value, source = "primary"
+      ),
+    dplyr::transmute(
+      detection, assay, comparison, adjusted_p_value,
+      source = "detection_sensitivity"
+    )
+  ) |>
+    dplyr::group_by(.data$comparison) |>
+    dplyr::mutate(
+      sensitivity_bh_adjusted_p_value = stats::p.adjust(
+        .data$adjusted_p_value, method = "BH"
+      )
+    ) |>
+    dplyr::ungroup() |>
+    dplyr::filter(.data$source == "detection_sensitivity") |>
+    dplyr::select(
+      "assay", "comparison", "sensitivity_bh_adjusted_p_value"
+    )
+  dplyr::filter(primary, .data$assay %in% .env$sensitivity_assays) |>
+    dplyr::select(
+      "assay", "comparison", "group1", "group2",
+      primary_effect = "effect", primary_p_value = "adjusted_p_value",
+      primary_bh_adjusted_p_value = "bh_adjusted_p_value"
+    ) |>
+    dplyr::left_join(
+      dplyr::select(
+        detection, "assay", "comparison",
+        detection_log_odds_ratio = "effect", "odds_ratio",
+        detection_p_value = "adjusted_p_value"
+      ),
+      by = c("assay", "comparison")
+    ) |>
+    dplyr::left_join(
+      sensitivity_family, by = c("assay", "comparison")
+    ) |>
+    dplyr::arrange(.data$comparison, .data$detection_p_value)
+}
+
 analyze_luminex_llod <- function(input) {
   marker_plan <- luminex_llod_marker_plan()
   stopifnot(setequal(input$assays, marker_plan$assay))
@@ -339,10 +401,16 @@ analyze_luminex_llod <- function(input) {
   primary <- luminex_llod_fit_models(
     input$data, llod_qc, marker_plan,
     c("primary_linear", "primary_censored", "primary_detection"),
-    adjust_bh = TRUE
+    adjust_bh = TRUE, force_censored = TRUE
+  )
+  detection_sensitivity <- luminex_llod_fit_models(
+    input$data, llod_qc, marker_plan, "primary_detection"
   )
   exploratory <- luminex_llod_fit_models(
     input$data, llod_qc, marker_plan, "exploratory_detection"
+  )
+  sensitivity <- luminex_llod_detection_sensitivity(
+    primary$statistics, detection_sensitivity$statistics
   )
   list(
     data_wide = input$data,
@@ -354,9 +422,11 @@ analyze_luminex_llod <- function(input) {
       input$data, input$assays, llod_qc
     ),
     primary_statistics = primary$statistics,
+    detection_sensitivity = sensitivity,
     exploratory_statistics = exploratory$statistics,
     model_exclusions = dplyr::bind_rows(
-      primary$exclusions, exploratory$exclusions
+      primary$exclusions, detection_sensitivity$exclusions,
+      exploratory$exclusions
     ),
     detection_rates = luminex_llod_detection_rates(
       input$data, input$assays, llod_qc
@@ -422,6 +492,7 @@ write_luminex_llod_artifacts <- function(result) {
   writexl::write_xlsx(
     list(
       primary_statistics = result$primary_statistics,
+      detection_sensitivity = result$detection_sensitivity,
       exploratory_detection = result$exploratory_statistics,
       detection_rates = result$detection_rates,
       llod_by_batch = result$llod_by_batch,
@@ -451,8 +522,7 @@ write_luminex_llod_volcano <- function(
   plot <- ggplot2::ggplot(
     data,
     ggplot2::aes(
-      x = effect, y = neg_log10_q, label = assay, color = significant,
-      shape = model
+      x = effect, y = neg_log10_q, label = assay, color = significant
     )
   ) +
     ggplot2::geom_point(size = 3) +
@@ -466,11 +536,11 @@ write_luminex_llod_volcano <- function(
     ggplot2::scale_color_manual(values = c("FALSE" = "black", "TRUE" = "blue")) +
     ggplot2::labs(
       x = paste0(
-        "Adjusted model estimate: ", group1, " - ", group2,
-        " (model-specific scale)"
+        "Adjusted underlying log2 concentration difference: ",
+        group1, " - ", group2
       ),
       y = expression(-Log[10] ~ "BH-adjusted p value"),
-      color = "BH < 0.1", shape = "Primary model"
+      color = "BH < 0.1"
     ) +
     ggplot2::theme_classic()
   path <- file.path(

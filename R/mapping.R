@@ -1,14 +1,14 @@
-run_azimuth <- function(object, config) {
-  configure_runtime(config)
+run_azimuth <- function(object, settings) {
+  configure_runtime()
   # The pinned Azimuth reference calls the SeuratObject Key setter by name.
   suppressPackageStartupMessages(library("Seurat", character.only = TRUE))
   query <- SeuratObject::JoinLayers(object)
   mapped <- Azimuth::RunAzimuth(
     query = query,
-    reference = config$azimuth$reference,
+    reference = settings$reference,
     assay = "RNA"
   )
-  threshold <- as.numeric(config$azimuth$score_threshold)
+  threshold <- as.numeric(settings$score_threshold)
   predictions <- data.frame(row.names = colnames(mapped))
   for (level in 1:3) {
     source_label <- paste0("predicted.celltype.l", level)

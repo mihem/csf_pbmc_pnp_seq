@@ -1,42 +1,41 @@
-cluster_integrated_object <- function(object, config) {
-  configure_runtime(config)
+cluster_integrated_object <- function(object, settings) {
+  configure_runtime()
   object <- Seurat::FindNeighbors(
     object,
     reduction = "stacas.ss.all",
-    dims = seq_len(as.integer(config$annotation$dimensions)),
+    dims = seq_len(as.integer(settings$dimensions)),
     assay = "RNA",
     graph.name = c("RNA_nn", "RNA_snn")
   )
-  for (resolution in unlist(config$annotation$resolutions)) {
+  for (resolution in unlist(settings$resolutions)) {
     object <- Seurat::FindClusters(
       object,
       resolution = resolution,
-      random.seed = as.integer(config$annotation$cluster_seed)
+      random.seed = as.integer(settings$cluster_seed)
     )
   }
   object
 }
 
-read_manual_overrides <- function(config, manual_files) {
-  stopifnot(length(manual_files) == 7L)
-  outlier_files <- file.path(
-    "lookup",
-    paste0(c("cl9", "cl12", "cl23", "cl24"), "_outliers.csv")
-  )
+read_manual_overrides <- function(nk_overrides_file, outlier_files, cluster_column) {
+  stopifnot(length(outlier_files) == 4L)
   outliers <- purrr::map_dfr(outlier_files, function(path) {
-    readr::read_csv(path, show_col_types = FALSE) |>
+    data <- readr::read_csv(path, show_col_types = FALSE)
+    stopifnot(cluster_column %in% names(data))
+    data |>
       dplyr::transmute(
         cell_barcode,
-        cluster = paste0(RNA_snn_res.1, "_outliers")
+        cluster = paste0(.data[[cluster_column]], "_outliers")
       )
   })
-  nk <- readr::read_csv(config$paths$nk_overrides, show_col_types = FALSE) |>
+  nk <- readr::read_csv(nk_overrides_file, show_col_types = FALSE) |>
     dplyr::transmute(cell_barcode, cluster = "23_nk_cells")
   stopifnot(!anyDuplicated(outliers$cell_barcode), !anyDuplicated(nk$cell_barcode))
   list(outliers = outliers, nk = nk)
 }
 
-apply_annotations <- function(object, overrides, config) {
+apply_annotations <- function(object, overrides, annotation_file, cluster_column) {
+  stopifnot(cluster_column %in% colnames(object@meta.data))
   metadata <- object@meta.data |>
     tibble::rownames_to_column("cell_barcode") |>
     dplyr::left_join(
@@ -44,7 +43,9 @@ apply_annotations <- function(object, overrides, config) {
       by = "cell_barcode"
     ) |>
     dplyr::mutate(
-      cluster = dplyr::coalesce(cluster_outlier, as.character(RNA_snn_res.1))
+      cluster = dplyr::coalesce(
+        cluster_outlier, as.character(.data[[cluster_column]])
+      )
     ) |>
     dplyr::select(-cluster_outlier) |>
     dplyr::left_join(
@@ -54,7 +55,7 @@ apply_annotations <- function(object, overrides, config) {
     dplyr::mutate(cluster = dplyr::coalesce(cluster_nk, cluster)) |>
     dplyr::select(-cluster_nk)
 
-  annotations <- readxl::read_xlsx(config$paths$annotations) |>
+  annotations <- readxl::read_xlsx(annotation_file) |>
     dplyr::transmute(cluster = as.character(number), final, cluster_order)
   stopifnot(!anyDuplicated(annotations$cluster))
   metadata <- metadata |>

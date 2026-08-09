@@ -6,17 +6,29 @@ targets_annotation <- list(
   ),
   tar_target(
     sc_annotation_input,
-    apply_annotation_checkpoint(sc_integrated, annotation_checkpoint_file)
+    prepare_annotation_input(sc_azimuth, lookup, annotation_checkpoint_file)
   ),
   tar_target(
     sc_clustered,
-    cluster_integrated_object(sc_annotation_input, analysis_config)
+    cluster_integrated_object(sc_annotation_input, clustering_config)
   ),
   tar_target(
     manual_overrides,
-    read_manual_overrides(analysis_config, manual_files)
+    read_manual_overrides(
+      nk_overrides_file,
+      annotation_outlier_files,
+      annotation_config$cluster_column
+    )
   ),
-  tar_target(sc_annotated, apply_annotations(sc_clustered, manual_overrides, analysis_config)),
+  tar_target(
+    sc_annotated,
+    apply_annotations(
+      sc_clustered,
+      manual_overrides,
+      annotation_file,
+      annotation_config$cluster_column
+    )
+  ),
   tar_target(
     azimuth_level2_stacas_map_file,
     write_azimuth_level2_map(
@@ -33,11 +45,6 @@ targets_annotation <- list(
       "results/targets/umap/stacas.ss.all_umap_tissue.png",
       seed = 123L
     ),
-    format = "file"
-  ),
-  tar_target(
-    annotation_marker_file,
-    analysis_config$paths$markers,
     format = "file"
   ),
   tar_target(

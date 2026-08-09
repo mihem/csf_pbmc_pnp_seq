@@ -1,7 +1,5 @@
-project:
-  seed: 123
-  workers: 6
-  future_globals_gib: 16
+proteomics:
+  fdr: 0.1
 
 preprocess:
   min_cells: 3
@@ -16,14 +14,6 @@ preprocess:
 azimuth:
   reference: pbmcref
   score_threshold: 0.4
-
-integration:
-  split_by: batch
-  labels: azimuth_pbmcref2
-  dimensions: 30
-  k_weight: 50
-  seed: 123
-  umap_seed: 42
 
 annotation:
   dimensions: 30
@@ -41,7 +31,6 @@ paths:
   sural_ic_metadata_umap: raw/sural/ic_metadata_umap.qs
   sural_metadata_umap: raw/sural/sc_merge_metadata_umap.qs
   sural_trust4: raw/sural/trust4
-  target_results: results/targets
 
 trust4:
   reduction: umap.scvi.full
@@ -56,10 +45,3 @@ trust4:
     GM_SN: P18
     SN5: P28
     SN6: P29
-
-legacy:
-  sc_list: objects/sc_list.qs
-  sc_merge_pre: objects/sc_merge_pre.qs
-  sc_azimuth: objects/sc_merge_azimuth.qs
-  sc_integrated: objects/sc_merge_batch.qs
-  sc_annotated: objects/sc_merge.qs

@@ -5,13 +5,13 @@ targets_preprocess <- list(
       rna_manifest,
       lookup,
       donor_assignments,
-      analysis_config,
+      rna_creation_config,
       rna_files
     )
   ),
   tar_target(
     sc_filtered,
-    filter_sample_objects(sc_list, qc_thresholds_file, analysis_config)
+    filter_sample_objects(sc_list, qc_thresholds_file, rna_filter_config)
   ),
   tar_target(sc_merge_pre, merge_sample_objects(sc_filtered, lookup)),
   tar_target(qc_count_cells, summarize_cell_counts(sc_list, sc_merge_pre)),
@@ -35,5 +35,7 @@ targets_preprocess <- list(
     ),
     format = "file"
   ),
-  tar_target(sc_preprocessed, normalize_and_reduce(sc_merge_pre, analysis_config))
+  tar_target(
+    sc_preprocessed, normalize_and_reduce(sc_merge_pre, rna_normalization_config)
+  )
 )

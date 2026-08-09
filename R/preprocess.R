@@ -53,11 +53,11 @@ create_sample_objects <- function(
   manifest,
   lookup,
   donor_assignments,
-  config,
+  settings,
   input_files
 ) {
   stopifnot(length(input_files) > 0L)
-  configure_runtime(config)
+  configure_runtime()
   pool_objects <- purrr::map2(
     manifest$h5,
     manifest$library_id,
@@ -65,8 +65,8 @@ create_sample_objects <- function(
       counts <- scMisc::ReadCellBender_h5(path)
       Seurat::CreateSeuratObject(
         counts = counts,
-        min.cells = as.integer(config$preprocess$min_cells),
-        min.features = as.integer(config$preprocess$min_features),
+        min.cells = as.integer(settings$min_cells),
+        min.features = as.integer(settings$min_features),
         project = "PNP"
       )
     }
@@ -113,7 +113,7 @@ create_sample_objects <- function(
   })
 }
 
-filter_sample_objects <- function(sample_objects, path, config) {
+filter_sample_objects <- function(sample_objects, path, settings) {
   thresholds <- readr::read_csv(path, show_col_types = FALSE) |>
     dplyr::rename(sample = patient, max_features = rna, max_percent_mt = mt)
   stopifnot(
@@ -123,7 +123,7 @@ filter_sample_objects <- function(sample_objects, path, config) {
 
   filtered <- purrr::imap(sample_objects, function(object, sample) {
     threshold <- dplyr::filter(thresholds, .data$sample == .env$sample)
-    keep <- object$nFeature_RNA > config$preprocess$max_features_default &
+    keep <- object$nFeature_RNA > settings$max_features_default &
       object$nFeature_RNA < threshold$max_features[[1]] &
       object$percent_mt < threshold$max_percent_mt[[1]]
     object[, keep]
@@ -168,18 +168,18 @@ merge_sample_objects <- function(filtered, lookup) {
   object
 }
 
-normalize_and_reduce <- function(object, config) {
-  configure_runtime(config)
+normalize_and_reduce <- function(object, settings) {
+  configure_runtime()
   object <- Seurat::NormalizeData(
     object,
-    normalization.method = config$preprocess$normalization_method,
-    scale.factor = config$preprocess$scale_factor,
+    normalization.method = settings$normalization_method,
+    scale.factor = settings$scale_factor,
     verbose = TRUE
   )
   object <- Seurat::FindVariableFeatures(
     object,
     selection.method = "vst",
-    nfeatures = as.integer(config$preprocess$variable_features)
+    nfeatures = as.integer(settings$variable_features)
   )
   object <- Seurat::ScaleData(object)
   object <- Seurat::RunPCA(object, seed.use = 42L)
@@ -190,10 +190,10 @@ normalize_and_reduce <- function(object, config) {
   nmf_object[["RNA"]] <- NULL
   nmf_object <- SeuratObject::RenameAssays(nmf_object, RNA3 = "RNA")
   nmf_object <- withr::with_seed(
-    as.integer(config$preprocess$nmf_seed),
+    as.integer(settings$nmf_seed),
     singlet::RunNMF(
       nmf_object,
-      k = as.integer(config$preprocess$nmf_factors)
+      k = as.integer(settings$nmf_factors)
     )
   )
   object[["nmf"]] <- nmf_object[["nmf"]]

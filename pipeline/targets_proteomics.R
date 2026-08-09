@@ -26,7 +26,7 @@ targets_proteomics <- c(list(
     luminex_llod_analysis, analyze_luminex_llod(luminex_input)
   ),
   targets::tar_target(
-    proteomics_parameters, proteomics_settings()
+    proteomics_parameters, proteomics_settings(analysis_config$proteomics$fdr)
   ),
   targets::tar_target(
     proteomics_luminex_marker_inventory_file,

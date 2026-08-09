@@ -61,14 +61,3 @@ rna_input_files <- function(manifest) {
   stopifnot(all(file.exists(files)))
   unname(files)
 }
-
-manual_annotation_files <- function(config) {
-  paths <- c(
-    config$paths$annotations,
-    config$paths$markers,
-    config$paths$nk_overrides,
-    file.path("lookup", paste0(c("cl9", "cl12", "cl23", "cl24"), "_outliers.csv"))
-  )
-  stopifnot(all(file.exists(paths)))
-  paths
-}

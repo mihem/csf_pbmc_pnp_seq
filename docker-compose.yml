@@ -8,6 +8,8 @@ services:
       RENV_CONFIG_SANDBOX_ENABLED: "FALSE"
       RENV_CONFIG_SYNCHRONIZED_CHECK: "FALSE"
       TAR_INCLUDE_HEAVY: "${TAR_INCLUDE_HEAVY:-false}"
+      ANALYSIS_WORKERS: "${ANALYSIS_WORKERS:-6}"
+      FUTURE_GLOBALS_GIB: "${FUTURE_GLOBALS_GIB:-16}"
     volumes:
       - .:/csf_pbmc_pnp_seq
     mem_limit: "${PIPELINE_MEMORY_LIMIT:-48g}"
@@ -24,6 +26,8 @@ services:
       RENV_CONFIG_SANDBOX_ENABLED: "FALSE"
       RENV_CONFIG_SYNCHRONIZED_CHECK: "FALSE"
       TAR_INCLUDE_HEAVY: "${TAR_INCLUDE_HEAVY:-false}"
+      ANALYSIS_WORKERS: "${ANALYSIS_WORKERS:-6}"
+      FUTURE_GLOBALS_GIB: "${FUTURE_GLOBALS_GIB:-16}"
     volumes:
       - .:/csf_pbmc_pnp_seq
     mem_limit: "8g"

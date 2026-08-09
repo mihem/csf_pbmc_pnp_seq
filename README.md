@@ -15,6 +15,15 @@ The container uses a 48 GiB memory limit by default. Pipeline outputs are
 written to `results/targets/`, while intermediate objects are stored in
 `_targets/`.
 
+Scientific settings live in `config/analysis.yml`. Expensive stages depend on
+stage-specific projections of that file, so changing one section only
+invalidates the corresponding stage and its descendants. Runtime resources do
+not affect target validity and can be overridden independently:
+
+```bash
+ANALYSIS_WORKERS=6 FUTURE_GLOBALS_GIB=16 docker compose run --rm csf_pbmc_pnp_seq
+```
+
 ## Project Structure
 
 - `R/`: analysis and plotting functions

@@ -6,7 +6,6 @@ tar_source("R")
 source("pipeline/targets_inputs.R")
 source("pipeline/targets_preprocess.R")
 source("pipeline/targets_mapping.R")
-source("pipeline/targets_integration.R")
 source("pipeline/targets_annotation.R")
 source("pipeline/targets_abundance.R")
 source("pipeline/targets_deg.R")
@@ -59,7 +58,6 @@ tar_option_set(
     "SeuratObject",
     "singlet",
     "speckle",
-    "STACAS",
     "stringr",
     "tibble",
     "tidyr",
@@ -78,7 +76,6 @@ pipeline <- c(
   targets_inputs,
   targets_preprocess,
   targets_mapping,
-  targets_integration,
   targets_annotation,
   targets_abundance,
   targets_deg,
@@ -99,4 +96,4 @@ if (include_heavy_targets()) {
   pipeline <- c(pipeline, targets_cerebro)
 }
 
-pipeline
+validate_pipeline_config_dependencies(pipeline)

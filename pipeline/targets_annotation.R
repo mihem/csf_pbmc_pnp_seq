@@ -6,7 +6,9 @@ targets_annotation <- list(
   ),
   tar_target(
     sc_annotation_input,
-    prepare_annotation_input(sc_azimuth, lookup, annotation_checkpoint_file)
+    prepare_annotation_input(
+      sc_azimuth, lookup_batch, annotation_checkpoint_file
+    )
   ),
   tar_target(
     sc_clustered,

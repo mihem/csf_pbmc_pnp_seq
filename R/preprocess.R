@@ -1,3 +1,30 @@
+lookup_columns <- function() {
+  c(
+    "patient", "pseudonym", "biobank_id", "cohort", "batch", "sex",
+    "group", "group2", "diagnosis", "diagnosis_detail",
+    "ean_2021_clinical", "ean_2021_level", "brighton_level",
+    "other_relevant_diagnosis", "immunomodulators", "therapy",
+    "nerve_frozen", "comment", "symptoms", "disease_duration_in_months",
+    "cell_count", "lymphocytes_count", "granulocytes_count",
+    "erythrocytes_count", "ig_g_synthesis", "csf_protein", "bbbd",
+    "csf_ocb", "glucose_csf", "glucose_ratio", "lactate_csf",
+    "incat_at_lumbar_puncture", "incat_follow_up",
+    "onls_at_lumbar_puncture", "onls_follow_up",
+    "mrc_sum_score_60_at_lumbar_puncture",
+    "mrc_sum_score_60_follow_up", "icu", "dml_median_motoric",
+    "cmap_median_motoric", "ncv_median_motoric",
+    "min_f_latency_median_motoric", "dml_ulnar_motoric",
+    "cmap_ulnar_motoric", "ncv_ulnar_motoric",
+    "min_f_latency_ulnar_motoric", "dml_peroneal_motoric",
+    "cmap_peroneal_motoric", "ncv_peroneal_motoric",
+    "min_f_latency_peroneal_motoric", "dml_tibial_motoric",
+    "cmap_tibial_motoric", "ncv_tibial_motoric",
+    "min_f_latency_tibial_motoric", "sp_sural_sensory",
+    "ncv_sural_sensory", "age", "follow_up", "incat_progress",
+    "onls_progress", "mrc_sum_score_60_progress"
+  )
+}
+
 clean_lookup <- function(path) {
   readxl::read_excel(path) |>
     janitor::clean_names() |>
@@ -20,7 +47,17 @@ clean_lookup <- function(path) {
         )
       ),
       dplyr::across(dml_median_motoric:ncv_sural_sensory, as.numeric)
-    )
+    ) |>
+    dplyr::select(tidyselect::all_of(lookup_columns()))
+}
+
+project_lookup <- function(lookup, columns) {
+  stopifnot(
+    "patient" %in% columns,
+    all(columns %in% names(lookup)),
+    !anyDuplicated(lookup$patient)
+  )
+  dplyr::select(lookup, tidyselect::all_of(columns))
 }
 
 read_donor_assignments <- function(manifest, input_files) {

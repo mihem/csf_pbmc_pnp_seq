@@ -145,12 +145,11 @@ prepare_flow_frontiers <- function(flow_raw, frontiers_lookup) {
   list(matched = matched, summary = summary)
 }
 
-prepare_flow_data <- function(flow_file, frontiers_file, seed_lookup_file) {
+prepare_flow_data <- function(flow_file, frontiers_file, seed_lookup) {
   flow_raw <- readxl::read_excel(flow_file)
   frontiers_raw <- readxl::read_excel(frontiers_file)
   frontiers_lookup <- read_flow_frontiers_lookup(frontiers_file)
   frontiers <- prepare_flow_frontiers(flow_raw, frontiers_lookup)
-  seed_lookup <- read_flow_seed_lookup(seed_lookup_file)
 
   flow_seed <- flow_raw |>
     dplyr::filter(!is.na(patient)) |>

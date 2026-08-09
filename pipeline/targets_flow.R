@@ -19,9 +19,13 @@ targets_flow <- list(
     format = "file"
   ),
   targets::tar_target(
+    flow_seed_lookup,
+    read_flow_seed_lookup(flow_seed_lookup_file)
+  ),
+  targets::tar_target(
     flow_prepared,
     prepare_flow_data(
-      flow_raw_file, flow_frontiers_lookup_file, flow_seed_lookup_file
+      flow_raw_file, flow_frontiers_lookup_file, flow_seed_lookup
     )
   ),
   targets::tar_target(flow_data, flow_prepared$flow),

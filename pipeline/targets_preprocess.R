@@ -3,7 +3,7 @@ targets_preprocess <- list(
     sc_list,
     create_sample_objects(
       rna_manifest,
-      lookup,
+      lookup_identity,
       donor_assignments,
       rna_creation_config,
       rna_files
@@ -13,7 +13,10 @@ targets_preprocess <- list(
     sc_filtered,
     filter_sample_objects(sc_list, qc_thresholds_file, rna_filter_config)
   ),
-  tar_target(sc_merge_pre, merge_sample_objects(sc_filtered, lookup)),
+  tar_target(
+    sc_merge_pre,
+    merge_sample_objects(sc_filtered, lookup_preprocess)
+  ),
   tar_target(qc_count_cells, summarize_cell_counts(sc_list, sc_merge_pre)),
   tar_target(qc_count_genes, summarize_gene_counts(sc_merge_pre)),
   tar_target(qc_cellranger_metrics, summarize_cellranger_metrics(rna_manifest)),

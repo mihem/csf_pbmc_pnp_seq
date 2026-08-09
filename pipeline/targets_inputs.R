@@ -47,5 +47,43 @@ targets_inputs <- list(
     format = "file"
   ),
   tar_target(lookup, clean_lookup(lookup_file)),
+  tar_target(
+    lookup_identity,
+    project_lookup(lookup, c("patient", "pseudonym"))
+  ),
+  tar_target(
+    lookup_preprocess,
+    project_lookup(
+      lookup,
+      c(
+        "patient", "sex", "group", "diagnosis",
+        "incat_at_lumbar_puncture", "incat_follow_up",
+        "onls_at_lumbar_puncture", "onls_follow_up",
+        "mrc_sum_score_60_at_lumbar_puncture",
+        "mrc_sum_score_60_follow_up", "icu", "age"
+      )
+    )
+  ),
+  tar_target(
+    lookup_batch,
+    project_lookup(lookup, c("patient", "batch"))
+  ),
+  tar_target(
+    lookup_model,
+    project_lookup(
+      lookup,
+      c("patient", "sex", "age", "group", "group2", "diagnosis")
+    )
+  ),
+  tar_target(
+    lookup_treatment,
+    project_lookup(
+      lookup,
+      c(
+        "patient", "sex", "age", "group", "group2", "diagnosis",
+        "therapy", "immunomodulators"
+      )
+    )
+  ),
   tar_target(donor_assignments, read_donor_assignments(rna_manifest, rna_files))
 )

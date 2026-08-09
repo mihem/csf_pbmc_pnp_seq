@@ -1,7 +1,7 @@
 targets_abundance <- list(
   tar_target(
     abundance_object,
-    prepare_abundance_object(sc_annotated, lookup)
+    prepare_abundance_object(sc_annotated, lookup_model)
   ),
   tar_target(abundance_tables, make_abundance_tables(abundance_object)),
   tar_target(
@@ -139,6 +139,102 @@ targets_abundance <- list(
       abundance_object@misc$diagnosis_col,
       abundance_result_dir(),
       seed = 123L
+    ),
+    format = "file"
+  ),
+  tar_target(
+    abundance_treatment_naive_data,
+    prepare_treatment_naive_abundance(abundance_object, lookup_treatment)
+  ),
+  tar_target(
+    abundance_treatment_naive_cohort_file,
+    write_abundance_table(
+      list(
+        excluded_patients = abundance_treatment_naive_data$excluded,
+        analysis_cohort = abundance_treatment_naive_data$cohort
+      ),
+      file.path(
+        abundance_result_dir(), "sensitivity_treatment_naive", "cohort.xlsx"
+      )
+    ),
+    format = "file"
+  ),
+  tar_target(
+    abundance_treatment_naive_comparison_config,
+    treatment_naive_abundance_comparisons(abundance_comparisons())
+  ),
+  tar_target(
+    abundance_treatment_naive_propeller_results,
+    run_treatment_naive_abundance_propeller(
+      abundance_treatment_naive_data$object,
+      abundance_treatment_naive_data$lookup,
+      abundance_treatment_naive_comparison_config,
+      seed = 123L,
+      n_perms = 1000L
+    )
+  ),
+  tar_target(
+    abundance_treatment_naive_propeller_results_file,
+    write_propeller_results(
+      abundance_treatment_naive_propeller_results,
+      file.path(
+        abundance_result_dir(), "sensitivity_treatment_naive",
+        "propeller_results.xlsx"
+      )
+    ),
+    format = "file"
+  ),
+  tar_target(
+    abundance_treatment_naive_concordance,
+    compare_propeller_sensitivity(
+      abundance_propeller_results,
+      abundance_treatment_naive_propeller_results
+    )
+  ),
+  tar_target(
+    abundance_treatment_naive_concordance_file,
+    write_propeller_results(
+      abundance_treatment_naive_concordance,
+      file.path(
+        abundance_result_dir(), "sensitivity_treatment_naive",
+        "full_vs_untreated.xlsx"
+      )
+    ),
+    format = "file"
+  ),
+  tar_target(
+    abundance_treatment_naive_propeller_plot_files,
+    write_propeller_plots(
+      abundance_treatment_naive_propeller_results,
+      abundance_treatment_naive_data$object@misc$cluster_col,
+      file.path(
+        abundance_result_dir(), "sensitivity_treatment_naive",
+        "propeller_plots"
+      )
+    ),
+    format = "file"
+  ),
+  tar_target(
+    abundance_treatment_naive_boxplot_csf_file,
+    write_abundance_boxplot(
+      abundance_treatment_naive_data$object,
+      "CSF",
+      file.path(
+        abundance_result_dir(), "sensitivity_treatment_naive",
+        "boxplot_cluster_csf_diagnosis.pdf"
+      )
+    ),
+    format = "file"
+  ),
+  tar_target(
+    abundance_treatment_naive_boxplot_pbmc_file,
+    write_abundance_boxplot(
+      abundance_treatment_naive_data$object,
+      "PBMC",
+      file.path(
+        abundance_result_dir(), "sensitivity_treatment_naive",
+        "boxplot_cluster_pbmc_diagnosis.pdf"
+      )
     ),
     format = "file"
   )

@@ -53,5 +53,148 @@ targets_tcr <- list(
     tcr_comparison_plot_files,
     write_tcr_comparison_plots(tcr_comparison, seed = 42L),
     format = "file"
+  ),
+
+  # Reviewer 4 comment 4: select clones on disease enrichment
+  # rather than raw size, then reverse phenotype them.
+  #
+  # Two selections are computed. The specificity group is the primary one. The
+  # per-clone Fisher test is retained because it is the evidence for why the
+  # unit was moved: on this cohort it selects only single-patient clones and its
+  # ranking is clone size, which is the selection the reviewer objected to.
+  tar_target(
+    tcr_disease_enriched_clones,
+    select_gliph_enriched_clones(
+      sc_tcr,
+      cluster_membership = tcr_comparison$cluster_membership,
+      diagnosis_enrichment = tcr_comparison$diagnosis_enrichment,
+      targets = c("GBS", "CIDP"),
+      fdr = 0.1,
+      min_patients = 2L
+    )
+  ),
+  tar_target(
+    tcr_per_clone_enriched_clones,
+    select_disease_enriched_clones(
+      sc_tcr,
+      targets = c("GBS", "CIDP"),
+      background = c("CTRL", "CIAP"),
+      min_cells = 3L,
+      fdr = 0.1
+    )
+  ),
+  tar_target(
+    tcr_size_matched_clones,
+    match_clones_by_size(tcr_disease_enriched_clones, seed = 42L)
+  ),
+  tar_target(
+    tcr_clone_cluster_composition,
+    reverse_phenotype_cluster_composition(sc_tcr, tcr_size_matched_clones)
+  ),
+  # The contrast runs over the CD8 effector clusters rather than CD8TEM_3
+  # alone. The selected clones sit in CD8TEM_1, and inside CD8TEM_3 no patient
+  # has both arms populated, so the narrower contrast is not estimable.
+  tar_target(
+    tcr_reverse_phenotype,
+    reverse_phenotype_pseudobulk(
+      sc_tcr,
+      tcr_disease_enriched_clones,
+      cluster_name = c("CD8TEM_1", "CD8TEM_2", "CD8TEM_3"),
+      min_cells_per_arm = 5L
+    )
+  ),
+  tar_target(
+    tcr_reverse_phenotype_panel,
+    reverse_phenotype_panel_scores(
+      sc_tcr,
+      tcr_disease_enriched_clones,
+      cluster_name = c("CD8TEM_1", "CD8TEM_2", "CD8TEM_3"),
+      min_cells_per_arm = 5L
+    )
+  ),
+  # Kept because the reply needs it as the power statement: the CD8TEM_3-only
+  # contrast has no eligible patients.
+  tar_target(
+    tcr_reverse_phenotype_cd8tem3_cohort,
+    reverse_phenotype_cohort(
+      sc_tcr,
+      tcr_disease_enriched_clones,
+      cluster_name = "CD8TEM_3",
+      min_cells_per_arm = 10L
+    )
+  ),
+  tar_target(
+    tcr_reverse_phenotype_file,
+    write_reverse_phenotype_workbook(
+      list(
+        specificity_group = tcr_disease_enriched_clones,
+        per_clone_fisher = tcr_per_clone_enriched_clones,
+        cluster_composition = tcr_clone_cluster_composition,
+        pseudobulk = tcr_reverse_phenotype$results,
+        cohort = tcr_reverse_phenotype$cohort,
+        cd8tem3_cohort = tcr_reverse_phenotype_cd8tem3_cohort,
+        panel_tests = tcr_reverse_phenotype_panel$tests,
+        panel_paired = tcr_reverse_phenotype_panel$paired
+      ),
+      file.path(reverse_phenotype_result_dir(), "reverse_phenotype.xlsx")
+    ),
+    format = "file"
+  ),
+  tar_target(
+    tcr_specificity_group_plot_file,
+    write_specificity_group_plot(
+      tcr_disease_enriched_clones,
+      file.path(
+        reverse_phenotype_result_dir(),
+        "fig_specificity_group_patient_support.pdf"
+      )
+    ),
+    format = "file"
+  ),
+  # Plots the per-clone test, not the specificity-group selection: the point of
+  # the panel is that significance tracks clone size.
+  tar_target(
+    tcr_per_clone_selection_plot_file,
+    write_disease_enriched_clone_plot(
+      tcr_per_clone_enriched_clones,
+      sc_tcr@misc$diagnosis_col,
+      file.path(
+        reverse_phenotype_result_dir(),
+        "fig_per_clone_selection_tracks_size.pdf"
+      )
+    ),
+    format = "file"
+  ),
+  tar_target(
+    tcr_clone_cluster_composition_plot_file,
+    write_clone_cluster_composition_plot(
+      tcr_clone_cluster_composition,
+      sc_tcr@misc$cluster_col,
+      file.path(
+        reverse_phenotype_result_dir(), "fig_clone_cluster_composition.pdf"
+      )
+    ),
+    format = "file"
+  ),
+  tar_target(
+    tcr_reverse_phenotype_plot_file,
+    write_reverse_phenotype_plot(
+      tcr_reverse_phenotype,
+      file.path(
+        reverse_phenotype_result_dir(), "fig_reverse_phenotype_volcano.pdf"
+      ),
+      seed = 42L
+    ),
+    format = "file"
+  ),
+  tar_target(
+    tcr_reverse_phenotype_panel_plot_file,
+    write_reverse_phenotype_panel_plot(
+      tcr_reverse_phenotype_panel,
+      file.path(
+        reverse_phenotype_result_dir(), "fig_reverse_phenotype_panel.pdf"
+      )
+    ),
+    format = "file"
   )
 )

@@ -196,6 +196,9 @@ prepare_tcr_comparison <- function(sc_tcr, input_files, seed = 42L) {
     tissue_enrichment = tissue_enrichment,
     myelin_enrichment = myelin_enrichment,
     exact_matches = exact,
+    # Returned so downstream analyses can map a CDR3b back to its specificity
+    # group. Additive only; nothing above depends on it.
+    cluster_membership = membership,
     diagnosis_colors = c(sc_tcr@misc$diagnosis_col, GBS_Sukenikova = "#FF7F00")
   )
 }

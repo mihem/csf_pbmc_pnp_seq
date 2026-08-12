@@ -264,6 +264,96 @@ reverse_phenotype_cluster_composition <- function(sc_tcr, matched_clones) {
     dplyr::arrange(.data$clone_group, dplyr::desc(.data$fraction))
 }
 
+#' Per-cluster odds ratio of carrying a disease-enriched clone.
+#'
+#' The stacked composition bars show where each set of cells sits, but reading
+#' an enrichment off two stacked bars is hard because every cluster's height
+#' depends on all the others. This states the same comparison directly, as one
+#' odds ratio per cluster with a confidence interval, so the question "is this
+#' cluster over-represented among disease-enriched clones" has a number and an
+#' uncertainty attached to it.
+#'
+#' The CD8TEM clusters are additionally tested pooled. They are one compartment
+#' biologically, and pooling raises the cell count behind the estimate.
+#'
+#' @param composition Output of `reverse_phenotype_cluster_composition()`.
+#' @param pool Named list of cluster sets to test as single units, in addition
+#'   to every individual cluster.
+#' @return Tibble of one row per cluster and per pooled set.
+reverse_phenotype_cluster_enrichment <- function(
+    composition,
+    pool = list(CD8TEM_pooled = c("CD8TEM_1", "CD8TEM_2", "CD8TEM_3"))) {
+  stopifnot(
+    is.data.frame(composition),
+    all(c("clone_group", "cluster", "n_cells") %in% colnames(composition)),
+    "disease_enriched" %in% composition$clone_group
+  )
+
+  counts <- composition |>
+    dplyr::mutate(cluster = as.character(.data$cluster)) |>
+    dplyr::select("clone_group", "cluster", "n_cells")
+
+  totals <- counts |>
+    dplyr::group_by(.data$clone_group) |>
+    dplyr::summarise(total = sum(.data$n_cells), .groups = "drop")
+  total_of <- function(group) {
+    value <- totals$total[totals$clone_group == group]
+    if (length(value) == 0L) 0L else value
+  }
+  total_enriched <- total_of("disease_enriched")
+  total_matched <- total_of("size_matched")
+  stopifnot(total_enriched > 0L, total_matched > 0L)
+
+  cells_in <- function(clusters, group) {
+    sum(counts$n_cells[counts$cluster %in% clusters &
+      counts$clone_group == group])
+  }
+
+  sets <- c(
+    stats::setNames(as.list(sort(unique(counts$cluster))), sort(unique(counts$cluster))),
+    pool
+  )
+
+  purrr::imap_dfr(sets, function(clusters, label) {
+    in_enriched <- cells_in(clusters, "disease_enriched")
+    in_matched <- cells_in(clusters, "size_matched")
+    test <- stats::fisher.test(matrix(
+      c(
+        in_enriched, total_enriched - in_enriched,
+        in_matched, total_matched - in_matched
+      ),
+      nrow = 2L
+    ))
+    # A cluster absent from one arm gives an infinite or zero odds ratio, which
+    # cannot go on a log axis. CD8TEM_3 is exactly that case, so carry a
+    # Haldane-Anscombe corrected estimate alongside the exact one for plotting.
+    corrected <- ((in_enriched + 0.5) / (total_enriched - in_enriched + 0.5)) /
+      ((in_matched + 0.5) / (total_matched - in_matched + 0.5))
+    tibble::tibble(
+      cluster = label,
+      pooled = label %in% names(pool),
+      n_enriched = in_enriched,
+      n_matched = in_matched,
+      total_enriched = total_enriched,
+      total_matched = total_matched,
+      fraction_enriched = in_enriched / total_enriched,
+      fraction_matched = in_matched / total_matched,
+      odds_ratio = unname(test$estimate),
+      odds_ratio_corrected = corrected,
+      ci_low = test$conf.int[[1L]],
+      ci_high = test$conf.int[[2L]],
+      p_value = test$p.value
+    )
+  }) |>
+    # Pooled sets restate cells already counted in their members, so they are
+    # excluded from the multiplicity correction rather than inflating it.
+    dplyr::mutate(p_adj = ifelse(
+      .data$pooled, NA_real_,
+      stats::p.adjust(ifelse(.data$pooled, NA_real_, .data$p_value), "BH")
+    )) |>
+    dplyr::arrange(dplyr::desc(.data$odds_ratio))
+}
+
 #' Cells eligible for the patient-paired reverse-phenotype contrast.
 #'
 #' Returns the per-patient arm sizes plus a `retained` flag, so the power
@@ -592,6 +682,78 @@ write_clone_cluster_composition_plot <- function(composition, colors, path) {
       subtitle = "Disease-enriched vs size-matched clones"
     )
   ggplot2::ggsave(path, plot = plot, width = 7, height = 4.5)
+  path
+}
+
+#' Forest plot of the per-cluster enrichment odds ratios.
+#'
+#' The companion to the stacked bars. Reads left to right as depleted to
+#' enriched, with the pooled CD8TEM estimate marked separately.
+write_cluster_enrichment_plot <- function(enrichment, path,
+                                          highlight = "CD8TEM_3") {
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+
+  stopifnot("odds_ratio_corrected" %in% colnames(enrichment))
+  data <- enrichment |>
+    # Plot the continuity-corrected estimate: CD8TEM_3 has no size-matched
+    # cells, so its exact odds ratio is infinite and would drop the one cluster
+    # this panel most needs to show. Open bounds are drawn as arrows.
+    dplyr::filter(.data$n_enriched + .data$n_matched > 0L) |>
+    dplyr::arrange(dplyr::desc(.data$odds_ratio_corrected)) |>
+    dplyr::mutate(
+      cluster = factor(.data$cluster, levels = rev(.data$cluster)),
+      unbounded = !is.finite(.data$odds_ratio),
+      ci_high_plot = ifelse(
+        is.finite(.data$ci_high), .data$ci_high,
+        max(.data$odds_ratio_corrected) * 3
+      ),
+      ci_low_plot = pmax(.data$ci_low, min(.data$odds_ratio_corrected) / 3),
+      role = dplyr::case_when(
+        .data$pooled ~ "CD8TEM pooled",
+        as.character(.data$cluster) == highlight ~ highlight,
+        TRUE ~ "other"
+      ),
+      # Keyed on the interval rather than the FDR: pooled sets are held out
+      # of the multiplicity family and carry p_adj = NA, which would otherwise
+      # draw the strongest estimate in the panel as non-significant.
+      excludes_one = .data$ci_low > 1 | .data$ci_high < 1
+    )
+
+  plot <- ggplot2::ggplot(
+    data, ggplot2::aes(x = .data$odds_ratio_corrected, y = .data$cluster)
+  ) +
+    ggplot2::geom_vline(xintercept = 1, linetype = "dashed", colour = "grey60") +
+    ggplot2::geom_errorbarh(
+      ggplot2::aes(xmin = .data$ci_low_plot, xmax = .data$ci_high_plot),
+      height = 0.25, colour = "grey45"
+    ) +
+    ggplot2::geom_point(
+      ggplot2::aes(x = .data$odds_ratio_corrected, colour = .data$role,
+        shape = .data$excludes_one),
+      size = 2.8
+    ) +
+    ggplot2::scale_x_log10() +
+    ggplot2::scale_colour_manual(
+      values = stats::setNames(
+        c("#E41A1C", "#377EB8", "grey30"),
+        c(highlight, "CD8TEM pooled", "other")
+      ),
+      name = NULL
+    ) +
+    ggplot2::scale_shape_manual(
+      values = c(`TRUE` = 16, `FALSE` = 1), name = "95% CI excludes 1"
+    ) +
+    ggplot2::theme_classic() +
+    ggplot2::labs(
+      x = "Odds ratio, disease-enriched vs size-matched clones (log scale)",
+      y = NULL,
+      title = "Which clusters carry the disease-enriched clones",
+      subtitle = paste(
+        "Right of the line means over-represented among disease-enriched",
+        "clones.\nOpen intervals are unbounded"
+      )
+    )
+  ggplot2::ggsave(path, plot = plot, width = 7.5, height = 5)
   path
 }
 

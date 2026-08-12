@@ -91,6 +91,10 @@ targets_tcr <- list(
     tcr_clone_cluster_composition,
     reverse_phenotype_cluster_composition(sc_tcr, tcr_size_matched_clones)
   ),
+  tar_target(
+    tcr_clone_cluster_enrichment,
+    reverse_phenotype_cluster_enrichment(tcr_clone_cluster_composition)
+  ),
   # The contrast runs over the CD8 effector clusters rather than CD8TEM_3
   # alone. The selected clones sit in CD8TEM_1, and inside CD8TEM_3 no patient
   # has both arms populated, so the narrower contrast is not estimable.
@@ -130,6 +134,7 @@ targets_tcr <- list(
         specificity_group = tcr_disease_enriched_clones,
         per_clone_fisher = tcr_per_clone_enriched_clones,
         cluster_composition = tcr_clone_cluster_composition,
+        cluster_enrichment = tcr_clone_cluster_enrichment,
         pseudobulk = tcr_reverse_phenotype$results,
         cohort = tcr_reverse_phenotype$cohort,
         cd8tem3_cohort = tcr_reverse_phenotype_cd8tem3_cohort,
@@ -173,6 +178,17 @@ targets_tcr <- list(
       file.path(
         reverse_phenotype_result_dir(), "fig_clone_cluster_composition.pdf"
       )
+    ),
+    format = "file"
+  ),
+  tar_target(
+    tcr_clone_cluster_enrichment_plot_file,
+    write_cluster_enrichment_plot(
+      tcr_clone_cluster_enrichment,
+      file.path(
+        reverse_phenotype_result_dir(), "fig_clone_cluster_enrichment.pdf"
+      ),
+      highlight = "CD8TEM_3"
     ),
     format = "file"
   ),

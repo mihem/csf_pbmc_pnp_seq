@@ -214,6 +214,28 @@ select_gliph_enriched_clones <- function(sc_tcr,
   clones
 }
 
+#' Every clonotype in the object, flagged by whether it was selected.
+#'
+#' `match_clones_by_size()` draws its comparison set from the unselected rows of
+#' whatever it is given. Handing it the selected clones alone leaves nothing to
+#' match against, because every row there is selected by construction, and the
+#' composition then has no comparison arm at all. This builds the full universe
+#' so the matching has a pool to draw from.
+reverse_phenotype_clone_universe <- function(sc_tcr, clone_set) {
+  stopifnot(
+    inherits(sc_tcr, "Seurat"),
+    is.data.frame(clone_set),
+    "CTaa" %in% colnames(clone_set)
+  )
+  sc_tcr[[]] |>
+    dplyr::filter(!is.na(.data$CTaa)) |>
+    dplyr::count(.data$CTaa, name = "n_cells") |>
+    dplyr::mutate(
+      selected = .data$CTaa %in% clone_set$CTaa,
+      n_target = .data$n_cells
+    )
+}
+
 #' Size-matched comparison set for the enriched clones.
 #'
 #' Panel B asks whether disease-enriched clones sit in different clusters from
@@ -264,6 +286,70 @@ reverse_phenotype_cluster_composition <- function(sc_tcr, matched_clones) {
     dplyr::arrange(.data$clone_group, dplyr::desc(.data$fraction))
 }
 
+#' Per-cluster enrichment estimated over repeated size-matched draws.
+#'
+#' A single size-matched comparison set is one arbitrary draw. Small clusters
+#' can land at zero matched cells purely by that draw, which sends the exact
+#' odds ratio to infinity and makes the estimate look undefined when it is only
+#' unstable. CD8TEM_3 is exactly that case: 13 cells among disease-enriched
+#' clones and 0 in one particular matched draw.
+#'
+#' Repeating the match many times and reporting the distribution of the odds
+#' ratio across draws removes the artefact. The point estimate becomes the
+#' median across draws and the interval reports how much the matching itself
+#' moves it, which is the uncertainty a reader of the figure actually cares
+#' about.
+#'
+#' @param sc_tcr Seurat object carrying scRepertoire metadata.
+#' @param clone_set Selected clones, from `select_gliph_enriched_clones()`.
+#' @param all_clones One row per clonotype with `n_target` and `selected`.
+#' @param n_resamples Number of independent size-matched draws.
+#' @param seed Base seed; each draw uses `seed + index - 1`.
+#' @return Tibble of one row per cluster with the median odds ratio, the 2.5
+#'   and 97.5 percentiles across draws, and the median Fisher p-value.
+reverse_phenotype_cluster_enrichment_resampled <- function(sc_tcr,
+                                                           all_clones,
+                                                           n_resamples = 200L,
+                                                           seed = 42L) {
+  stopifnot(
+    inherits(sc_tcr, "Seurat"),
+    is.data.frame(all_clones),
+    all(c("CTaa", "n_target", "selected") %in% colnames(all_clones)),
+    n_resamples >= 1L
+  )
+
+  draws <- purrr::map_dfr(seq_len(n_resamples), function(index) {
+    matched <- match_clones_by_size(all_clones, seed = seed + index - 1L)
+    composition <- reverse_phenotype_cluster_composition(sc_tcr, matched)
+    reverse_phenotype_cluster_enrichment(composition, pool = NULL) |>
+      dplyr::mutate(draw = index)
+  })
+
+  draws |>
+    dplyr::group_by(.data$cluster) |>
+    dplyr::summarise(
+      n_draws = dplyr::n(),
+      n_enriched = stats::median(.data$n_enriched),
+      n_matched = stats::median(.data$n_matched),
+      draws_with_zero_matched = sum(.data$n_matched == 0L),
+      odds_ratio = stats::median(.data$odds_ratio_corrected),
+      ci_low = stats::quantile(
+        .data$odds_ratio_corrected, 0.025, names = FALSE, na.rm = TRUE
+      ),
+      ci_high = stats::quantile(
+        .data$odds_ratio_corrected, 0.975, names = FALSE, na.rm = TRUE
+      ),
+      p_value = stats::median(.data$p_value),
+      .groups = "drop"
+    ) |>
+    dplyr::mutate(
+      pooled = FALSE,
+      odds_ratio_corrected = .data$odds_ratio,
+      p_adj = stats::p.adjust(.data$p_value, "BH")
+    ) |>
+    dplyr::arrange(dplyr::desc(.data$odds_ratio))
+}
+
 #' Per-cluster odds ratio of carrying a disease-enriched clone.
 #'
 #' The stacked composition bars show where each set of cells sits, but reading
@@ -282,7 +368,7 @@ reverse_phenotype_cluster_composition <- function(sc_tcr, matched_clones) {
 #' @return Tibble of one row per cluster and per pooled set.
 reverse_phenotype_cluster_enrichment <- function(
     composition,
-    pool = list(CD8TEM_pooled = c("CD8TEM_1", "CD8TEM_2", "CD8TEM_3"))) {
+    pool = NULL) {
   stopifnot(
     is.data.frame(composition),
     all(c("clone_group", "cluster", "n_cells") %in% colnames(composition)),
@@ -698,7 +784,7 @@ write_cluster_enrichment_plot <- function(enrichment, path,
     # Plot the continuity-corrected estimate: CD8TEM_3 has no size-matched
     # cells, so its exact odds ratio is infinite and would drop the one cluster
     # this panel most needs to show. Open bounds are drawn as arrows.
-    dplyr::filter(.data$n_enriched + .data$n_matched > 0L) |>
+    dplyr::filter(.data$n_enriched > 0L) |>
     dplyr::arrange(dplyr::desc(.data$odds_ratio_corrected)) |>
     dplyr::mutate(
       cluster = factor(.data$cluster, levels = rev(.data$cluster)),
@@ -713,10 +799,13 @@ write_cluster_enrichment_plot <- function(enrichment, path,
         as.character(.data$cluster) == highlight ~ highlight,
         TRUE ~ "other"
       ),
-      # Keyed on the interval rather than the FDR: pooled sets are held out
-      # of the multiplicity family and carry p_adj = NA, which would otherwise
-      # draw the strongest estimate in the panel as non-significant.
-      excludes_one = .data$ci_low > 1 | .data$ci_high < 1
+      # Pooled sets are held out of the multiplicity family and carry
+      # p_adj = NA, so fall back to the interval for those rows only.
+      significant = dplyr::if_else(
+        is.na(.data$p_adj),
+        .data$ci_low > 1 | .data$ci_high < 1,
+        .data$p_adj < 0.05
+      )
     )
 
   plot <- ggplot2::ggplot(
@@ -729,7 +818,7 @@ write_cluster_enrichment_plot <- function(enrichment, path,
     ) +
     ggplot2::geom_point(
       ggplot2::aes(x = .data$odds_ratio_corrected, colour = .data$role,
-        shape = .data$excludes_one),
+        shape = .data$significant),
       size = 2.8
     ) +
     ggplot2::scale_x_log10() +
@@ -741,7 +830,7 @@ write_cluster_enrichment_plot <- function(enrichment, path,
       name = NULL
     ) +
     ggplot2::scale_shape_manual(
-      values = c(`TRUE` = 16, `FALSE` = 1), name = "95% CI excludes 1"
+      values = c(`TRUE` = 16, `FALSE` = 1), name = "FDR < 0.05"
     ) +
     ggplot2::theme_classic() +
     ggplot2::labs(
@@ -750,7 +839,7 @@ write_cluster_enrichment_plot <- function(enrichment, path,
       title = "Which clusters carry the disease-enriched clones",
       subtitle = paste(
         "Right of the line means over-represented among disease-enriched",
-        "clones.\nOpen intervals are unbounded"
+        "clones.\nEstimated over repeated size-matched draws"
       )
     )
   ggplot2::ggsave(path, plot = plot, width = 7.5, height = 5)

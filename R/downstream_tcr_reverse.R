@@ -307,10 +307,12 @@ reverse_phenotype_cluster_composition <- function(sc_tcr, matched_clones) {
 #' @param seed Base seed; each draw uses `seed + index - 1`.
 #' @return Tibble of one row per cluster with the median odds ratio, the 2.5
 #'   and 97.5 percentiles across draws, and the median Fisher p-value.
-reverse_phenotype_cluster_enrichment_resampled <- function(sc_tcr,
-                                                           all_clones,
-                                                           n_resamples = 200L,
-                                                           seed = 42L) {
+reverse_phenotype_cluster_enrichment_resampled <- function(
+    sc_tcr,
+    all_clones,
+    n_resamples = 200L,
+    seed = 42L,
+    pool = list(CD8TEM_pooled = c("CD8TEM_1", "CD8TEM_2", "CD8TEM_3"))) {
   stopifnot(
     inherits(sc_tcr, "Seurat"),
     is.data.frame(all_clones),
@@ -321,12 +323,12 @@ reverse_phenotype_cluster_enrichment_resampled <- function(sc_tcr,
   draws <- purrr::map_dfr(seq_len(n_resamples), function(index) {
     matched <- match_clones_by_size(all_clones, seed = seed + index - 1L)
     composition <- reverse_phenotype_cluster_composition(sc_tcr, matched)
-    reverse_phenotype_cluster_enrichment(composition, pool = NULL) |>
+    reverse_phenotype_cluster_enrichment(composition, pool = pool) |>
       dplyr::mutate(draw = index)
   })
 
   draws |>
-    dplyr::group_by(.data$cluster) |>
+    dplyr::group_by(.data$cluster, .data$pooled) |>
     dplyr::summarise(
       n_draws = dplyr::n(),
       n_enriched = stats::median(.data$n_enriched),
@@ -343,9 +345,15 @@ reverse_phenotype_cluster_enrichment_resampled <- function(sc_tcr,
       .groups = "drop"
     ) |>
     dplyr::mutate(
-      pooled = FALSE,
       odds_ratio_corrected = .data$odds_ratio,
-      p_adj = stats::p.adjust(.data$p_value, "BH")
+      # Pooled sets restate cells already counted in their members, so they are
+      # kept out of the multiplicity family rather than inflating it.
+      p_adj = {
+        adjusted <- rep(NA_real_, length(.data$p_value))
+        keep <- !.data$pooled
+        adjusted[keep] <- stats::p.adjust(.data$p_value[keep], "BH")
+        adjusted
+      }
     ) |>
     dplyr::arrange(dplyr::desc(.data$odds_ratio))
 }
@@ -775,8 +783,13 @@ write_clone_cluster_composition_plot <- function(composition, colors, path) {
 #'
 #' The companion to the stacked bars. Reads left to right as depleted to
 #' enriched, with the pooled CD8TEM estimate marked separately.
-write_cluster_enrichment_plot <- function(enrichment, path,
-                                          highlight = "CD8TEM_3") {
+write_cluster_enrichment_plot <- function(
+    enrichment, path,
+    highlight = c("CD8TEM_pooled", "CD8TEM_1", "CD8TEM_2", "CD8TEM_3", "CD4TEM"),
+    highlight_colors = c(
+      CD8TEM_pooled = "#1F78B4", CD8TEM_1 = "#E41A1C", CD8TEM_2 = "#FB9A99",
+      CD8TEM_3 = "#6A3D9A", CD4TEM = "#33A02C"
+    )) {
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
 
   stopifnot("odds_ratio_corrected" %in% colnames(enrichment))
@@ -794,10 +807,9 @@ write_cluster_enrichment_plot <- function(enrichment, path,
         max(.data$odds_ratio_corrected) * 3
       ),
       ci_low_plot = pmax(.data$ci_low, min(.data$odds_ratio_corrected) / 3),
-      role = dplyr::case_when(
-        .data$pooled ~ "CD8TEM pooled",
-        as.character(.data$cluster) == highlight ~ highlight,
-        TRUE ~ "other"
+      role = dplyr::if_else(
+        as.character(.data$cluster) %in% highlight,
+        as.character(.data$cluster), "other"
       ),
       # Pooled sets are held out of the multiplicity family and carry
       # p_adj = NA, so fall back to the interval for those rows only.
@@ -823,10 +835,8 @@ write_cluster_enrichment_plot <- function(enrichment, path,
     ) +
     ggplot2::scale_x_log10() +
     ggplot2::scale_colour_manual(
-      values = stats::setNames(
-        c("#E41A1C", "#377EB8", "grey30"),
-        c(highlight, "CD8TEM pooled", "other")
-      ),
+      values = c(highlight_colors[highlight], other = "grey35"),
+      breaks = c(highlight, "other"),
       name = NULL
     ) +
     ggplot2::scale_shape_manual(

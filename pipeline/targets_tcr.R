@@ -200,8 +200,7 @@ targets_tcr <- list(
       tcr_clone_cluster_enrichment,
       file.path(
         reverse_phenotype_result_dir(), "fig_clone_cluster_enrichment.pdf"
-      ),
-      highlight = "CD8TEM_3"
+      )
     ),
     format = "file"
   ),

@@ -84,16 +84,29 @@ targets_tcr <- list(
     )
   ),
   tar_target(
+    tcr_all_clones,
+    reverse_phenotype_clone_universe(sc_tcr, tcr_disease_enriched_clones)
+  ),
+  tar_target(
     tcr_size_matched_clones,
-    match_clones_by_size(tcr_disease_enriched_clones, seed = 42L)
+    match_clones_by_size(tcr_all_clones, seed = 42L)
   ),
   tar_target(
     tcr_clone_cluster_composition,
     reverse_phenotype_cluster_composition(sc_tcr, tcr_size_matched_clones)
   ),
+  # Estimated over repeated size-matched draws. A single draw is one
+  # arbitrary sample: CD8TEM_3 lands at zero matched cells in 7 of 20 draws,
+  # which sends its odds ratio to infinity and its p-value from 0.003 to 0.31
+  # depending only on the seed.
   tar_target(
     tcr_clone_cluster_enrichment,
-    reverse_phenotype_cluster_enrichment(tcr_clone_cluster_composition)
+    reverse_phenotype_cluster_enrichment_resampled(
+      sc_tcr,
+      tcr_all_clones,
+      n_resamples = 200L,
+      seed = 42L
+    )
   ),
   # The contrast runs over the CD8 effector clusters rather than CD8TEM_3
   # alone. The selected clones sit in CD8TEM_1, and inside CD8TEM_3 no patient
@@ -210,6 +223,47 @@ targets_tcr <- list(
       file.path(
         reverse_phenotype_result_dir(), "fig_reverse_phenotype_panel.pdf"
       )
+    ),
+    format = "file"
+  ),
+  # Brain revision, Reviewer 4 comment 5: whether clones from a systemic trigger
+  # are detectable in blood at all. Figure 5C cannot answer this because it is
+  # computed only over clones already found in both compartments.
+  tar_target(
+    tcr_blood_expansion,
+    blood_clonal_expansion(sc_tcr, top_n = 10L, min_cells = 50L)
+  ),
+  tar_target(
+    tcr_blood_expansion_summary,
+    blood_expansion_summary(tcr_blood_expansion)
+  ),
+  tar_target(
+    tcr_blood_expansion_file,
+    write_blood_expansion_workbook(
+      tcr_blood_expansion,
+      tcr_blood_expansion_summary,
+      file.path(tcr_blood_result_dir(), "blood_clonal_expansion.xlsx")
+    ),
+    format = "file"
+  ),
+  tar_target(
+    tcr_blood_expansion_plot_file,
+    write_blood_expansion_plot(
+      tcr_blood_expansion,
+      sc_tcr@misc$diagnosis_col,
+      file.path(tcr_blood_result_dir(), "fig_blood_clonal_expansion.pdf"),
+      seed = 42L
+    ),
+    format = "file"
+  ),
+  tar_target(
+    tcr_blood_expansion_gbs_plot_file,
+    write_blood_expansion_plot(
+      tcr_blood_expansion,
+      sc_tcr@misc$diagnosis_col,
+      file.path(tcr_blood_result_dir(), "fig_blood_clonal_expansion_gbs.pdf"),
+      diagnoses = c("CTRL", "CIAP", "GBS", "CIDP"),
+      seed = 42L
     ),
     format = "file"
   )

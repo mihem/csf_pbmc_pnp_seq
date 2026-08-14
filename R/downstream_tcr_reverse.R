@@ -783,16 +783,17 @@ write_clone_cluster_composition_plot <- function(composition, colors, path) {
 #'
 #' The companion to the stacked bars. Reads left to right as depleted to
 #' enriched, with the pooled CD8TEM estimate marked separately.
-write_cluster_enrichment_plot <- function(
-    enrichment, path,
-    highlight = c("CD8TEM_pooled", "CD8TEM_1", "CD8TEM_2", "CD8TEM_3", "CD4TEM"),
-    highlight_colors = c(
-      CD8TEM_pooled = "#1F78B4", CD8TEM_1 = "#E41A1C", CD8TEM_2 = "#FB9A99",
-      CD8TEM_3 = "#6A3D9A", CD4TEM = "#33A02C"
-    )) {
+write_cluster_enrichment_plot <- function(enrichment, colors, path,
+                                          show_pooled = FALSE) {
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
 
   stopifnot("odds_ratio_corrected" %in% colnames(enrichment))
+  # Pooled sets restate cells already counted in their members, so showing them
+  # beside the individual clusters mixes two units on one axis. They stay in the
+  # returned table and the workbook either way.
+  if (!show_pooled) {
+    enrichment <- dplyr::filter(enrichment, !.data$pooled)
+  }
   data <- enrichment |>
     # Plot the continuity-corrected estimate: CD8TEM_3 has no size-matched
     # cells, so its exact odds ratio is infinite and would drop the one cluster
@@ -807,10 +808,6 @@ write_cluster_enrichment_plot <- function(
         max(.data$odds_ratio_corrected) * 3
       ),
       ci_low_plot = pmax(.data$ci_low, min(.data$odds_ratio_corrected) / 3),
-      role = dplyr::if_else(
-        as.character(.data$cluster) %in% highlight,
-        as.character(.data$cluster), "other"
-      ),
       # Pooled sets are held out of the multiplicity family and carry
       # p_adj = NA, so fall back to the interval for those rows only.
       significant = dplyr::if_else(
@@ -829,15 +826,17 @@ write_cluster_enrichment_plot <- function(
       height = 0.25, colour = "grey45"
     ) +
     ggplot2::geom_point(
-      ggplot2::aes(x = .data$odds_ratio_corrected, colour = .data$role,
+      ggplot2::aes(x = .data$odds_ratio_corrected, colour = .data$cluster,
         shape = .data$significant),
       size = 2.8
     ) +
     ggplot2::scale_x_log10() +
+    # The study cluster palette, so a reader recognises the same colours here as
+    # in every other panel. A pooled row has no entry in that palette, so it
+    # falls back to grey. The legend is suppressed because the y axis already
+    # names every cluster.
     ggplot2::scale_colour_manual(
-      values = c(highlight_colors[highlight], other = "grey35"),
-      breaks = c(highlight, "other"),
-      name = NULL
+      values = colors, na.value = "grey35", guide = "none"
     ) +
     ggplot2::scale_shape_manual(
       values = c(`TRUE` = 16, `FALSE` = 1), name = "FDR < 0.05"

@@ -198,6 +198,7 @@ targets_tcr <- list(
     tcr_clone_cluster_enrichment_plot_file,
     write_cluster_enrichment_plot(
       tcr_clone_cluster_enrichment,
+      sc_tcr@misc$cluster_col,
       file.path(
         reverse_phenotype_result_dir(), "fig_clone_cluster_enrichment.pdf"
       )

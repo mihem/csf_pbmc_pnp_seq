@@ -498,17 +498,77 @@ write_tcr_shared_clone_plots <- function(sc_tcr, lookup, tables) {
       caption = "Small points: clonotypes; large points and fit: patient means"
     ) +
     ggplot2::theme_classic()
+
+  protein_clone_data <- tables$shared_clones_csf_pbmc_abundance |>
+    dplyr::left_join(
+      dplyr::select(lookup, "patient", "csf_protein"),
+      by = "patient"
+    ) |>
+    dplyr::filter(!is.na(.data$csf_protein))
+  protein_data <- protein_clone_data |>
+    dplyr::group_by(.data$patient, .data$diagnosis, .data$csf_protein) |>
+    dplyr::summarise(log2_ratio = mean(.data$log2_ratio), .groups = "drop")
+  protein_test <- stats::cor.test(
+    protein_data$csf_protein,
+    protein_data$log2_ratio,
+    method = "spearman",
+    exact = FALSE
+  )
+  protein_subtitle <- sprintf(
+    "Patient-level Spearman rho = %.2f, p = %.2g, n = %d",
+    unname(protein_test$estimate), protein_test$p.value, nrow(protein_data)
+  )
+  protein_plot <- ggplot2::ggplot() +
+    ggplot2::geom_point(
+      data = protein_clone_data,
+      ggplot2::aes(
+        x = .data$csf_protein,
+        y = .data$log2_ratio,
+        color = .data$diagnosis
+      ),
+      size = 1,
+      alpha = 0.5,
+      position = ggplot2::position_jitter(width = 10, height = 0, seed = 42L)
+    ) +
+    ggplot2::geom_point(
+      data = protein_data,
+      ggplot2::aes(
+        x = .data$csf_protein,
+        y = .data$log2_ratio,
+        color = .data$diagnosis
+      ),
+      size = 2.5
+    ) +
+    ggplot2::geom_smooth(
+      data = protein_data,
+      ggplot2::aes(
+        x = .data$csf_protein,
+        y = .data$log2_ratio,
+        group = 1
+      ),
+      method = "lm", se = TRUE, linewidth = 0.5, color = "black"
+    ) +
+    ggplot2::scale_color_manual(values = sc_tcr@misc$diagnosis_col) +
+    ggplot2::labs(
+      x = "CSF protein (mg/L)",
+      y = "log2(CSF / blood frequency)",
+      subtitle = protein_subtitle,
+      caption = "Small points: clonotypes; large points and fit: patient means"
+    ) +
+    ggplot2::theme_classic()
   paths <- file.path(
     root,
     c(
       "tcr_shared_clones_summary.pdf",
       "shared_clones_enrichment_ratio_expanded.pdf",
-      "shared_clones_disease_duration_correlation.pdf"
+      "shared_clones_disease_duration_correlation.pdf",
+      "shared_clones_csf_protein_correlation.pdf"
     )
   )
   ggplot2::ggsave(paths[[1L]], shared_plot, width = 5, height = 5)
   ggplot2::ggsave(paths[[2L]], enrichment_plot, width = 5, height = 3)
   ggplot2::ggsave(paths[[3L]], duration_plot, width = 5, height = 3)
+  ggplot2::ggsave(paths[[4L]], protein_plot, width = 5, height = 3)
   paths
 }
 

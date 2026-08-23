@@ -391,7 +391,7 @@ write_tcr_basic_plots <- function(combined_tcr, sc_tcr, seed = 42L) {
   )
 }
 
-write_tcr_shared_clone_plots <- function(sc_tcr, tables) {
+write_tcr_shared_clone_plots <- function(sc_tcr, lookup, tables) {
   root <- tcr_result_dir()
   dir.create(root, recursive = TRUE, showWarnings = FALSE)
   summary <- tables$shared_clones_summary
@@ -437,12 +437,78 @@ write_tcr_shared_clone_plots <- function(sc_tcr, tables) {
     ) +
     ggplot2::theme_classic() +
     ggplot2::theme(legend.position = "none")
+
+  duration_clone_data <- tables$shared_clones_csf_pbmc_abundance |>
+    dplyr::left_join(
+      dplyr::select(lookup, "patient", "disease_duration_in_months"),
+      by = "patient"
+    ) |>
+    dplyr::filter(.data$disease_duration_in_months > 0)
+  duration_data <- duration_clone_data |>
+    dplyr::group_by(
+      .data$patient, .data$diagnosis, .data$disease_duration_in_months
+    ) |>
+    dplyr::summarise(log2_ratio = mean(.data$log2_ratio), .groups = "drop")
+  duration_test <- stats::cor.test(
+    duration_data$disease_duration_in_months,
+    duration_data$log2_ratio,
+    method = "spearman",
+    exact = FALSE
+  )
+  duration_subtitle <- sprintf(
+    "Patient-level Spearman rho = %.2f, p = %.2g, n = %d",
+    unname(duration_test$estimate), duration_test$p.value, nrow(duration_data)
+  )
+  duration_plot <- ggplot2::ggplot() +
+    ggplot2::geom_point(
+      data = duration_clone_data,
+      ggplot2::aes(
+        x = .data$disease_duration_in_months,
+        y = .data$log2_ratio,
+        color = .data$diagnosis
+      ),
+      size = 1,
+      alpha = 0.5,
+      position = ggplot2::position_jitter(width = 0.06, height = 0, seed = 42L)
+    ) +
+    ggplot2::geom_point(
+      data = duration_data,
+      ggplot2::aes(
+        x = .data$disease_duration_in_months,
+        y = .data$log2_ratio,
+        color = .data$diagnosis
+      ),
+      size = 2.5
+    ) +
+    ggplot2::geom_smooth(
+      data = duration_data,
+      ggplot2::aes(
+        x = .data$disease_duration_in_months,
+        y = .data$log2_ratio,
+        group = 1
+      ),
+      method = "lm", se = TRUE, linewidth = 0.5, color = "black"
+    ) +
+    ggplot2::scale_x_log10() +
+    ggplot2::scale_color_manual(values = sc_tcr@misc$diagnosis_col) +
+    ggplot2::labs(
+      x = "Disease duration (months, log scale)",
+      y = "log2(CSF / blood frequency)",
+      subtitle = duration_subtitle,
+      caption = "Small points: clonotypes; large points and fit: patient means"
+    ) +
+    ggplot2::theme_classic()
   paths <- file.path(
     root,
-    c("tcr_shared_clones_summary.pdf", "shared_clones_enrichment_ratio_expanded.pdf")
+    c(
+      "tcr_shared_clones_summary.pdf",
+      "shared_clones_enrichment_ratio_expanded.pdf",
+      "shared_clones_disease_duration_correlation.pdf"
+    )
   )
   ggplot2::ggsave(paths[[1L]], shared_plot, width = 5, height = 5)
   ggplot2::ggsave(paths[[2L]], enrichment_plot, width = 5, height = 3)
+  ggplot2::ggsave(paths[[3L]], duration_plot, width = 5, height = 3)
   paths
 }
 

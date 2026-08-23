@@ -20,7 +20,7 @@ targets_tcr <- list(
   ),
   tar_target(
     tcr_shared_clone_plot_files,
-    write_tcr_shared_clone_plots(sc_tcr, tcr_report_tables),
+    write_tcr_shared_clone_plots(sc_tcr, lookup, tcr_report_tables),
     format = "file"
   ),
   tar_target(

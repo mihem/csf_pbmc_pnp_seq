@@ -50,7 +50,6 @@ tar_option_set(
     "pals",
     "purrr",
     "qs",
-    "rcna",
     "readr",
     "readxl",
     "scRepertoire",

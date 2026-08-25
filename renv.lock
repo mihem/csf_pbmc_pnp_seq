@@ -5947,32 +5947,6 @@
       ],
       "Hash": "dfc034a172fd88fc66b1a703894c4185"
     },
-    "rcna": {
-      "Package": "rcna",
-      "Version": "0.0.99",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteRepo": "rcna",
-      "RemoteUsername": "korsunskylab",
-      "RemoteRef": "HEAD",
-      "RemoteSha": "e3683c55e4fdb8a3dc55aaeab8735922e360609d",
-      "Requirements": [
-        "Matrix",
-        "R",
-        "RSpectra",
-        "dplyr",
-        "ggplot2",
-        "ggthemes",
-        "glue",
-        "moments",
-        "patchwork",
-        "purrr",
-        "rlang",
-        "tibble"
-      ],
-      "Hash": "0e0b97138e178e6d3c759144a2dda2c5"
-    },
     "readr": {
       "Package": "readr",
       "Version": "2.1.5",

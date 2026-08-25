@@ -1,6 +1,6 @@
 services:
   csf_pbmc_pnp_seq:
-    image: mihem/csf_pbmc_pnp_seq:v0.6
+    image: mihem/csf_pbmc_pnp_seq:v0.7
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-100}"
     working_dir: /csf_pbmc_pnp_seq
     environment:
@@ -18,7 +18,7 @@ services:
     restart: "no"
 
   dag:
-    image: mihem/csf_pbmc_pnp_seq:v0.6
+    image: mihem/csf_pbmc_pnp_seq:v0.7
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-100}"
     working_dir: /csf_pbmc_pnp_seq
     environment:

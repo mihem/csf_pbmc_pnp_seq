@@ -5,12 +5,12 @@ if (!exists("prepare_flow_data", mode = "function")) {
 targets_flow <- list(
   targets::tar_target(
     flow_raw_file,
-    file.path("raw", "flow", "flowbasic_v7.xlsx"),
+    file.path("raw", "flow", "flowbasic_v8_anonymized.xlsx"),
     format = "file"
   ),
   targets::tar_target(
     flow_frontiers_lookup_file,
-    file.path("raw", "flow", "cidp_stats_safe.xls"),
+    file.path("raw", "flow", "cidp_stats_safe_anonymized.xlsx"),
     format = "file"
   ),
   targets::tar_target(

@@ -26,120 +26,57 @@ read_flow_seed_lookup <- function(path) {
 }
 
 read_flow_frontiers_lookup <- function(path) {
-  readxl::read_excel(path) |>
-    dplyr::select(
-      name, id, date...6, birth, dx, age, sex, protein, disruption:lac
-    ) |>
+  required <- c(
+    "frontiers_id", "measure_date", "dx", "age", "sex", "protein",
+    "lymphos_pct", "monos_pct", "tcells_pct", "cd4cells_pct",
+    "cd8cells_pct", "bcells_pct", "nkcells_pct", "nktcells_pct",
+    "cd4cellshladr_pct", "cd8cellshladr_pct", "plasmacells_pct",
+    "monosclassical_pct", "monosatypical_pct", "nkcellsbright_pct",
+    "nkcellsdim_pct"
+  )
+  lookup <- readxl::read_excel(path)
+  stopifnot(all(required %in% names(lookup)))
+  lookup <- lookup |>
+    dplyr::select(tidyselect::all_of(required)) |>
     dplyr::mutate(
-      measure_date = suppressWarnings(lubridate::dmy(date...6)),
-      birth_date = suppressWarnings(lubridate::dmy(birth))
+      measure_date = as.Date(.data$measure_date)
     ) |>
     dplyr::filter(dx %in% c("CIDP", "IIH", "GBS")) |>
     dplyr::mutate(
       dx = dplyr::if_else(dx == "IIH", "CTRL", dx),
       sex = dplyr::if_else(sex == "M", "male", "female")
-    ) |>
-    tidyr::separate_wider_delim(
-      name, delim = ", ", names = c("last_name", "first_name")
-    ) |>
-    dplyr::mutate(
-      first_name_letter = substring(first_name, 1L, 1L),
-      last_name_letter = substring(last_name, 1L, 1L),
-      id = as.numeric(id)
     )
+  stopifnot(
+    !anyNA(lookup$frontiers_id),
+    !anyDuplicated(lookup$frontiers_id),
+    !anyNA(lookup$measure_date)
+  )
+  lookup
 }
 
 prepare_flow_frontiers <- function(flow_raw, frontiers_lookup) {
   flow_frontiers <- flow_raw |>
-    dplyr::filter(cohort == "frontiers") |>
-    dplyr::select(-measure_date) |>
-    tidyr::separate_wider_regex(
-      flow_file_name,
-      patterns = c(
-        last_name_letter = "^[A-Za-z]",
-        first_name_letter = "[A-Za-z]",
-        birth_date = "\\d{8}",
-        extra = ".*",
-        measure_date = "20\\d{2}-\\d{2}-\\d{2}",
-        extra2 = ".*"
-      ),
-      cols_remove = FALSE
+    dplyr::filter(cohort == "frontiers")
+  matched <- flow_frontiers |>
+    dplyr::filter(!is.na(.data$frontiers_id)) |>
+    dplyr::inner_join(
+      frontiers_lookup,
+      by = "frontiers_id",
+      relationship = "many-to-one",
+      suffix = c("_flow", "_lookup")
     ) |>
     dplyr::mutate(
-      birth_date1 = suppressWarnings(lubridate::dmy(birth_date)),
-      birth_date2 = suppressWarnings(lubridate::mdy(birth_date)),
-      birth_date = dplyr::coalesce(birth_date1, birth_date2),
-      measure_date = lubridate::ymd(measure_date)
+      id = .data$frontiers_id,
+      patient = NA_character_,
+      measure_date = as.Date(.data$measure_date_flow),
+      match_level = "frontiers_id"
     ) |>
-    dplyr::select(-extra, -extra2, -birth_date1, -birth_date2)
-
-  matched_1 <- flow_frontiers |>
-    dplyr::inner_join(
-      frontiers_lookup,
-      dplyr::join_by(
-        first_name_letter, last_name_letter, birth_date, measure_date
-      ),
-      suffix = c("_flow", "_lookup")
-    ) |>
-    dplyr::mutate(match_level = "all_four")
-  unmatched_1 <- flow_frontiers |>
-    dplyr::anti_join(
-      frontiers_lookup,
-      dplyr::join_by(
-        first_name_letter, last_name_letter, birth_date, measure_date
-      )
-    )
-
-  matched_2 <- unmatched_1 |>
-    dplyr::inner_join(
-      frontiers_lookup,
-      dplyr::join_by(first_name_letter, birth_date, measure_date),
-      suffix = c("_flow", "_lookup")
-    ) |>
-    dplyr::mutate(match_level = "three_no_last")
-  unmatched_2 <- unmatched_1 |>
-    dplyr::anti_join(
-      frontiers_lookup,
-      dplyr::join_by(first_name_letter, birth_date, measure_date)
-    )
-
-  matched_3 <- unmatched_2 |>
-    dplyr::inner_join(
-      dplyr::select(frontiers_lookup, -measure_date, -last_name_letter),
-      dplyr::join_by(first_name_letter, birth_date),
-      suffix = c("_flow", "_lookup")
-    ) |>
-    dplyr::mutate(match_level = "two_name_birth")
-  unmatched_3 <- unmatched_2 |>
-    dplyr::anti_join(
-      frontiers_lookup,
-      dplyr::join_by(first_name_letter, birth_date)
-    )
-
-  matched_4 <- unmatched_3 |>
-    dplyr::inner_join(
-      dplyr::select(frontiers_lookup, -birth_date, -last_name_letter),
-      dplyr::join_by(first_name_letter, measure_date),
-      suffix = c("_flow", "_lookup")
-    ) |>
-    dplyr::mutate(match_level = "two_name_date")
-  unmatched_4 <- unmatched_3 |>
-    dplyr::anti_join(
-      frontiers_lookup,
-      dplyr::join_by(first_name_letter, measure_date)
-    )
-
-  matched <- dplyr::bind_rows(matched_1, matched_2, matched_3, matched_4) |>
     dplyr::rename(diagnosis = dx)
+  unmatched <- flow_frontiers |>
+    dplyr::filter(is.na(.data$frontiers_id))
   summary <- tibble::tibble(
-    match_level = c(
-      "all_four", "three_no_last", "two_name_birth", "two_name_date",
-      "unmatched"
-    ),
-    records = c(
-      nrow(matched_1), nrow(matched_2), nrow(matched_3), nrow(matched_4),
-      nrow(unmatched_4)
-    )
+    match_level = c("frontiers_id", "unmatched"),
+    records = c(nrow(matched), nrow(unmatched))
   )
   stopifnot(nrow(matched) > 0L, sum(summary$records) == nrow(flow_frontiers))
   list(matched = matched, summary = summary)
@@ -147,7 +84,6 @@ prepare_flow_frontiers <- function(flow_raw, frontiers_lookup) {
 
 prepare_flow_data <- function(flow_file, frontiers_file, seed_lookup) {
   flow_raw <- readxl::read_excel(flow_file)
-  frontiers_raw <- readxl::read_excel(frontiers_file)
   frontiers_lookup <- read_flow_frontiers_lookup(frontiers_file)
   frontiers <- prepare_flow_frontiers(flow_raw, frontiers_lookup)
 
@@ -163,7 +99,8 @@ prepare_flow_data <- function(flow_file, frontiers_file, seed_lookup) {
     dplyr::mutate(
       diagnosis = factor(diagnosis, levels = flow_diagnosis_order()),
       id = as.character(id),
-      patient_id = dplyr::coalesce(patient, id)
+      patient_id = dplyr::coalesce(patient, id),
+      patient = patient_id
     ) |>
     dplyr::distinct(patient_id, tissue, .keep_all = TRUE)
   stopifnot(
@@ -179,44 +116,21 @@ prepare_flow_data <- function(flow_file, frontiers_file, seed_lookup) {
   list(
     flow = flow,
     gating_comparison = make_flow_gating_comparison(
-      flow_raw, frontiers_raw, frontiers$matched
+      flow_raw, frontiers_lookup
     ),
     match_summary = frontiers$summary
   )
 }
 
-make_flow_gating_comparison <- function(flow_raw, frontiers_raw, flow_matched) {
-  flow_louisa <- flow_matched |>
-    dplyr::filter(tissue == "CSF") |>
-    dplyr::inner_join(dplyr::select(flow_raw, flow_file_name, Gran:intMono))
-  flow_andi <- frontiers_raw |>
-    dplyr::mutate(
-      measure_date = suppressWarnings(lubridate::dmy(date...6)),
-      birth_date = suppressWarnings(lubridate::dmy(birth))
-    ) |>
-    dplyr::filter(dx %in% c("CIDP", "IIH", "GBS")) |>
-    dplyr::mutate(
-      dx = dplyr::if_else(dx == "IIH", "CTRL", dx),
-      sex = dplyr::if_else(sex == "M", "male", "female")
-    ) |>
-    tidyr::separate_wider_delim(
-      name, delim = ", ", names = c("last_name", "first_name")
-    ) |>
-    dplyr::mutate(
-      first_name_letter = substring(first_name, 1L, 1L),
-      last_name_letter = substring(last_name, 1L, 1L)
-    ) |>
-    dplyr::select(
-      measure_date, birth_date, first_name_letter, last_name_letter,
-      id, dx, age, sex, protein, disruption:cd4cd8ratio
-    ) |>
-    dplyr::mutate(tissue = "CSF") |>
-    dplyr::select(
-      -dplyr::contains("_abs"), -cd45cells_pct, -cd4cd8cells_pct,
-      -tcellshladr_pct, -nkcellshladr_pct, -cd4cd8ratio
-    ) |>
+make_flow_gating_comparison <- function(flow_raw, frontiers_lookup) {
+  flow_louisa <- flow_raw |>
+    dplyr::filter(
+      .data$cohort == "frontiers", .data$tissue == "CSF",
+      !is.na(.data$frontiers_id)
+    )
+  flow_andi <- frontiers_lookup |>
     dplyr::rename(
-      patient = id, diagnosis = dx, Lymph = lymphos_pct, Mono = monos_pct,
+      diagnosis = dx, Lymph = lymphos_pct, Mono = monos_pct,
       T = tcells_pct, CD4 = cd4cells_pct, CD8 = cd8cells_pct,
       B = bcells_pct, NK = nkcells_pct, NKT = nktcells_pct,
       actCD4 = cd4cellshladr_pct, actCD8 = cd8cellshladr_pct,
@@ -229,18 +143,16 @@ make_flow_gating_comparison <- function(flow_raw, frontiers_raw, flow_matched) {
   flow_vars <- intersect(flow_vars, names(flow_andi))
   comparison <- flow_louisa |>
     dplyr::select(
-      flow_file_name, diagnosis, first_name_letter, last_name_letter,
-      birth_date, measure_date, dplyr::all_of(flow_vars)
+      flow_record_id, frontiers_id, measure_date_flow = measure_date,
+      dplyr::all_of(flow_vars)
     ) |>
     dplyr::inner_join(
       dplyr::select(
-        flow_andi, first_name_letter, last_name_letter, birth_date,
-        measure_date, dplyr::all_of(flow_vars)
+        flow_andi, frontiers_id, diagnosis,
+        measure_date_lookup = measure_date, dplyr::all_of(flow_vars)
       ),
-      by = c(
-        "first_name_letter", "last_name_letter", "birth_date", "measure_date"
-      ),
-      suffix = c("_louisa", "_andi")
+      by = "frontiers_id", suffix = c("_louisa", "_andi"),
+      relationship = "many-to-one"
     )
   for (variable in flow_vars) {
     comparison[[paste0(variable, "_diff")]] <-
@@ -251,8 +163,8 @@ make_flow_gating_comparison <- function(flow_raw, frontiers_raw, flow_matched) {
       comparison[[paste0(variable, "_andi")]]
   }
   id_columns <- c(
-    "flow_file_name", "diagnosis", "first_name_letter", "last_name_letter",
-    "birth_date", "measure_date"
+    "flow_record_id", "frontiers_id", "diagnosis",
+    "measure_date_flow", "measure_date_lookup"
   )
   value_columns <- unlist(lapply(flow_vars, function(variable) {
     paste0(

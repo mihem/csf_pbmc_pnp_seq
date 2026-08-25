@@ -2,7 +2,7 @@ targets_tables <- list(
   tar_target(
     scrna_overview_table_file,
     write_scrna_overview_table(
-      lookup,
+      lookup_model,
       file.path(table_result_dir(), "overview_table.xlsx")
     ),
     format = "file"

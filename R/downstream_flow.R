@@ -16,7 +16,8 @@ flow_diagnosis_colors <- function() {
 read_flow_seed_lookup <- function(path) {
   lookup <- readxl::read_excel(path) |>
     janitor::clean_names() |>
-    dplyr::select(patient, pseudonym, cohort, sex, age, diagnosis)
+    dplyr::filter(!is.na(.data$patient)) |>
+    dplyr::select(patient, pseudonym, sex, age, diagnosis)
   stopifnot(
     !anyDuplicated(lookup$patient),
     !anyNA(lookup$patient),

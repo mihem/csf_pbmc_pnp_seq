@@ -19,7 +19,7 @@ targets_deg <- tarchetypes::tar_map(
     deg_cluster_result,
     run_deg_limma(
       deg_cluster_pseudobulk[[deg_cluster_name]],
-      lookup,
+      lookup_model,
       condition_1,
       condition_2
     ),
@@ -32,7 +32,7 @@ targets_deg <- tarchetypes::tar_map(
   ),
   targets::tar_target(
     deg_combined_result,
-    run_deg_combined(deg_subset, lookup, condition_1, condition_2)
+    run_deg_combined(deg_subset, lookup_model, condition_1, condition_2)
   ),
   targets::tar_target(
     deg_eligibility,

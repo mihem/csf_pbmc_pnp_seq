@@ -21,7 +21,9 @@ targets_demographics <- list(
   ),
   targets::tar_target(
     demographics_scrna_files,
-    write_scrna_demographics(lookup, sc_annotated@misc$diagnosis_col, 123L),
+    write_scrna_demographics(
+      lookup_demographics, sc_annotated@misc$diagnosis_col, 123L
+    ),
     format = "file"
   ),
   targets::tar_target(

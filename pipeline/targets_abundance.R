@@ -100,7 +100,7 @@ targets_abundance <- list(
     abundance_propeller_results,
     run_abundance_propeller(
       abundance_object,
-      lookup,
+      lookup_model,
       abundance_comparison_config,
       seed = 123L,
       n_perms = 1000L

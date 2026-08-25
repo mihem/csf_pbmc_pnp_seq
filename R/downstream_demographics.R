@@ -110,7 +110,7 @@ write_demographics_plot <- function(plot, name, width, height, seed = 123L) {
 }
 
 write_scrna_demographics <- function(lookup, diagnosis_colors, seed = 123L) {
-  data <- dplyr::filter(lookup, grepl("scRNA", .data$cohort))
+  data <- lookup
   boxes <- demographics_boxplot_config()
   bars <- demographics_barplot_config()
   box_files <- vapply(seq_len(nrow(boxes)), function(index) {

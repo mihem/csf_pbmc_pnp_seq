@@ -4,9 +4,10 @@ lookup_columns <- function() {
     "group", "group2", "diagnosis", "diagnosis_detail",
     "ean_2021_clinical", "ean_2021_level", "brighton_level",
     "other_relevant_diagnosis", "immunomodulators", "therapy",
-    "nerve_frozen", "comment", "symptoms", "disease_duration_in_months",
+    "comment", "symptoms", "disease_duration_in_months",
     "cell_count", "lymphocytes_count", "granulocytes_count",
-    "erythrocytes_count", "ig_g_synthesis", "csf_protein", "bbbd",
+    "erythrocytes_count", "ig_g_synthesis", "csf_protein",
+    "albumin_quotient", "bbbd",
     "csf_ocb", "glucose_csf", "glucose_ratio", "lactate_csf",
     "incat_at_lumbar_puncture", "incat_follow_up",
     "onls_at_lumbar_puncture", "onls_follow_up",
@@ -26,9 +27,9 @@ lookup_columns <- function() {
 }
 
 clean_lookup <- function(path) {
-  readxl::read_excel(path) |>
+  lookup <- readxl::read_excel(path) |>
     janitor::clean_names() |>
-    dplyr::filter(cohort %in% c("scRNA", "scRNA_flow")) |>
+    dplyr::filter(grepl("^scRNA", .data$cohort)) |>
     dplyr::mutate(
       incat_progress =
         (incat_follow_up - incat_at_lumbar_puncture) / follow_up,
@@ -46,9 +47,21 @@ clean_lookup <- function(path) {
           "MFS", "PNC", "CAN", "PPN"
         )
       ),
+      disease_duration_in_months = as.numeric(
+        .data$disease_duration_in_months
+      ),
+      albumin_quotient = as.numeric(.data$albumin_quotient),
       dplyr::across(dml_median_motoric:ncv_sural_sensory, as.numeric)
     ) |>
     dplyr::select(tidyselect::all_of(lookup_columns()))
+  albumin <- stats::na.omit(lookup$albumin_quotient)
+  stopifnot(
+    !anyDuplicated(lookup$patient),
+    is.numeric(lookup$albumin_quotient),
+    all(is.finite(albumin)),
+    all(albumin > 0)
+  )
+  lookup
 }
 
 project_lookup <- function(lookup, columns) {

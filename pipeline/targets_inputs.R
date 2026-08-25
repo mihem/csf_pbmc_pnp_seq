@@ -85,5 +85,42 @@ targets_inputs <- list(
       )
     )
   ),
+  tar_target(
+    lookup_correlation,
+    project_lookup(
+      lookup,
+      unique(c("patient", "sex", "age", correlation_scores()))
+    )
+  ),
+  tar_target(
+    lookup_severity,
+    project_lookup(
+      lookup, c("patient", "diagnosis", "incat_at_lumbar_puncture")
+    )
+  ),
+  tar_target(
+    lookup_tcr_shared,
+    project_lookup(
+      lookup,
+      c("patient", "disease_duration_in_months", "csf_protein")
+    )
+  ),
+  tar_target(
+    lookup_albumin,
+    project_lookup(
+      lookup, c("patient", "albumin_quotient")
+    )
+  ),
+  tar_target(
+    lookup_demographics,
+    project_lookup(
+      lookup,
+      c(
+        "patient", "diagnosis", "sex", "age", "ncv_tibial_motoric",
+        "incat_at_lumbar_puncture", "incat_progress",
+        "disease_duration_in_months", "csf_protein", "therapy", "bbbd"
+      )
+    )
+  ),
   tar_target(donor_assignments, read_donor_assignments(rna_manifest, rna_files))
 )

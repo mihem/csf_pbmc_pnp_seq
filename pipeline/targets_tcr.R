@@ -3,7 +3,9 @@ targets_tcr <- list(
   tar_target(tcr_files, tcr_input_files(tcr_manifest), format = "file"),
   tar_target(
     tcr_contigs,
-    import_tcr_contigs(tcr_manifest, tcr_files, donor_assignments, lookup)
+    import_tcr_contigs(
+      tcr_manifest, tcr_files, donor_assignments, lookup_identity
+    )
   ),
   tar_target(combined_tcr, combine_tcr_contigs(tcr_contigs)),
   tar_target(sc_tcr, annotate_tcr_cells(sc_annotated, combined_tcr)),
@@ -20,7 +22,16 @@ targets_tcr <- list(
   ),
   tar_target(
     tcr_shared_clone_plot_files,
-    write_tcr_shared_clone_plots(sc_tcr, lookup, tcr_report_tables),
+    write_tcr_shared_clone_plots(
+      sc_tcr, lookup_tcr_shared, tcr_report_tables
+    ),
+    format = "file"
+  ),
+  tar_target(
+    tcr_albumin_quotient_plot_file,
+    write_tcr_albumin_quotient_plot(
+      sc_tcr, lookup_albumin, tcr_report_tables
+    ),
     format = "file"
   ),
   tar_target(

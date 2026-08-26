@@ -10,7 +10,7 @@
 !config/analysis.yml
 !_targets.R
 !renv.lock
-!Dockerfile
+!Dockerfile*
 !docker-compose.yml
 !.dockerignore
 !.gitignore

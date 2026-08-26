@@ -1,5 +1,5 @@
 # Keep the build context small. Data, results, target objects, and local R
 # libraries are mounted or generated at runtime, never copied into the image.
 **
-!Dockerfile
+!Dockerfile*
 !renv.lock

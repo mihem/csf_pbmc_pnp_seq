@@ -35,6 +35,13 @@ targets_tcr <- list(
     format = "file"
   ),
   tar_target(
+    tcr_csf_cell_count_plot_file,
+    write_tcr_csf_cell_count_plot(
+      sc_tcr, lookup_csf_cell_count, tcr_report_tables
+    ),
+    format = "file"
+  ),
+  tar_target(
     tcr_alluvial_plot_files,
     write_tcr_alluvial_plots(sc_tcr, seed = 42L),
     format = "file"

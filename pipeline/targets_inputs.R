@@ -112,6 +112,10 @@ targets_inputs <- list(
     )
   ),
   tar_target(
+    lookup_csf_cell_count,
+    project_lookup(lookup, c("patient", "cell_count"))
+  ),
+  tar_target(
     lookup_demographics,
     project_lookup(
       lookup,

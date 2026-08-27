@@ -564,6 +564,23 @@ write_tcr_albumin_quotient_plot <- function(sc_tcr, lookup, tables) {
   path
 }
 
+write_tcr_csf_cell_count_plot <- function(sc_tcr, lookup, tables) {
+  plot <- make_tcr_shared_clone_correlation_plot(
+    tables$shared_clones_csf_pbmc_abundance,
+    lookup,
+    "cell_count",
+    "CSF cell count (cells/µL)",
+    sc_tcr@misc$diagnosis_col,
+    jitter_width = 0.1
+  )
+  path <- file.path(
+    tcr_result_dir(), "shared_clones_csf_cell_count_correlation.pdf"
+  )
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  ggplot2::ggsave(path, plot, width = 5, height = 3)
+  path
+}
+
 write_tcr_analysis_plots <- function(sc_tcr, lookup, tables, seed = 42L) {
   root <- tcr_result_dir()
   dir.create(root, recursive = TRUE, showWarnings = FALSE)

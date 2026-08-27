@@ -581,6 +581,109 @@ write_tcr_csf_cell_count_plot <- function(sc_tcr, lookup, tables) {
   path
 }
 
+prepare_tcr_barrier_adjustment <- function(tables, lookup) {
+  shared <- tables$shared_clones_csf_pbmc_abundance
+  stopifnot(
+    all(c("patient", "diagnosis", "log2_ratio") %in% names(shared)),
+    all(c("patient", "albumin_quotient", "cell_count") %in% names(lookup))
+  )
+  data <- shared |>
+    dplyr::left_join(lookup, by = "patient") |>
+    dplyr::filter(
+      .data$diagnosis %in% c("CTRL", "CIAP", "CIDP", "GBS"),
+      !is.na(.data$albumin_quotient),
+      !is.na(.data$cell_count),
+      .data$albumin_quotient > 0,
+      .data$cell_count >= 0
+    ) |>
+    dplyr::group_by(
+      .data$patient, .data$diagnosis,
+      .data$albumin_quotient, .data$cell_count
+    ) |>
+    dplyr::summarise(
+      mean_log2_ratio = mean(.data$log2_ratio),
+      shared_clonotypes = dplyr::n(),
+      .groups = "drop"
+    ) |>
+    dplyr::mutate(
+      diagnosis = stats::relevel(
+        factor(.data$diagnosis), ref = "CIDP"
+      ),
+      log10_albumin_quotient = log10(.data$albumin_quotient),
+      log1p_cell_count = log1p(.data$cell_count),
+      scaled_log10_albumin_quotient = as.numeric(scale(
+        .data$log10_albumin_quotient
+      )),
+      scaled_log1p_cell_count = as.numeric(scale(
+        .data$log1p_cell_count
+      ))
+    )
+  stopifnot(
+    nrow(data) > 6L,
+    all(table(data$diagnosis) > 1L),
+    all(is.finite(data$scaled_log10_albumin_quotient)),
+    all(is.finite(data$scaled_log1p_cell_count))
+  )
+
+  models <- list(
+    unadjusted = stats::lm(mean_log2_ratio ~ diagnosis, data = data),
+    adjusted_qalb_cell_count = stats::lm(
+      mean_log2_ratio ~ diagnosis + scaled_log10_albumin_quotient +
+        scaled_log1p_cell_count,
+      data = data
+    )
+  )
+  tidy_model <- function(model, model_name) {
+    coefficients <- summary(model)$coefficients
+    intervals <- stats::confint(model)
+    tibble::tibble(
+      model = model_name,
+      term = rownames(coefficients),
+      estimate = coefficients[, "Estimate"],
+      std_error = coefficients[, "Std. Error"],
+      statistic = coefficients[, "t value"],
+      p_value = coefficients[, "Pr(>|t|)"],
+      conf_low = intervals[, 1L],
+      conf_high = intervals[, 2L]
+    )
+  }
+  coefficients <- purrr::imap_dfr(models, tidy_model)
+  model_summary <- purrr::imap_dfr(models, function(fit_model, model_name) {
+    contrast <- dplyr::filter(
+      coefficients,
+      .data$model == model_name,
+      .data$term == "diagnosisGBS"
+    )
+    fit <- summary(fit_model)
+    tibble::tibble(
+      model = model_name,
+      formula = paste(deparse(stats::formula(fit_model)), collapse = " "),
+      patients = stats::nobs(fit_model),
+      residual_df = stats::df.residual(fit_model),
+      r_squared = fit$r.squared,
+      adjusted_r_squared = fit$adj.r.squared,
+      gbs_vs_cidp_estimate = contrast$estimate,
+      gbs_vs_cidp_conf_low = contrast$conf_low,
+      gbs_vs_cidp_conf_high = contrast$conf_high,
+      gbs_vs_cidp_p_value = contrast$p_value
+    )
+  })
+  list(
+    model_summary = model_summary,
+    coefficients = coefficients,
+    patient_data = data
+  )
+}
+
+write_tcr_barrier_adjustment_table <- function(result) {
+  path <- file.path(
+    tcr_result_dir(), "shared_clones_barrier_adjustment.xlsx"
+  )
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  writexl::write_xlsx(result, path)
+  path
+}
+
 write_tcr_analysis_plots <- function(sc_tcr, lookup, tables, seed = 42L) {
   root <- tcr_result_dir()
   dir.create(root, recursive = TRUE, showWarnings = FALSE)

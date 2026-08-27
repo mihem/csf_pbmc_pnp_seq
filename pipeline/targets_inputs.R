@@ -116,6 +116,12 @@ targets_inputs <- list(
     project_lookup(lookup, c("patient", "cell_count"))
   ),
   tar_target(
+    lookup_tcr_barrier,
+    project_lookup(
+      lookup, c("patient", "albumin_quotient", "cell_count")
+    )
+  ),
+  tar_target(
     lookup_demographics,
     project_lookup(
       lookup,

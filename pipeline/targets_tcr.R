@@ -42,6 +42,17 @@ targets_tcr <- list(
     format = "file"
   ),
   tar_target(
+    tcr_barrier_adjustment,
+    prepare_tcr_barrier_adjustment(
+      tcr_report_tables, lookup_tcr_barrier
+    )
+  ),
+  tar_target(
+    tcr_barrier_adjustment_table_file,
+    write_tcr_barrier_adjustment_table(tcr_barrier_adjustment),
+    format = "file"
+  ),
+  tar_target(
     tcr_alluvial_plot_files,
     write_tcr_alluvial_plots(sc_tcr, seed = 42L),
     format = "file"

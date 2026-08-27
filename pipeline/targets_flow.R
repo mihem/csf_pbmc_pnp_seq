@@ -15,7 +15,7 @@ targets_flow <- list(
   ),
   targets::tar_target(
     flow_seed_lookup_file,
-    file.path("lookup", "SEED_lookup_v15_anonymized.xlsx"),
+    file.path("lookup", "SEED_lookup_v16_anonymized.xlsx"),
     format = "file"
   ),
   targets::tar_target(

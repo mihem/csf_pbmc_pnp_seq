@@ -22,7 +22,7 @@ annotation:
   cluster_seed: 0
 
 paths:
-  lookup: lookup/SEED_lookup_v15_anonymized.xlsx
+  lookup: lookup/SEED_lookup_v16_anonymized.xlsx
   qc_thresholds: lookup/filter_df.csv
   annotations: lookup/annotations.xlsx
   markers: lookup/markers.csv

@@ -200,6 +200,7 @@ write_sural_projectil_outputs <- function(projection) {
   prediction_path <- file.path(root, "cd8tem_3_cell_predictions.csv")
   summary_path <- file.path(root, "cd8tem_3_prediction_summary.csv")
   plot_path <- file.path(root, "cd8tem_3_all_sural_projectil.pdf")
+  assignment_path <- file.path(root, "cd8tem_3_sural_cluster_assignments.pdf")
   predictions <- projected[[]] |>
     tibble::rownames_to_column("cell_id") |>
     dplyr::select(
@@ -211,11 +212,58 @@ write_sural_projectil_outputs <- function(projection) {
       prediction_confidence = "functional.cluster.conf"
     )
   readr::write_csv(predictions, prediction_path)
+  tnk_clusters <- c("CD4", "Treg", "MAIT", "CD4_CD8", "CD8", "NK_CD8", "NK")
+  reference_frequencies <- reference[[]] |>
+    dplyr::filter(.data$functional.cluster %in% tnk_clusters) |>
+    dplyr::count(.data$functional.cluster, name = "reference_cells") |>
+    dplyr::mutate(
+      reference_fraction = .data$reference_cells / sum(.data$reference_cells)
+    )
   summary <- predictions |>
     dplyr::count(.data$predicted_sural_cluster, name = "cells") |>
     dplyr::mutate(fraction = .data$cells / sum(.data$cells)) |>
-    dplyr::arrange(dplyr::desc(.data$cells))
+    dplyr::left_join(
+      reference_frequencies,
+      by = c("predicted_sural_cluster" = "functional.cluster")
+    ) |>
+    dplyr::mutate(
+      enrichment = .data$fraction / .data$reference_fraction
+    ) |>
+    dplyr::arrange(dplyr::desc(.data$enrichment))
+  stopifnot(!anyNA(summary$enrichment))
   readr::write_csv(summary, summary_path)
+
+  assignment_plot <- summary |>
+    dplyr::mutate(
+      predicted_sural_cluster = factor(
+        .data$predicted_sural_cluster,
+        levels = rev(.data$predicted_sural_cluster)
+      ),
+      label = sprintf("%.2fx (%.1f%%)", .data$enrichment, 100 * .data$fraction)
+    ) |>
+    ggplot2::ggplot(ggplot2::aes(
+      x = .data$enrichment,
+      y = .data$predicted_sural_cluster,
+      fill = .data$predicted_sural_cluster
+    )) +
+    ggplot2::geom_col(width = 0.7) +
+    ggplot2::geom_vline(xintercept = 1, linetype = "dashed", color = "gray40") +
+    ggplot2::geom_text(
+      ggplot2::aes(label = .data$label), hjust = -0.1, size = 3.5
+    ) +
+    ggplot2::scale_x_continuous(
+      expand = ggplot2::expansion(mult = c(0, 0.25))
+    ) +
+    ggplot2::scale_fill_manual(
+      values = reference@misc$atlas.palette, guide = "none"
+    ) +
+    ggplot2::labs(
+      x = "Observed / expected assignment", y = NULL,
+      title = "Normalized sural cluster assignment",
+      subtitle = "Expected from T/NK reference cluster abundance"
+    ) +
+    ggplot2::theme_classic(base_size = 11)
+  ggplot2::ggsave(assignment_path, assignment_plot, width = 6, height = 4)
 
   plot <- ProjecTILs::plot.projection(
     reference,
@@ -235,5 +283,5 @@ write_sural_projectil_outputs <- function(projection) {
     ggplot2::labs(x = "UMAP1", y = "UMAP2", title = "CD8TEM_3")
   ggplot2::ggsave(plot_path, plot, width = 8, height = 6)
 
-  c(plot_path, prediction_path, summary_path)
+  c(plot_path, assignment_path, prediction_path, summary_path)
 }

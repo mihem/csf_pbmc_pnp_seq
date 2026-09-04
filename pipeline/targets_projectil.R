@@ -24,5 +24,21 @@ targets_projectil <- list(
     projectil_plot_files,
     write_projectil_plots(projectil_cd8tem3),
     format = "file"
+  ),
+  tar_target(
+    sural_projectil_input_file,
+    "raw/sural/ic_projectil.qs",
+    format = "file"
+  ),
+  tar_target(
+    sural_projectil_cd8tem3,
+    run_sural_projectil_cd8tem3(
+      sc_annotated, sural_projectil_input_file, ncores = 2L
+    )
+  ),
+  tar_target(
+    sural_projectil_files,
+    write_sural_projectil_outputs(sural_projectil_cd8tem3),
+    format = "file"
   )
 )

@@ -1,5 +1,7 @@
 prepare_sural_trust4_v2_analysis <- function(
-  tcr_contigs, combined_tcr, mapped, patient_map, sc_tcr
+  tcr_contigs, combined_tcr, mapped, patient_map, sc_tcr,
+  enrichment_permutations = 10000L, enrichment_seed = 20260906L,
+  enrichment_min_shared_clonotypes = 3L
 ) {
   beta <- prepare_sural_tcr_comparison(
     tcr_contigs, mapped$records, patient_map
@@ -11,6 +13,14 @@ prepare_sural_trust4_v2_analysis <- function(
     beta = beta,
     chains = chains,
     expansion = prepare_sural_tcr_expansion(beta, chains),
+    enrichment = prepare_sural_tcr_cluster_enrichment(
+      beta,
+      chains,
+      sc_tcr,
+      enrichment_permutations,
+      enrichment_seed,
+      enrichment_min_shared_clonotypes
+    ),
     cluster_compositions = list(
       trb = prepare_tcr_intersection_cluster_composition(
         beta, "TRB_CDR3aa", sc_tcr, mapped$records
@@ -169,6 +179,8 @@ write_sural_trust4_v2_outputs <- function(
       ),
       write_sural_tcr_expansion_workbook(analysis$expansion),
       write_sural_tcr_expansion_plot(analysis$expansion),
+      write_sural_tcr_cluster_enrichment_workbook(analysis$enrichment),
+      write_sural_tcr_cluster_enrichment_plot(analysis$enrichment),
       write_tcr_intersection_cluster_plot(
         analysis$cluster_compositions$trb,
         "TRB clonotype",

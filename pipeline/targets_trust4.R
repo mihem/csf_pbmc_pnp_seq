@@ -11,6 +11,14 @@ targets_trust4 <- list(
     )
   ),
   tar_target(
+    sural_tcr_cluster_enrichment_config,
+    list(
+      permutations = 10000L,
+      seed = 20260906L,
+      min_shared_clonotypes = 3L
+    )
+  ),
+  tar_target(
     sural_trust4_v2_manifest,
     discover_sural_trust4_inputs(
       file.path("raw", "sural", "trust4_v2_r2"),
@@ -195,13 +203,39 @@ targets_trust4 <- list(
     )
   ),
   tar_target(
+    sural_tcr_cluster_enrichment,
+    prepare_sural_tcr_cluster_enrichment(
+      sural_tcr_cross_tissue_comparison,
+      sural_tcr_chain_comparisons,
+      sc_tcr,
+      sural_tcr_cluster_enrichment_config$permutations,
+      sural_tcr_cluster_enrichment_config$seed,
+      sural_tcr_cluster_enrichment_config$min_shared_clonotypes
+    )
+  ),
+  tar_target(
+    sural_tcr_cluster_enrichment_workbook_file,
+    write_sural_tcr_cluster_enrichment_workbook(
+      sural_tcr_cluster_enrichment
+    ),
+    format = "file"
+  ),
+  tar_target(
+    sural_tcr_cluster_enrichment_plot_file,
+    write_sural_tcr_cluster_enrichment_plot(sural_tcr_cluster_enrichment),
+    format = "file"
+  ),
+  tar_target(
     sural_trust4_v2_analysis,
     prepare_sural_trust4_v2_analysis(
       tcr_contigs,
       combined_tcr,
       sural_trust4_v2_mapped,
       sural_trust4_5prime_maps$patient_map,
-      sc_tcr
+      sc_tcr,
+      sural_tcr_cluster_enrichment_config$permutations,
+      sural_tcr_cluster_enrichment_config$seed,
+      sural_tcr_cluster_enrichment_config$min_shared_clonotypes
     )
   ),
   tar_target(

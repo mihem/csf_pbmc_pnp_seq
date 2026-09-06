@@ -40,5 +40,15 @@ targets_projectil <- list(
     sural_projectil_files,
     write_sural_projectil_outputs(sural_projectil_cd8tem3),
     format = "file"
+  ),
+  tar_target(
+    sural_featureplot_input_file,
+    "raw/sural/ic_featureplot.qs",
+    format = "file"
+  ),
+  tar_target(
+    sural_cd8tem3_feature_plot_file,
+    write_sural_cd8tem3_feature_plot(sural_featureplot_input_file),
+    format = "file"
   )
 )

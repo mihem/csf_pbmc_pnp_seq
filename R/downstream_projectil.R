@@ -285,3 +285,41 @@ write_sural_projectil_outputs <- function(projection) {
 
   c(plot_path, assignment_path, prediction_path, summary_path)
 }
+
+write_sural_cd8tem3_feature_plot <- function(path) {
+  object <- qs::qread(path)
+  markers <- c(
+    "IFNG", "FASLG", "TNFRSF9", "KLRG1", "SLAMF6",
+    "IL10RA", "CCR4", "CCR5", "CXCR6"
+  )
+  stopifnot(
+    inherits(object, "Seurat"),
+    all(markers %in% rownames(object)),
+    "umap.rpca" %in% names(object@reductions)
+  )
+
+  plot <- Seurat::FeaturePlot(
+    object,
+    features = markers,
+    reduction = "umap.rpca",
+    pt.size = 0.1,
+    raster = FALSE,
+    coord.fixed = TRUE,
+    cols = c("#F0F0F0", "#CB181D"),
+    order = TRUE,
+    ncol = 3
+  ) &
+    ggplot2::theme(
+      axis.text = ggplot2::element_blank(),
+      axis.ticks = ggplot2::element_blank(),
+      panel.border = ggplot2::element_rect(
+        color = "black", fill = NA, linewidth = 1
+      )
+    ) &
+    ggplot2::labs(x = "UMAP1", y = "UMAP2")
+  output <- file.path(
+    sural_projectil_result_dir(), "cd8tem_3_marker_featureplots.pdf"
+  )
+  ggplot2::ggsave(output, plot, width = 9, height = 9)
+  output
+}

@@ -355,6 +355,164 @@ write_sural_tcr_tracking_plot <- function(comparison) {
   path
 }
 
+prepare_tcr_intersection_cluster_composition <- function(
+  comparison, clone_column, sc_tcr, trust4_records
+) {
+  stopifnot(
+    clone_column %in% names(comparison$cell_clones),
+    clone_column %in% names(comparison$tracking),
+    "cluster" %in% names(sc_tcr[[]]),
+    all(c("library_id", "barcode", "seurat_cluster") %in%
+      names(trust4_records))
+  )
+
+  shared_intersections <- comparison$tracking |>
+    dplyr::filter(grepl("\\+", .data$presence)) |>
+    dplyr::select("patient", dplyr::all_of(clone_column), "presence")
+  study_clusters <- sc_tcr[[]] |>
+    tibble::rownames_to_column("cell_id") |>
+    dplyr::transmute(
+      cell_id = .data$cell_id,
+      study_cluster = as.character(.data$cluster)
+    )
+  sural_clusters <- trust4_records |>
+    dplyr::transmute(
+      cell_id = paste(.data$library_id, .data$barcode, sep = "_"),
+      sural_cluster = as.character(.data$seurat_cluster)
+    ) |>
+    dplyr::distinct()
+  stopifnot(!anyDuplicated(sural_clusters$cell_id))
+  presence_levels <- c(
+    "CSF + blood", "CSF + sural", "blood + sural",
+    "CSF + blood + sural"
+  )
+
+  cell_annotations <- comparison$cell_clones |>
+    dplyr::inner_join(
+      shared_intersections,
+      by = c("patient", clone_column),
+      relationship = "many-to-one"
+    ) |>
+    dplyr::left_join(study_clusters, by = "cell_id") |>
+    dplyr::left_join(sural_clusters, by = "cell_id") |>
+    dplyr::mutate(
+      presence = factor(.data$presence, levels = presence_levels),
+      cluster = dplyr::if_else(
+        as.character(.data$tissue) == "Sural",
+        .data$sural_cluster,
+        .data$study_cluster
+      ),
+      cluster = dplyr::coalesce(
+        .data$cluster, "Unmatched to scRNA-seq"
+      )
+    )
+  cluster_counts <- cell_annotations |>
+    dplyr::group_by(.data$patient, .data$presence, .data$cluster) |>
+    dplyr::summarise(
+      cell_count = dplyr::n_distinct(.data$cell_id),
+      .groups = "drop"
+    )
+  intersections <- comparison$intersections
+  if (is.null(intersections)) {
+    intersections <- comparison$intersection_summary
+  }
+  stopifnot(!is.null(intersections))
+  totals <- intersections |>
+    dplyr::filter(grepl("\\+", .data$presence)) |>
+    dplyr::select("patient", "presence") |>
+    dplyr::mutate(
+      presence = factor(as.character(.data$presence), levels = presence_levels)
+    ) |>
+    dplyr::left_join(
+      cluster_counts |>
+        dplyr::group_by(.data$patient, .data$presence) |>
+        dplyr::summarise(
+          cell_count = sum(.data$cell_count),
+          .groups = "drop"
+        ),
+      by = c("patient", "presence")
+    ) |>
+    dplyr::mutate(cell_count = dplyr::coalesce(.data$cell_count, 0L))
+
+  observed_clusters <- unique(cluster_counts$cluster)
+  study_colors <- sc_tcr@misc$cluster_col
+  extra_clusters <- setdiff(
+    observed_clusters,
+    c(names(study_colors), "Unmatched to scRNA-seq")
+  )
+  extra_colors <- character()
+  if (length(extra_clusters) > 0L) {
+    extra_colors <- stats::setNames(
+      scales::hue_pal()(length(extra_clusters)), extra_clusters
+    )
+  }
+  cluster_colors <- c(study_colors, extra_colors)
+  cluster_colors["Unmatched to scRNA-seq"] <- "#BDBDBD"
+
+  list(
+    cell_annotations = cell_annotations,
+    cluster_counts = cluster_counts,
+    totals = totals,
+    cluster_colors = cluster_colors
+  )
+}
+
+write_tcr_intersection_cluster_plot <- function(
+  composition, chain_label, file_name
+) {
+  path <- file.path(sural_tcr_comparison_result_dir(), file_name)
+  ensure_parent_dir(path)
+  plot <- ggplot2::ggplot(
+    composition$cluster_counts,
+    ggplot2::aes(
+      x = .data$presence,
+      y = .data$cell_count,
+      fill = .data$cluster
+    )
+  ) +
+    ggplot2::geom_col(width = 0.75) +
+    ggplot2::geom_text(
+      data = composition$totals,
+      ggplot2::aes(
+        x = .data$presence,
+        y = .data$cell_count,
+        label = .data$cell_count
+      ),
+      inherit.aes = FALSE,
+      vjust = -0.3,
+      size = 3.2
+    ) +
+    ggplot2::facet_wrap(~patient, nrow = 1L) +
+    ggplot2::scale_y_continuous(
+      breaks = scales::breaks_pretty(),
+      expand = ggplot2::expansion(mult = c(0, 0.12))
+    ) +
+    ggplot2::scale_fill_manual(
+      values = composition$cluster_colors,
+      drop = TRUE
+    ) +
+    ggplot2::labs(
+      title = paste(
+        "Cell clusters in exact cross-tissue", chain_label, "matches"
+      ),
+      subtitle = paste(
+        "Bar height counts receptor-positive cells; gray indicates cells",
+        "absent from the corresponding scRNA-seq metadata"
+      ),
+      x = NULL,
+      y = "Number of cells",
+      fill = "Cell cluster"
+    ) +
+    ggplot2::theme_classic() +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+      strip.text = ggplot2::element_text(face = "bold"),
+      legend.position = "right"
+    )
+  ggplot2::ggsave(path, plot, width = 12, height = 5.5)
+  path
+}
+
 extract_csf_pbmc_tra <- function(tcr_contigs, patients) {
   selected <- tcr_contigs[
     sub(".*_", "", names(tcr_contigs)) %in% patients

@@ -137,6 +137,41 @@ targets_trust4 <- list(
     )
   ),
   tar_target(
+    sural_tcr_intersection_cluster_compositions,
+    list(
+      trb = prepare_tcr_intersection_cluster_composition(
+        sural_tcr_cross_tissue_comparison,
+        "TRB_CDR3aa",
+        sc_tcr,
+        sural_trust4_mapped$records
+      ),
+      tra = prepare_tcr_intersection_cluster_composition(
+        sural_tcr_chain_comparisons$alpha,
+        "clonotype",
+        sc_tcr,
+        sural_trust4_mapped$records
+      )
+    )
+  ),
+  tar_target(
+    sural_trb_intersection_cluster_plot_file,
+    write_tcr_intersection_cluster_plot(
+      sural_tcr_intersection_cluster_compositions$trb,
+      "TRB clonotype",
+      "trb_shared_tissue_intersections_by_cluster.pdf"
+    ),
+    format = "file"
+  ),
+  tar_target(
+    sural_tra_intersection_cluster_plot_file,
+    write_tcr_intersection_cluster_plot(
+      sural_tcr_intersection_cluster_compositions$tra,
+      "TRA clonotype",
+      "tra_shared_tissue_intersections_by_cluster.pdf"
+    ),
+    format = "file"
+  ),
+  tar_target(
     sural_tcr_chain_comparison_workbook_file,
     write_sural_chain_comparison_workbook(sural_tcr_chain_comparisons),
     format = "file"

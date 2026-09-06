@@ -286,8 +286,10 @@ write_sural_projectil_outputs <- function(projection) {
   c(plot_path, assignment_path, prediction_path, summary_path)
 }
 
-write_sural_cd8tem3_feature_plot <- function(path) {
+write_sural_cd8tem3_marker_dotplot <- function(path) {
   object <- qs::qread(path)
+  root <- sural_projectil_result_dir()
+  dir.create(root, recursive = TRUE, showWarnings = FALSE)
   markers <- c(
     "IFNG", "FASLG", "TNFRSF9", "KLRG1", "SLAMF6",
     "IL10RA", "CCR4", "CCR5", "CXCR6"
@@ -298,28 +300,29 @@ write_sural_cd8tem3_feature_plot <- function(path) {
     "umap.rpca" %in% names(object@reductions)
   )
 
-  plot <- Seurat::FeaturePlot(
+  tnk_clusters <- c("CD4", "Treg", "MAIT", "CD4_CD8", "CD8", "NK_CD8", "NK")
+  dot_plot <- Seurat::DotPlot(
     object,
     features = markers,
-    reduction = "umap.rpca",
-    pt.size = 0.1,
-    raster = FALSE,
-    coord.fixed = TRUE,
-    cols = c("#F0F0F0", "#CB181D"),
-    order = TRUE,
-    ncol = 3
-  ) &
+    idents = tnk_clusters,
+    group.by = "ic_cluster",
+    dot.scale = 10,
+    scale.by = "size",
+    dot.min = 0.01,
+    scale = TRUE
+  ) +
+    viridis::scale_color_viridis(option = "viridis") +
+    ggplot2::scale_size(range = c(0, 10)) +
     ggplot2::theme(
-      axis.text = ggplot2::element_blank(),
-      axis.ticks = ggplot2::element_blank(),
-      panel.border = ggplot2::element_rect(
-        color = "black", fill = NA, linewidth = 1
+      axis.text.x = ggplot2::element_text(
+        angle = 90, vjust = 0.5, hjust = 1, face = "italic"
       )
-    ) &
-    ggplot2::labs(x = "UMAP1", y = "UMAP2")
-  output <- file.path(
-    sural_projectil_result_dir(), "cd8tem_3_marker_featureplots.pdf"
-  )
-  ggplot2::ggsave(output, plot, width = 9, height = 9)
-  output
+    ) +
+    ggplot2::labs(
+      x = NULL, y = NULL
+    )
+  dot_plot_path <- file.path(root, "cd8tem_3_marker_dotplot.pdf")
+  ggplot2::ggsave(dot_plot_path, dot_plot, width = 8, height = 4.5)
+
+  dot_plot_path
 }

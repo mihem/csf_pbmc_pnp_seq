@@ -47,8 +47,8 @@ targets_projectil <- list(
     format = "file"
   ),
   tar_target(
-    sural_cd8tem3_feature_plot_file,
-    write_sural_cd8tem3_feature_plot(sural_featureplot_input_file),
+    sural_cd8tem3_marker_dotplot_file,
+    write_sural_cd8tem3_marker_dotplot(sural_featureplot_input_file),
     format = "file"
   )
 )

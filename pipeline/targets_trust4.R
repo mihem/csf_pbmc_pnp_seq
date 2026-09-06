@@ -1,5 +1,28 @@
 targets_trust4 <- list(
   tar_target(
+    sural_trust4_5prime_maps,
+    list(
+      sample_map = replace_trust4_library(
+        trust4_discovery_config$sample_map, "GM_SN", "GM_SN_5"
+      ),
+      patient_map = replace_trust4_library(
+        trust4_patient_config$patient_map, "GM_SN", "GM_SN_5"
+      )
+    )
+  ),
+  tar_target(
+    sural_trust4_v2_manifest,
+    discover_sural_trust4_inputs(
+      file.path("raw", "sural", "trust4_v2_r2"),
+      sural_trust4_5prime_maps$sample_map
+    )
+  ),
+  tar_target(
+    sural_trust4_v2_files,
+    sural_trust4_input_files(sural_trust4_v2_manifest),
+    format = "file"
+  ),
+  tar_target(
     sural_metadata_umap_file,
     trust4_config$paths$sural_metadata_umap,
     format = "file"
@@ -8,7 +31,7 @@ targets_trust4 <- list(
     sural_trust4_manifest,
     discover_sural_trust4_inputs(
       trust4_config$paths$sural_trust4,
-      trust4_discovery_config$sample_map
+      sural_trust4_5prime_maps$sample_map
     )
   ),
   tar_target(
@@ -72,6 +95,24 @@ targets_trust4 <- list(
     )
   ),
   tar_target(
+    sural_trust4_v2_mapped,
+    map_sural_trust4_barcodes(
+      sural_trust4_v2_manifest,
+      sural_trust4_v2_files,
+      sural_metadata_umap,
+      trust4_main_config$cluster_column
+    )
+  ),
+  tar_target(
+    sural_ic_trust4_v2_mapped,
+    map_sural_trust4_barcodes(
+      sural_trust4_v2_manifest,
+      sural_trust4_v2_files,
+      sural_ic_metadata_umap,
+      trust4_ic_config$ic_cluster_column
+    )
+  ),
+  tar_target(
     sural_ic_trust4_table_file,
     write_sural_trust4_table(
       sural_ic_trust4_mapped,
@@ -103,7 +144,7 @@ targets_trust4 <- list(
     prepare_sural_tcr_comparison(
       tcr_contigs,
       sural_trust4_mapped$records,
-      trust4_patient_config$patient_map
+      sural_trust4_5prime_maps$patient_map
     )
   ),
   tar_target(
@@ -133,7 +174,7 @@ targets_trust4 <- list(
       tcr_contigs,
       combined_tcr,
       sural_trust4_mapped$records,
-      trust4_patient_config$patient_map
+      sural_trust4_5prime_maps$patient_map
     )
   ),
   tar_target(
@@ -152,6 +193,44 @@ targets_trust4 <- list(
         sural_trust4_mapped$records
       )
     )
+  ),
+  tar_target(
+    sural_trust4_v2_analysis,
+    prepare_sural_trust4_v2_analysis(
+      tcr_contigs,
+      combined_tcr,
+      sural_trust4_v2_mapped,
+      sural_trust4_5prime_maps$patient_map,
+      sc_tcr
+    )
+  ),
+  tar_target(
+    sural_trust4_version_comparison,
+    prepare_trust4_version_comparison(
+      sural_trust4_mapped,
+      sural_ic_trust4_mapped,
+      sural_tcr_cross_tissue_comparison,
+      sural_tcr_chain_comparisons,
+      sural_trust4_v2_mapped,
+      sural_ic_trust4_v2_mapped,
+      sural_trust4_v2_analysis
+    )
+  ),
+  tar_target(
+    sural_trust4_version_comparison_file,
+    write_trust4_version_comparison(sural_trust4_version_comparison),
+    format = "file"
+  ),
+  tar_target(
+    sural_trust4_v2_output_files,
+    write_sural_trust4_v2_outputs(
+      sural_trust4_v2_mapped,
+      sural_ic_trust4_v2_mapped,
+      sural_metadata_umap,
+      sural_ic_metadata_umap,
+      sural_trust4_v2_analysis
+    ),
+    format = "file"
   ),
   tar_target(
     sural_trb_intersection_cluster_plot_file,

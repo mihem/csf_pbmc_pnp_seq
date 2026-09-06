@@ -684,7 +684,17 @@ build_chain_tissue_tracking <- function(cell_clones, patients) {
       values_from = c("cell_count", "frequency"),
       names_glue = "{.value}_{tissue}",
       values_fill = 0
-    ) |>
+    )
+  expected_columns <- unlist(lapply(
+    c("cell_count", "frequency"),
+    paste,
+    c("CSF", "PBMC", "Sural"),
+    sep = "_"
+  ))
+  for (column in setdiff(expected_columns, names(tracking))) {
+    tracking[[column]] <- 0
+  }
+  tracking <- tracking |>
     dplyr::mutate(
       n_tissues =
         (.data$cell_count_CSF > 0) +

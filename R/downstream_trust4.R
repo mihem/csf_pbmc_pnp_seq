@@ -2,17 +2,36 @@ sural_trust4_result_dir <- function() {
   file.path("results", "targets", "trust4")
 }
 
+replace_trust4_library <- function(mapping, old_library, new_library) {
+  mapping <- unlist(mapping, use.names = TRUE)
+  stopifnot(
+    length(old_library) == 1L,
+    length(new_library) == 1L,
+    old_library %in% names(mapping),
+    !new_library %in% names(mapping)
+  )
+  names(mapping)[names(mapping) == old_library] <- new_library
+  mapping
+}
+
 discover_sural_trust4_inputs <- function(raw_dir, sample_map) {
   files <- list.files(
     raw_dir,
     pattern = "_TRUST4_output_barcode_report\\.tsv$",
-    full.names = TRUE
+    full.names = TRUE,
+    recursive = TRUE
   )
   files <- sort(files)
   library_id <- sub(
     "_TRUST4_output_barcode_report\\.tsv$", "", basename(files)
   )
   sample_map <- unlist(sample_map, use.names = TRUE)
+  selected <- library_id %in% names(sample_map)
+  files <- files[selected]
+  library_id <- library_id[selected]
+  selected_order <- order(library_id)
+  files <- files[selected_order]
+  library_id <- library_id[selected_order]
 
   stopifnot(
     dir.exists(raw_dir),

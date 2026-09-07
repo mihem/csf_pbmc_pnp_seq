@@ -7,6 +7,7 @@ source("pipeline/targets_inputs.R")
 source("pipeline/targets_preprocess.R")
 source("pipeline/targets_mapping.R")
 source("pipeline/targets_annotation.R")
+source("pipeline/targets_sural_transfer.R")
 source("pipeline/targets_abundance.R")
 source("pipeline/targets_deg.R")
 source("pipeline/targets_enrichment.R")
@@ -76,6 +77,7 @@ pipeline <- c(
   targets_preprocess,
   targets_mapping,
   targets_annotation,
+  targets_sural_transfer,
   targets_abundance,
   targets_deg,
   targets_enrichment,

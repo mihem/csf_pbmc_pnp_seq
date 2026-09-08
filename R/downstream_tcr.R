@@ -102,6 +102,65 @@ combine_tcr_contigs <- function(contigs) {
   )
 }
 
+import_supplemental_tcr_contigs <- function(
+  manifest, input_files, donor_assignments, patient_map, pseudonym_map
+) {
+  patient_map <- unlist(patient_map, use.names = TRUE)
+  pseudonym_map <- unlist(pseudonym_map, use.names = TRUE)
+  stopifnot(
+    length(input_files) == nrow(manifest),
+    identical(unname(manifest$file), input_files),
+    length(pseudonym_map) >= 1L,
+    !anyDuplicated(names(pseudonym_map)),
+    all(names(pseudonym_map) %in% names(patient_map))
+  )
+
+  supplemental <- purrr::imap(pseudonym_map, function(pseudonym, library_id) {
+    patient <- unname(patient_map[[library_id]])
+    pool_ids <- names(donor_assignments)[vapply(
+      donor_assignments,
+      function(assignments) pseudonym %in% assignments$donor_id,
+      logical(1)
+    )]
+    pool_ids <- intersect(pool_ids, manifest$library_id)
+    tissues <- sub("_.*", "", pool_ids)
+    stopifnot(
+      length(patient) == 1L,
+      nzchar(patient),
+      length(pool_ids) == 2L,
+      setequal(tissues, c("CSF", "PBMC"))
+    )
+
+    result <- purrr::map(pool_ids, function(pool_id) {
+      path <- manifest$file[match(pool_id, manifest$library_id)]
+      assignments <- donor_assignments[[pool_id]]
+      selected_barcodes <- assignments$cell[
+        assignments$donor_id == pseudonym
+      ]
+      contigs <- utils::read.csv(path) |>
+        dplyr::filter(.data$barcode %in% selected_barcodes)
+      stopifnot(nrow(contigs) > 0L)
+      contigs
+    })
+    names(result) <- paste(tissues, patient, sep = "_")
+    result
+  })
+  supplemental <- purrr::list_flatten(unname(supplemental))
+  supplemental[order(names(supplemental))]
+}
+
+extend_tcr_samples <- function(primary, supplemental) {
+  stopifnot(
+    is.list(primary),
+    is.list(supplemental),
+    length(supplemental) >= 1L,
+    !anyDuplicated(names(supplemental)),
+    !any(names(supplemental) %in% names(primary))
+  )
+  result <- c(primary, supplemental)
+  result[order(names(result))]
+}
+
 annotate_tcr_cells <- function(sc_annotated, combined_tcr) {
   cells <- colnames(sc_annotated)[
     as.character(sc_annotated$cluster) %in% tcr_cluster_names()

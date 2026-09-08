@@ -12,6 +12,9 @@ prepare_sural_trust4_v2_analysis <- function(
   list(
     beta = beta,
     chains = chains,
+    normalized_intersections = prepare_sural_tcr_normalized_intersections(
+      beta, chains
+    ),
     expansion = prepare_sural_tcr_expansion(beta, chains),
     enrichment = prepare_sural_tcr_cluster_enrichment(
       beta,
@@ -99,18 +102,33 @@ prepare_trust4_version_comparison <- function(
     )
   ) |>
     dplyr::arrange(.data$patient, .data$chain, .data$clonotype, .data$version)
-  sural_shared_summary <- sural_shared |>
-    dplyr::count(.data$version, .data$patient, .data$chain, name = "clonotypes") |>
-    tidyr::complete(
-      version = c("V1", "V2 R2-only"),
-      patient = c("P18", "P28", "P29"),
-      chain = c("TRA", "TRB", "paired TRA + TRB"),
-      fill = list(clonotypes = 0L)
+  patient_version_availability <- dplyr::bind_rows(
+    tibble::tibble(
+      version = "V1",
+      patient = as.character(v1_beta$patient_mapping$patient)
+    ),
+    tibble::tibble(
+      version = "V2 R2-only",
+      patient = as.character(v2_analysis$beta$patient_mapping$patient)
+    )
+  ) |>
+    dplyr::distinct()
+  sural_shared_summary <- patient_version_availability |>
+    tidyr::crossing(chain = c("TRA", "TRB", "paired TRA + TRB")) |>
+    dplyr::left_join(
+      sural_shared |>
+        dplyr::count(
+          .data$version, .data$patient, .data$chain,
+          name = "clonotypes"
+        ),
+      by = c("version", "patient", "chain")
     ) |>
+    dplyr::mutate(clonotypes = dplyr::coalesce(.data$clonotypes, 0L)) |>
     dplyr::arrange(.data$patient, .data$chain, .data$version)
 
   list(
     mapping_summary = mapping_summary,
+    patient_version_availability = patient_version_availability,
     intersections = intersections,
     sural_shared_summary = sural_shared_summary,
     sural_shared_clonotypes = sural_shared
@@ -176,6 +194,9 @@ write_sural_trust4_v2_outputs <- function(
         analysis$chains$paired,
         "paired TRA + TRB",
         "sural_shared_paired_tra_trb_tracking.pdf"
+      ),
+      write_sural_tcr_normalized_intersection_outputs(
+        analysis$normalized_intersections
       ),
       write_sural_tcr_expansion_workbook(analysis$expansion),
       write_sural_tcr_expansion_plot(analysis$expansion),

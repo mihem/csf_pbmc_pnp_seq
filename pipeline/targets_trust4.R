@@ -11,6 +11,34 @@ targets_trust4 <- list(
     )
   ),
   tar_target(
+    sural_trust4_v2_supplement,
+    list(
+      library_id = "SN16",
+      sample = "S07",
+      patient = "P38",
+      pseudonym = "PNP52"
+    )
+  ),
+  tar_target(
+    sural_trust4_v2_maps,
+    list(
+      sample_map = c(
+        sural_trust4_5prime_maps$sample_map,
+        stats::setNames(
+          sural_trust4_v2_supplement$sample,
+          sural_trust4_v2_supplement$library_id
+        )
+      ),
+      patient_map = c(
+        sural_trust4_5prime_maps$patient_map,
+        stats::setNames(
+          sural_trust4_v2_supplement$patient,
+          sural_trust4_v2_supplement$library_id
+        )
+      )
+    )
+  ),
+  tar_target(
     sural_tcr_cluster_enrichment_config,
     list(
       permutations = 10000L,
@@ -22,13 +50,38 @@ targets_trust4 <- list(
     sural_trust4_v2_manifest,
     discover_sural_trust4_inputs(
       file.path("raw", "sural", "trust4_v2_r2"),
-      sural_trust4_5prime_maps$sample_map
+      sural_trust4_v2_maps$sample_map
     )
   ),
   tar_target(
     sural_trust4_v2_files,
     sural_trust4_input_files(sural_trust4_v2_manifest),
     format = "file"
+  ),
+  tar_target(
+    supplemental_tcr_contigs,
+    import_supplemental_tcr_contigs(
+      tcr_manifest,
+      tcr_files,
+      donor_assignments,
+      sural_trust4_v2_maps$patient_map,
+      stats::setNames(
+        sural_trust4_v2_supplement$pseudonym,
+        sural_trust4_v2_supplement$library_id
+      )
+    )
+  ),
+  tar_target(
+    supplemental_combined_tcr,
+    combine_tcr_contigs(supplemental_tcr_contigs)
+  ),
+  tar_target(
+    sural_trust4_v2_tcr_contigs,
+    extend_tcr_samples(tcr_contigs, supplemental_tcr_contigs)
+  ),
+  tar_target(
+    sural_trust4_v2_combined_tcr,
+    extend_tcr_samples(combined_tcr, supplemental_combined_tcr)
   ),
   tar_target(
     sural_metadata_umap_file,
@@ -228,10 +281,10 @@ targets_trust4 <- list(
   tar_target(
     sural_trust4_v2_analysis,
     prepare_sural_trust4_v2_analysis(
-      tcr_contigs,
-      combined_tcr,
+      sural_trust4_v2_tcr_contigs,
+      sural_trust4_v2_combined_tcr,
       sural_trust4_v2_mapped,
-      sural_trust4_5prime_maps$patient_map,
+      sural_trust4_v2_maps$patient_map,
       sc_tcr,
       sural_tcr_cluster_enrichment_config$permutations,
       sural_tcr_cluster_enrichment_config$seed,

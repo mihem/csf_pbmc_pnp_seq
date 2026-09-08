@@ -2,6 +2,15 @@ sural_tcr_comparison_result_dir <- function() {
   file.path(sural_trust4_result_dir(), "cross_tissue_tcr")
 }
 
+tcr_patient_facet_labels <- function() {
+  c(
+    P18 = "P18 (CIDP)",
+    P28 = "P28 (CAN)",
+    P29 = "P29 (CAN)",
+    P38 = "P38 (CIAP)"
+  )
+}
+
 valid_trb_cdr3 <- function(sequence) {
   !is.na(sequence) &
     dplyr::between(nchar(sequence), 5L, 30L) &
@@ -125,7 +134,7 @@ prepare_sural_tcr_comparison <- function(
 ) {
   patient_map <- unlist(patient_map, use.names = TRUE)
   patients <- unname(patient_map)
-  stopifnot(!anyDuplicated(patients), length(patients) == 3L)
+  stopifnot(!anyDuplicated(patients), length(patients) >= 1L)
 
   csf_pbmc <- extract_csf_pbmc_trb(tcr_contigs, patients)
   sural <- extract_sural_trb(trust4_records, patient_map)
@@ -264,7 +273,11 @@ write_sural_tcr_intersection_plot <- function(comparison) {
       vjust = -0.3,
       size = 3.2
     ) +
-    ggplot2::facet_wrap(~patient, nrow = 1L) +
+    ggplot2::facet_wrap(
+      ~patient,
+      nrow = 1L,
+      labeller = ggplot2::as_labeller(tcr_patient_facet_labels())
+    ) +
     ggplot2::scale_y_continuous(
       breaks = scales::breaks_pretty(),
       expand = ggplot2::expansion(mult = c(0, 0.12))
@@ -314,6 +327,22 @@ write_sural_tcr_tracking_plot <- function(comparison) {
       tissue = factor(.data$tissue, levels = c("CSF", "PBMC", "Sural")),
       patient = droplevels(.data$patient)
     )
+  patients <- levels(comparison$tracking$patient)
+  if (is.null(patients)) {
+    patients <- unique(as.character(comparison$tracking$patient))
+  }
+  no_sural_shared <- setdiff(
+    patients,
+    unique(as.character(comparison$sural_shared$patient))
+  )
+  subtitle <- if (length(no_sural_shared) > 0L) {
+    paste(
+      "No exact sural-shared TRB clonotypes:",
+      paste(no_sural_shared, collapse = ", ")
+    )
+  } else {
+    "All included patients have at least one exact sural-shared TRB clonotype"
+  }
   stopifnot(nrow(data) > 0L)
   plot <- ggplot2::ggplot(
     data,
@@ -329,7 +358,11 @@ write_sural_tcr_tracking_plot <- function(comparison) {
       color = "black",
       stroke = 0.25
     ) +
-    ggplot2::facet_wrap(~patient, scales = "free_y") +
+    ggplot2::facet_wrap(
+      ~patient,
+      scales = "free_y",
+      labeller = ggplot2::as_labeller(tcr_patient_facet_labels())
+    ) +
     ggplot2::scale_fill_manual(
       values = c(CSF = "#D1495B", PBMC = "#3264A8", Sural = "#E09F3E"),
       guide = "none"
@@ -341,7 +374,7 @@ write_sural_tcr_tracking_plot <- function(comparison) {
     ggplot2::scale_size_continuous(range = c(1.5, 7)) +
     ggplot2::labs(
       title = "Sural TRB clonotypes tracked across tissues",
-      subtitle = "P28 has no exact sural-shared TRB clonotypes",
+      subtitle = subtitle,
       x = NULL,
       y = "TRB CDR3 amino-acid sequence",
       size = "Cells"
@@ -482,7 +515,11 @@ write_tcr_intersection_cluster_plot <- function(
       vjust = -0.3,
       size = 3.2
     ) +
-    ggplot2::facet_wrap(~patient, nrow = 1L) +
+    ggplot2::facet_wrap(
+      ~patient,
+      nrow = 1L,
+      labeller = ggplot2::as_labeller(tcr_patient_facet_labels())
+    ) +
     ggplot2::scale_y_continuous(
       breaks = scales::breaks_pretty(),
       expand = ggplot2::expansion(mult = c(0, 0.12))
@@ -807,7 +844,11 @@ write_sural_chain_intersection_plot <- function(
       vjust = -0.3,
       size = 3.2
     ) +
-    ggplot2::facet_wrap(~patient, nrow = 1L) +
+    ggplot2::facet_wrap(
+      ~patient,
+      nrow = 1L,
+      labeller = ggplot2::as_labeller(tcr_patient_facet_labels())
+    ) +
     ggplot2::scale_y_continuous(
       breaks = scales::breaks_pretty(),
       expand = ggplot2::expansion(mult = c(0, 0.12))
@@ -890,7 +931,11 @@ write_sural_chain_tracking_plot <- function(
       color = "black",
       stroke = 0.25
     ) +
-    ggplot2::facet_wrap(~patient, scales = "free_y") +
+    ggplot2::facet_wrap(
+      ~patient,
+      scales = "free_y",
+      labeller = ggplot2::as_labeller(tcr_patient_facet_labels())
+    ) +
     ggplot2::scale_fill_manual(
       values = c(CSF = "#D1495B", PBMC = "#3264A8", Sural = "#E09F3E"),
       guide = "none"
@@ -910,6 +955,111 @@ write_sural_chain_tracking_plot <- function(
     ggplot2::theme(strip.text = ggplot2::element_text(face = "bold"))
   ggplot2::ggsave(path, plot, width = 9, height = 6)
   path
+}
+
+prepare_sural_tcr_normalized_intersections <- function(beta, chain_comparisons) {
+  combinations <- list(
+    "CSF + blood" = c("CSF", "PBMC"),
+    "CSF + sural" = c("CSF", "Sural"),
+    "blood + sural" = c("PBMC", "Sural"),
+    "CSF + blood + sural" = c("CSF", "PBMC", "Sural")
+  )
+  summarize_chain <- function(tracking, chain) {
+    purrr::imap_dfr(combinations, function(tissues, intersection) {
+      presence_columns <- paste0("cell_count_", tissues)
+      tracking |>
+        dplyr::group_by(.data$patient) |>
+        dplyr::summarise(
+          shared_clonotypes = sum(
+            dplyr::if_all(dplyr::all_of(presence_columns), ~ .x > 0L)
+          ),
+          union_clonotypes = sum(
+            dplyr::if_any(dplyr::all_of(presence_columns), ~ .x > 0L)
+          ),
+          .groups = "drop"
+        ) |>
+        dplyr::mutate(intersection = intersection, .after = "patient")
+    }) |>
+      dplyr::mutate(chain = chain, .before = 1L)
+  }
+  data <- dplyr::bind_rows(
+    summarize_chain(chain_comparisons$alpha$tracking, "TRA"),
+    summarize_chain(beta$tracking, "TRB")
+  ) |>
+    dplyr::mutate(
+      chain = factor(.data$chain, levels = c("TRA", "TRB")),
+      intersection = factor(.data$intersection, levels = names(combinations)),
+      jaccard_percent = 100 * .data$shared_clonotypes / .data$union_clonotypes,
+      count_label = paste0(.data$shared_clonotypes, "/", .data$union_clonotypes)
+    ) |>
+    dplyr::arrange(.data$chain, .data$patient, .data$intersection)
+  stopifnot(
+    all(data$shared_clonotypes <= data$union_clonotypes),
+    all(dplyr::between(data$jaccard_percent, 0, 100), na.rm = TRUE)
+  )
+  data
+}
+
+write_sural_tcr_normalized_intersection_outputs <- function(data) {
+  root <- sural_tcr_comparison_result_dir()
+  paths <- file.path(
+    root,
+    c(
+      "normalized_tra_trb_tissue_intersections.xlsx",
+      "normalized_tra_trb_tissue_intersections.pdf"
+    )
+  )
+  purrr::walk(paths, ensure_parent_dir)
+  writexl::write_xlsx(list(normalized_intersections = data), paths[[1L]])
+  plot <- ggplot2::ggplot(
+    data,
+    ggplot2::aes(
+      x = .data$intersection,
+      y = .data$jaccard_percent,
+      fill = .data$intersection
+    )
+  ) +
+    ggplot2::geom_col(width = 0.75) +
+    ggplot2::geom_text(
+      ggplot2::aes(label = .data$count_label),
+      vjust = -0.3,
+      size = 3.2
+    ) +
+    ggplot2::facet_grid(
+      rows = ggplot2::vars(.data$chain),
+      cols = ggplot2::vars(.data$patient),
+      labeller = ggplot2::labeller(
+        patient = ggplot2::as_labeller(tcr_patient_facet_labels())
+      )
+    ) +
+    ggplot2::scale_fill_manual(
+      values = c(
+        "CSF + blood" = "#6C5CE7",
+        "CSF + sural" = "#D1495B",
+        "blood + sural" = "#00798C",
+        "CSF + blood + sural" = "#E09F3E"
+      ),
+      guide = "none"
+    ) +
+    ggplot2::scale_y_continuous(
+      breaks = scales::breaks_pretty(),
+      labels = scales::label_percent(scale = 1),
+      expand = ggplot2::expansion(mult = c(0, 0.15))
+    ) +
+    ggplot2::labs(
+      title = "Normalized exact TCR clonotype overlap across tissues",
+      subtitle = "Jaccard overlap: shared clonotypes divided by the tissue-union repertoire",
+      x = NULL,
+      y = "Jaccard overlap",
+      caption = "Labels show shared/union clonotypes; pairwise overlaps include clonotypes found in all three tissues."
+    ) +
+    ggplot2::theme_classic() +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
+      strip.text = ggplot2::element_text(face = "bold")
+    )
+  ggplot2::ggsave(paths[[2L]], plot, width = 13, height = 7)
+  paths
 }
 
 prepare_sural_tcr_expansion <- function(beta, chain_comparisons) {
@@ -1316,7 +1466,13 @@ prepare_sural_tcr_cluster_enrichment <- function(
         "Benjamini-Hochberg within each chain"
       )
     ),
-    cluster_levels = names(sc_tcr@misc$cluster_col)
+    cluster_levels = names(sc_tcr@misc$cluster_col),
+    patient_levels = levels(beta$tracking$patient),
+    patient_coverage = tibble::tibble(
+      patient = levels(beta$tracking$patient),
+      study_cluster_annotations = levels(beta$tracking$patient) %in%
+        unique(results$patient)
+    )
   )
 }
 
@@ -1329,6 +1485,7 @@ write_sural_tcr_cluster_enrichment_workbook <- function(enrichment) {
   writexl::write_xlsx(
     list(
       enrichment = enrichment$results,
+      patient_coverage = enrichment$patient_coverage,
       parameters = enrichment$parameters
     ),
     path
@@ -1348,7 +1505,7 @@ write_sural_tcr_cluster_enrichment_plot <- function(enrichment) {
       .data$shared_clonotypes_in_cluster > 0L
     ) |>
     dplyr::mutate(
-      patient = factor(.data$patient, levels = c("P18", "P28", "P29")),
+      patient = factor(.data$patient, levels = enrichment$patient_levels),
       tissue = factor(.data$tissue, levels = c("CSF", "PBMC")),
       chain = factor(.data$chain, levels = c("TRA", "TRB")),
       cluster = factor(.data$cluster, levels = rev(enrichment$cluster_levels)),
@@ -1358,6 +1515,21 @@ write_sural_tcr_cluster_enrichment_plot <- function(enrichment) {
         TRUE ~ "FDR > 0.05"
       )
     )
+  missing_patients <- setdiff(
+    enrichment$patient_levels,
+    unique(enrichment$results$patient)
+  )
+  subtitle <- paste(
+    "Color: cell-weighted log2 observed/expected; size: shared clonotypes;",
+    "black outline: clonotype-permutation FDR <= 0.05; tests require >=3 clones"
+  )
+  if (length(missing_patients) > 0L) {
+    subtitle <- paste0(
+      subtitle,
+      ". Not shown without study-cluster annotations: ",
+      paste(missing_patients, collapse = ", ")
+    )
+  }
   plot <- ggplot2::ggplot(
     data,
     ggplot2::aes(x = .data$tissue, y = .data$cluster)
@@ -1373,7 +1545,10 @@ write_sural_tcr_cluster_enrichment_plot <- function(enrichment) {
     ) +
     ggplot2::facet_grid(
       rows = ggplot2::vars(.data$chain),
-      cols = ggplot2::vars(.data$patient)
+      cols = ggplot2::vars(.data$patient),
+      labeller = ggplot2::labeller(
+        patient = ggplot2::as_labeller(tcr_patient_facet_labels())
+      )
     ) +
     ggplot2::scale_size_continuous(
       range = c(0, 8),
@@ -1396,10 +1571,7 @@ write_sural_tcr_cluster_enrichment_plot <- function(enrichment) {
     ) +
     ggplot2::labs(
       title = "Cluster enrichment of sural-shared TCR clonotypes",
-      subtitle = paste(
-        "Color: cell-weighted log2 observed/expected; size: shared clonotypes;",
-        "black outline: clonotype-permutation FDR <= 0.05; tests require >=3 clones"
-      ),
+      subtitle = stringr::str_wrap(subtitle, width = 105),
       x = NULL,
       y = NULL,
       size = "Shared\nclonotypes",

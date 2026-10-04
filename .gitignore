@@ -15,6 +15,9 @@
 !.dockerignore
 !.gitignore
 !README.md
+!.vscode/
+.vscode/*
+!.vscode/settings.json
 
 # Local binary dependencies are never tracked.
 /references/

@@ -74,6 +74,14 @@ targets_annotation <- list(
     format = "file"
   ),
   tar_target(
+    chemokine_receptor_dotplot_file,
+    write_chemokine_receptor_dotplot(
+      sc_annotated,
+      "results/targets/dotplot/dp_ccr_cxcr_by_diagnosis_celltype.pdf"
+    ),
+    format = "file"
+  ),
+  tar_target(
     annotated_umap,
     write_annotation_umap(sc_annotated, "results/targets/umap/umap_annotated.pdf"),
     format = "file"

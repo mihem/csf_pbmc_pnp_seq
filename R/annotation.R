@@ -186,3 +186,74 @@ write_annotation_dotplot <- function(
   ggplot2::ggsave(path, plot, width = width, height = height)
   path
 }
+
+write_chemokine_receptor_dotplot <- function(object, path) {
+  required_metadata <- c("cluster", "diagnosis", "tissue")
+  stopifnot(
+    inherits(object, "Seurat"),
+    all(required_metadata %in% colnames(object[[]]))
+  )
+
+  receptors <- grep("^(CCR|CXCR)[0-9]+$", rownames(object), value = TRUE)
+  receptor_number <- as.integer(sub("^(CCR|CXCR)", "", receptors))
+  receptors <- receptors[order(sub("[0-9]+$", "", receptors), receptor_number)]
+  stopifnot(length(receptors) > 0L)
+
+  object$receptor_group <- interaction(
+    object$tissue,
+    object$diagnosis,
+    object$cluster,
+    sep = "|||",
+    drop = TRUE
+  )
+  tissue_levels <- if (is.factor(object$tissue)) {
+    levels(object$tissue)
+  } else {
+    sort(unique(object$tissue))
+  }
+  diagnosis_levels <- if (is.factor(object$diagnosis)) {
+    levels(object$diagnosis)
+  } else {
+    sort(unique(object$diagnosis))
+  }
+  Seurat::DefaultAssay(object) <- "RNA"
+  dot_data <- Seurat::DotPlot(
+    object,
+    features = receptors,
+    group.by = "receptor_group",
+    dot.min = 0,
+    scale = TRUE
+  )$data
+  groups <- stringr::str_split_fixed(as.character(dot_data$id), "\\|\\|\\|", 3L)
+  dot_data$tissue <- factor(groups[, 1L], levels = tissue_levels)
+  dot_data$diagnosis <- factor(groups[, 2L], levels = diagnosis_levels)
+  dot_data$cluster <- factor(groups[, 3L], levels = object@misc$cluster_order)
+  dot_data$features.plot <- factor(dot_data$features.plot, levels = receptors)
+
+  plot <- ggplot2::ggplot(
+    dot_data,
+    ggplot2::aes(
+      x = features.plot,
+      y = cluster,
+      size = pct.exp,
+      color = avg.exp.scaled
+    )
+  ) +
+    ggplot2::geom_point() +
+    ggplot2::facet_grid(tissue ~ diagnosis, drop = FALSE) +
+    viridis::scale_color_viridis(option = "viridis", name = "Scaled average\nexpression") +
+    ggplot2::scale_size(range = c(0, 5), name = "Percent expressed") +
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(
+        angle = 90, vjust = 0.5, hjust = 1, face = "italic"
+      ),
+      panel.grid = ggplot2::element_blank(),
+      strip.text.x = ggplot2::element_text(angle = 90)
+    ) +
+    ggplot2::labs(x = NULL, y = NULL)
+
+  ensure_parent_dir(path)
+  ggplot2::ggsave(path, plot, width = 24, height = 14, limitsize = FALSE)
+  path
+}
